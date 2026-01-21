@@ -121,10 +121,27 @@
       text-align: center;
       align-self: center;
     }
+
+    /* Eraser cursor indicator */
+    .eraser-cursor {
+      position: fixed;
+      border: 2px solid rgba(0, 0, 0, 0.5);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 1000;
+      display: none;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .eraser-cursor.visible {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <canvas id="canvas"></canvas>
+  <div class="eraser-cursor" id="eraserCursor"></div>
 
   <div class="toolbar-trigger"></div>
   <div class="toolbar" id="toolbar">
@@ -164,6 +181,22 @@
     let baseSize = 2;
     let isEraser = false;
     let activeEraser = false; // True during stroke if using eraser tip or eraser tool
+
+    // Eraser cursor indicator
+    const eraserCursor = document.getElementById('eraserCursor');
+
+    function updateEraserCursor(x, y, show) {
+      if (show) {
+        const size = (getStrokeWidth(0.5) + 10) * 2; // Match eraser size (doubled)
+        eraserCursor.style.width = size + 'px';
+        eraserCursor.style.height = size + 'px';
+        eraserCursor.style.left = x + 'px';
+        eraserCursor.style.top = y + 'px';
+        eraserCursor.classList.add('visible');
+      } else {
+        eraserCursor.classList.remove('visible');
+      }
+    }
 
     // High DPI support
     function resizeCanvas() {
@@ -210,6 +243,9 @@
       lastY = pos.y;
       lastPressure = pos.pressure;
 
+      // Show eraser cursor
+      updateEraserCursor(e.clientX, e.clientY, activeEraser);
+
       // Set composite operation for eraser (destination-out removes pixels)
       if (activeEraser) {
         ctx.globalCompositeOperation = 'destination-out';
@@ -230,11 +266,14 @@
       const width = getStrokeWidth(pos.pressure);
       const lastWidth = getStrokeWidth(lastPressure);
 
+      // Update eraser cursor position
+      updateEraserCursor(e.clientX, e.clientY, activeEraser);
+
       ctx.beginPath();
       ctx.moveTo(lastX, lastY);
       ctx.lineTo(pos.x, pos.y);
       ctx.strokeStyle = activeEraser ? 'rgba(0,0,0,1)' : strokeColor;
-      ctx.lineWidth = activeEraser ? (width + lastWidth) / 2 + 10 : (width + lastWidth) / 2;
+      ctx.lineWidth = activeEraser ? ((width + lastWidth) / 2 + 10) * 2 : (width + lastWidth) / 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.stroke();
@@ -246,6 +285,7 @@
 
     function endStroke() {
       isDrawing = false;
+      updateEraserCursor(0, 0, false); // Hide eraser cursor
     }
 
     function getStrokeWidth(pressure) {
@@ -255,9 +295,20 @@
     }
 
     canvas.addEventListener('pointerdown', startStroke);
-    canvas.addEventListener('pointermove', continueStroke);
+    canvas.addEventListener('pointermove', (e) => {
+      continueStroke(e);
+      // Show eraser cursor on hover when eraser tool is selected
+      if (!isDrawing && (isEraser || isEraserTip(e))) {
+        updateEraserCursor(e.clientX, e.clientY, true);
+      } else if (!isDrawing) {
+        updateEraserCursor(0, 0, false);
+      }
+    });
     canvas.addEventListener('pointerup', endStroke);
-    canvas.addEventListener('pointerleave', endStroke);
+    canvas.addEventListener('pointerleave', (e) => {
+      endStroke();
+      updateEraserCursor(0, 0, false); // Hide cursor when leaving canvas
+    });
     canvas.addEventListener('pointercancel', endStroke);
 
     canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
