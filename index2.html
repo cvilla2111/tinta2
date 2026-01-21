@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Canvas</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #fff;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    /* Minimal toolbar - appears on hover at top */
+    .toolbar {
+      position: fixed;
+      top: -50px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      padding: 10px 16px;
+      background: rgba(30, 30, 30, 0.9);
+      border-radius: 0 0 12px 12px;
+      backdrop-filter: blur(10px);
+      transition: top 0.3s ease;
+      z-index: 100;
+    }
+
+    .toolbar:hover,
+    .toolbar.visible {
+      top: 0;
+    }
+
+    /* Hover zone to trigger toolbar */
+    .toolbar-trigger {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 20px;
+      z-index: 99;
+    }
+
+    .toolbar-trigger:hover + .toolbar,
+    .toolbar-trigger:hover ~ .toolbar {
+      top: 0;
+    }
+
+    .btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+      font-size: 16px;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn.active {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .color-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+
+    .color-btn:hover {
+      transform: scale(1.15);
+    }
+
+    .color-btn.active {
+      border-color: #fff;
+    }
+
+    .separator {
+      width: 1px;
+      background: rgba(255, 255, 255, 0.2);
+      margin: 0 4px;
+    }
+
+    .size-indicator {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 11px;
+      font-family: system-ui, sans-serif;
+      min-width: 28px;
+      text-align: center;
+      align-self: center;
+    }
+
+    .zoom-indicator {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      font-family: system-ui, sans-serif;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.4);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 4px 10px;
+      border-radius: 4px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .zoom-indicator.visible {
+      opacity: 1;
+    }
+
+    .stroke-count {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      font-family: system-ui, sans-serif;
+      font-size: 11px;
+      color: rgba(0, 0, 0, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div class="toolbar-trigger"></div>
+  <div class="toolbar" id="toolbar">
+    <!-- Colors -->
+    <button class="color-btn active" style="background: #1a1a1a;" data-color="#1a1a1a" title="Black"></button>
+    <button class="color-btn" style="background: #e74c3c;" data-color="#e74c3c" title="Red"></button>
+    <button class="color-btn" style="background: #3498db;" data-color="#3498db" title="Blue"></button>
+    <button class="color-btn" style="background: #27ae60;" data-color="#27ae60" title="Green"></button>
+
+    <div class="separator"></div>
+
+    <!-- Size controls -->
+    <button class="btn" id="sizeDown" title="Smaller [ ">−</button>
+    <span class="size-indicator" id="sizeDisplay">2</span>
+    <button class="btn" id="sizeUp" title="Larger ]">+</button>
+
+    <div class="separator"></div>
+
+    <!-- Tools -->
+    <button class="btn" id="undoBtn" title="Undo (Ctrl+Z)">↶</button>
+    <button class="btn" id="redoBtn" title="Redo (Ctrl+Y)">↷</button>
+    <button class="btn" id="eraserBtn" title="Eraser (E)">⌫</button>
+
+    <div class="separator"></div>
+
+    <!-- Zoom -->
+    <button class="btn" id="zoomOutBtn" title="Zoom Out">−🔍</button>
+    <button class="btn" id="zoomInBtn" title="Zoom In">+🔍</button>
+    <button class="btn" id="zoomResetBtn" title="Reset Zoom">1:1</button>
+
+    <div class="separator"></div>
+
+    <button class="btn" id="clearBtn" title="Clear All">✕</button>
+  </div>
+
+  <div class="zoom-indicator" id="zoomIndicator">100%</div>
+  <div class="stroke-count" id="strokeCount">0 strokes</div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { desynchronized: true });
+
+    // ==================== VECTOR STROKE STORAGE ====================
+    let strokes = [];           // Array of stroke objects
+    let currentStroke = null;   // Stroke being drawn
+    let undoStack = [];         // For redo functionality
+
+    // Stroke structure:
+    // { points: [{x, y, pressure}, ...], color: '#000', baseSize: 2 }
+
+    // ==================== STATE ====================
+    let isDrawing = false;
+    let strokeColor = '#1a1a1a';
+    let baseSize = 2;
+    let isEraser = false;
+    let zoomLevel = 1;
+    let panX = 0;
+    let panY = 0;
+    let dpr = 1;
+
+    // ==================== CANVAS SETUP ====================
+    function resizeCanvas() {
+      dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+
+      render();
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // ==================== RENDER (Vector) ====================
+    function render() {
+      const rect = canvas.getBoundingClientRect();
+
+      // Clear canvas
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Apply transforms: DPR, then zoom and pan
+      ctx.setTransform(dpr * zoomLevel, 0, 0, dpr * zoomLevel, panX * dpr, panY * dpr);
+
+      // Draw all completed strokes
+      for (const stroke of strokes) {
+        drawStroke(stroke);
+      }
+
+      // Draw current stroke being drawn
+      if (currentStroke && currentStroke.points.length > 0) {
+        drawStroke(currentStroke);
+      }
+
+      updateStrokeCount();
+    }
+
+    function drawStroke(stroke) {
+      const points = stroke.points;
+      if (points.length === 0) return;
+
+      ctx.strokeStyle = stroke.color;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (points.length === 1) {
+        // Single point - draw a dot
+        const p = points[0];
+        const width = getStrokeWidth(p.pressure, stroke.baseSize);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, width / 2, 0, Math.PI * 2);
+        ctx.fillStyle = stroke.color;
+        ctx.fill();
+        return;
+      }
+
+      // Draw stroke with variable width based on pressure
+      for (let i = 1; i < points.length; i++) {
+        const p0 = points[i - 1];
+        const p1 = points[i];
+
+        const w0 = getStrokeWidth(p0.pressure, stroke.baseSize);
+        const w1 = getStrokeWidth(p1.pressure, stroke.baseSize);
+
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.lineWidth = (w0 + w1) / 2;
+        ctx.stroke();
+      }
+    }
+
+    function getStrokeWidth(pressure, size) {
+      const minWidth = size * 0.3;
+      const maxWidth = size * 2.5;
+      return minWidth + (maxWidth - minWidth) * pressure;
+    }
+
+    // ==================== POINTER EVENTS ====================
+    function getPointerPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      // Convert screen coords to canvas coords (accounting for zoom/pan)
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+      return {
+        x: (screenX - panX) / zoomLevel,
+        y: (screenY - panY) / zoomLevel,
+        pressure: e.pressure || 0.5
+      };
+    }
+
+    function startStroke(e) {
+      if (e.pointerType === 'touch' && !e.isPrimary) return;
+
+      const pos = getPointerPos(e);
+
+      if (isEraser) {
+        eraseAtPoint(pos.x, pos.y);
+        isDrawing = true;
+        return;
+      }
+
+      isDrawing = true;
+      currentStroke = {
+        points: [{ x: pos.x, y: pos.y, pressure: pos.pressure }],
+        color: strokeColor,
+        baseSize: baseSize
+      };
+
+      // Clear redo stack when new stroke starts
+      undoStack = [];
+      updateUndoRedoButtons();
+
+      render();
+    }
+
+    function continueStroke(e) {
+      if (!isDrawing) return;
+
+      const pos = getPointerPos(e);
+
+      if (isEraser) {
+        eraseAtPoint(pos.x, pos.y);
+        return;
+      }
+
+      if (currentStroke) {
+        currentStroke.points.push({
+          x: pos.x,
+          y: pos.y,
+          pressure: pos.pressure
+        });
+        render();
+      }
+    }
+
+    function endStroke(e) {
+      if (!isDrawing) return;
+
+      if (currentStroke && currentStroke.points.length > 0) {
+        strokes.push(currentStroke);
+        currentStroke = null;
+      }
+
+      isDrawing = false;
+      updateUndoRedoButtons();
+      render();
+    }
+
+    // ==================== ERASER (Stroke-based) ====================
+    function eraseAtPoint(x, y) {
+      const eraseRadius = baseSize * 5;
+      let didErase = false;
+
+      strokes = strokes.filter(stroke => {
+        for (const p of stroke.points) {
+          const dx = p.x - x;
+          const dy = p.y - y;
+          if (dx * dx + dy * dy < eraseRadius * eraseRadius) {
+            didErase = true;
+            return false; // Remove this stroke
+          }
+        }
+        return true; // Keep this stroke
+      });
+
+      if (didErase) {
+        undoStack = []; // Clear redo on erase
+        updateUndoRedoButtons();
+        render();
+      }
+    }
+
+    // ==================== UNDO / REDO ====================
+    function undo() {
+      if (strokes.length === 0) return;
+      const stroke = strokes.pop();
+      undoStack.push(stroke);
+      updateUndoRedoButtons();
+      render();
+    }
+
+    function redo() {
+      if (undoStack.length === 0) return;
+      const stroke = undoStack.pop();
+      strokes.push(stroke);
+      updateUndoRedoButtons();
+      render();
+    }
+
+    function updateUndoRedoButtons() {
+      document.getElementById('undoBtn').disabled = strokes.length === 0;
+      document.getElementById('redoBtn').disabled = undoStack.length === 0;
+    }
+
+    // ==================== ZOOM ====================
+    function setZoom(newZoom, centerX, centerY) {
+      const rect = canvas.getBoundingClientRect();
+      centerX = centerX ?? rect.width / 2;
+      centerY = centerY ?? rect.height / 2;
+
+      const oldZoom = zoomLevel;
+      zoomLevel = Math.max(0.25, Math.min(5, newZoom));
+
+      // Adjust pan to zoom toward center point
+      panX = centerX - (centerX - panX) * (zoomLevel / oldZoom);
+      panY = centerY - (centerY - panY) * (zoomLevel / oldZoom);
+
+      showZoomIndicator();
+      render();
+    }
+
+    function resetZoom() {
+      zoomLevel = 1;
+      panX = 0;
+      panY = 0;
+      showZoomIndicator();
+      render();
+    }
+
+    function showZoomIndicator() {
+      const indicator = document.getElementById('zoomIndicator');
+      indicator.textContent = Math.round(zoomLevel * 100) + '%';
+      indicator.classList.add('visible');
+      clearTimeout(indicator._timeout);
+      indicator._timeout = setTimeout(() => {
+        indicator.classList.remove('visible');
+      }, 1500);
+    }
+
+    // Mouse wheel zoom
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      setZoom(zoomLevel * delta, e.clientX - rect.left, e.clientY - rect.top);
+    }, { passive: false });
+
+    // ==================== EVENT LISTENERS ====================
+    canvas.addEventListener('pointerdown', startStroke);
+    canvas.addEventListener('pointermove', continueStroke);
+    canvas.addEventListener('pointerup', endStroke);
+    canvas.addEventListener('pointerleave', endStroke);
+    canvas.addEventListener('pointercancel', endStroke);
+
+    canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+    // ==================== TOOLBAR ====================
+    const toolbar = document.getElementById('toolbar');
+    const colorBtns = document.querySelectorAll('.color-btn');
+    const sizeDisplay = document.getElementById('sizeDisplay');
+    const eraserBtn = document.getElementById('eraserBtn');
+
+    colorBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        colorBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        strokeColor = btn.dataset.color;
+        isEraser = false;
+        eraserBtn.classList.remove('active');
+      });
+    });
+
+    document.getElementById('sizeUp').addEventListener('click', () => {
+      baseSize = Math.min(20, baseSize + 1);
+      sizeDisplay.textContent = baseSize;
+    });
+
+    document.getElementById('sizeDown').addEventListener('click', () => {
+      baseSize = Math.max(1, baseSize - 1);
+      sizeDisplay.textContent = baseSize;
+    });
+
+    eraserBtn.addEventListener('click', () => {
+      isEraser = !isEraser;
+      eraserBtn.classList.toggle('active', isEraser);
+      if (isEraser) {
+        colorBtns.forEach(b => b.classList.remove('active'));
+      } else {
+        document.querySelector(`[data-color="${strokeColor}"]`)?.classList.add('active');
+      }
+    });
+
+    document.getElementById('undoBtn').addEventListener('click', undo);
+    document.getElementById('redoBtn').addEventListener('click', redo);
+
+    document.getElementById('zoomInBtn').addEventListener('click', () => setZoom(zoomLevel * 1.25));
+    document.getElementById('zoomOutBtn').addEventListener('click', () => setZoom(zoomLevel / 1.25));
+    document.getElementById('zoomResetBtn').addEventListener('click', resetZoom);
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      if (strokes.length > 0) {
+        undoStack = [...strokes]; // Allow undo of clear
+        strokes = [];
+        updateUndoRedoButtons();
+        render();
+      }
+    });
+
+    toolbar.addEventListener('pointerdown', e => e.stopPropagation());
+
+    // ==================== KEYBOARD SHORTCUTS ====================
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            redo();
+          } else {
+            undo();
+          }
+        } else if (e.key === 'y') {
+          e.preventDefault();
+          redo();
+        } else if (e.key === '0') {
+          e.preventDefault();
+          resetZoom();
+        } else if (e.key === '=') {
+          e.preventDefault();
+          setZoom(zoomLevel * 1.25);
+        } else if (e.key === '-') {
+          e.preventDefault();
+          setZoom(zoomLevel / 1.25);
+        }
+      } else {
+        if (e.key === 'e' || e.key === 'E') {
+          eraserBtn.click();
+        } else if (e.key === '[') {
+          document.getElementById('sizeDown').click();
+        } else if (e.key === ']') {
+          document.getElementById('sizeUp').click();
+        } else if (e.key >= '1' && e.key <= '4') {
+          const idx = parseInt(e.key) - 1;
+          if (colorBtns[idx]) colorBtns[idx].click();
+        }
+      }
+    });
+
+    // ==================== STROKE COUNT ====================
+    function updateStrokeCount() {
+      const count = strokes.length + (currentStroke ? 1 : 0);
+      document.getElementById('strokeCount').textContent = count + ' stroke' + (count !== 1 ? 's' : '');
+    }
+
+    // Initial render
+    updateUndoRedoButtons();
+    render();
+  </script>
+</body>
+</html>
