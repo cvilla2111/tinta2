@@ -1,9 +1,312 @@
-193     }
-  194 
-  195     function startStroke(e) {
-- 196       if (e.pointerType === 'touch' && e.isPrimary === false) return;
-+ 196       // Only allow pen (stylus) input - disable finger/touch
-+ 197       if (e.pointerType === 'touch') return;
-  198 
-  199       isDrawing = true;
-  200       const pos = getPointerPos(e);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Canvas</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #fff;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    /* Minimal toolbar - appears on hover at top */
+    .toolbar {
+      position: fixed;
+      top: -50px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      padding: 10px 16px;
+      background: rgba(30, 30, 30, 0.9);
+      border-radius: 0 0 12px 12px;
+      backdrop-filter: blur(10px);
+      transition: top 0.3s ease;
+      z-index: 100;
+    }
+
+    .toolbar:hover,
+    .toolbar.visible {
+      top: 0;
+    }
+
+    /* Hover zone to trigger toolbar */
+    .toolbar-trigger {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 20px;
+      z-index: 99;
+    }
+
+    .toolbar-trigger:hover + .toolbar,
+    .toolbar-trigger:hover ~ .toolbar {
+      top: 0;
+    }
+
+    .btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+      font-size: 16px;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn.active {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .color-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+
+    .color-btn:hover {
+      transform: scale(1.15);
+    }
+
+    .color-btn.active {
+      border-color: #fff;
+    }
+
+    .separator {
+      width: 1px;
+      background: rgba(255, 255, 255, 0.2);
+      margin: 0 4px;
+    }
+
+    .size-indicator {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 11px;
+      font-family: system-ui, sans-serif;
+      min-width: 28px;
+      text-align: center;
+      align-self: center;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div class="toolbar-trigger"></div>
+  <div class="toolbar" id="toolbar">
+    <!-- Colors -->
+    <button class="color-btn active" style="background: #1a1a1a;" data-color="#1a1a1a" title="Black"></button>
+    <button class="color-btn" style="background: #e74c3c;" data-color="#e74c3c" title="Red"></button>
+    <button class="color-btn" style="background: #3498db;" data-color="#3498db" title="Blue"></button>
+    <button class="color-btn" style="background: #27ae60;" data-color="#27ae60" title="Green"></button>
+
+    <div class="separator"></div>
+
+    <!-- Size controls -->
+    <button class="btn" id="sizeDown" title="Smaller">−</button>
+    <span class="size-indicator" id="sizeDisplay">2</span>
+    <button class="btn" id="sizeUp" title="Larger">+</button>
+
+    <div class="separator"></div>
+
+    <!-- Tools -->
+    <button class="btn" id="eraserBtn" title="Eraser">⌫</button>
+    <button class="btn" id="clearBtn" title="Clear All">✕</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', {
+      willReadFrequently: false,
+      desynchronized: true
+    });
+
+    // State
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+    let lastPressure = 0.5;
+    let strokeColor = '#1a1a1a';
+    let baseSize = 2;
+    let isEraser = false;
+
+    // High DPI support
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+
+      ctx.scale(dpr, dpr);
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, rect.width, rect.height);
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    function getPointerPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+        pressure: e.pressure || 0.5
+      };
+    }
+
+    function startStroke(e) {
+      // Only allow pen (stylus) input - disable finger/touch
+      if (e.pointerType === 'touch') return;
+
+      isDrawing = true;
+      const pos = getPointerPos(e);
+      lastX = pos.x;
+      lastY = pos.y;
+      lastPressure = pos.pressure;
+
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, getStrokeWidth(pos.pressure) / 2, 0, Math.PI * 2);
+      ctx.fillStyle = isEraser ? '#ffffff' : strokeColor;
+      ctx.fill();
+    }
+
+    function continueStroke(e) {
+      if (!isDrawing) return;
+
+      const pos = getPointerPos(e);
+      const width = getStrokeWidth(pos.pressure);
+      const lastWidth = getStrokeWidth(lastPressure);
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.strokeStyle = isEraser ? '#ffffff' : strokeColor;
+      ctx.lineWidth = (width + lastWidth) / 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      lastX = pos.x;
+      lastY = pos.y;
+      lastPressure = pos.pressure;
+    }
+
+    function endStroke() {
+      isDrawing = false;
+    }
+
+    function getStrokeWidth(pressure) {
+      const minWidth = baseSize * 0.3;
+      const maxWidth = baseSize * 2.5;
+      return minWidth + (maxWidth - minWidth) * pressure;
+    }
+
+    canvas.addEventListener('pointerdown', startStroke);
+    canvas.addEventListener('pointermove', continueStroke);
+    canvas.addEventListener('pointerup', endStroke);
+    canvas.addEventListener('pointerleave', endStroke);
+    canvas.addEventListener('pointercancel', endStroke);
+
+    canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+    // Toolbar
+    const toolbar = document.getElementById('toolbar');
+    const colorBtns = document.querySelectorAll('.color-btn');
+    const sizeDisplay = document.getElementById('sizeDisplay');
+    const eraserBtn = document.getElementById('eraserBtn');
+
+    colorBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        colorBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        strokeColor = btn.dataset.color;
+        isEraser = false;
+        eraserBtn.classList.remove('active');
+      });
+    });
+
+    document.getElementById('sizeUp').addEventListener('click', () => {
+      baseSize = Math.min(20, baseSize + 1);
+      sizeDisplay.textContent = baseSize;
+    });
+
+    document.getElementById('sizeDown').addEventListener('click', () => {
+      baseSize = Math.max(1, baseSize - 1);
+      sizeDisplay.textContent = baseSize;
+    });
+
+    eraserBtn.addEventListener('click', () => {
+      isEraser = !isEraser;
+      eraserBtn.classList.toggle('active', isEraser);
+      if (isEraser) {
+        colorBtns.forEach(b => b.classList.remove('active'));
+      } else {
+        document.querySelector(`[data-color="${strokeColor}"]`)?.classList.add('active');
+      }
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      const rect = canvas.getBoundingClientRect();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, rect.width, rect.height);
+    });
+
+    toolbar.addEventListener('pointerdown', e => e.stopPropagation());
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+      if (e.key === 'e' || e.key === 'E') {
+        eraserBtn.click();
+      } else if (e.key === 'c' || e.key === 'C') {
+        document.getElementById('clearBtn').click();
+      } else if (e.key === '[') {
+        document.getElementById('sizeDown').click();
+      } else if (e.key === ']') {
+        document.getElementById('sizeUp').click();
+      } else if (e.key >= '1' && e.key <= '4') {
+        const idx = parseInt(e.key) - 1;
+        if (colorBtns[idx]) colorBtns[idx].click();
+      }
+    });
+  </script>
+</body>
+</html>
