@@ -169,7 +169,7 @@
 
     .selection-box.moving {
       cursor: move;
-      pointer-events: auto;
+      /* pointer-events stays none - movement handled through canvas */
     }
 
   </style>
@@ -178,9 +178,9 @@
   <div class="canvas-container">
     <canvas id="canvas"></canvas>
     <canvas id="lassoCanvas"></canvas>
+    <div class="selection-box" id="selectionBox"></div>
   </div>
   <div class="eraser-cursor" id="eraserCursor"></div>
-  <div class="selection-box" id="selectionBox"></div>
 
   <div class="toolbar-trigger"></div>
   <div class="toolbar" id="toolbar">
@@ -359,14 +359,16 @@
       selectionBounds = bounds;
       const dpr = window.devicePixelRatio || 1;
 
-      // Create a temporary canvas to extract selection with mask
+      // Create a temporary canvas at full DPR resolution to preserve quality
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = bounds.width * dpr;
       tempCanvas.height = bounds.height * dpr;
       const tempCtx = tempCanvas.getContext('2d');
+
+      // Scale context for DPR
       tempCtx.scale(dpr, dpr);
 
-      // Create clipping path from lasso
+      // Create clipping path from lasso (in local CSS coordinates)
       tempCtx.beginPath();
       tempCtx.moveTo(lassoPath[0].x - bounds.x, lassoPath[0].y - bounds.y);
       for (let i = 1; i < lassoPath.length; i++) {
@@ -376,6 +378,7 @@
       tempCtx.clip();
 
       // Draw the main canvas content into the clipped area
+      // Source is in actual canvas pixels (scaled by DPR), dest is in CSS pixels (but context is scaled)
       tempCtx.drawImage(
         canvas,
         bounds.x * dpr, bounds.y * dpr, bounds.width * dpr, bounds.height * dpr,
@@ -412,7 +415,7 @@
       drawSelectionPreview();
 
       // Clear lasso path display
-      clearLassoCanvas();
+      lassoPath = [];
     }
 
     // Draw selection preview on lasso canvas
@@ -423,7 +426,13 @@
       const x = selectionBounds.x + selectionOffsetX;
       const y = selectionBounds.y + selectionOffsetY;
 
-      lassoCtx.drawImage(selectionImageData, x, y, selectionBounds.width, selectionBounds.height);
+      // Draw the DPR-scaled selection image at the current position
+      // Source is the full temp canvas, dest is in CSS pixels (lassoCtx is already scaled)
+      lassoCtx.drawImage(
+        selectionImageData,
+        0, 0, selectionImageData.width, selectionImageData.height,
+        x, y, selectionBounds.width, selectionBounds.height
+      );
     }
 
     // Commit selection to main canvas
@@ -434,7 +443,12 @@
       const y = selectionBounds.y + selectionOffsetY;
 
       ctx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(selectionImageData, x, y, selectionBounds.width, selectionBounds.height);
+      // Draw DPR-scaled selection back to main canvas (ctx is already scaled)
+      ctx.drawImage(
+        selectionImageData,
+        0, 0, selectionImageData.width, selectionImageData.height,
+        x, y, selectionBounds.width, selectionBounds.height
+      );
 
       cancelSelection();
     }
@@ -453,21 +467,9 @@
 
     // Start lasso drawing
     function startLasso(e) {
-      // If we have a selection and click inside it, start moving
-      if (hasSelection && selectionBounds) {
-        const pos = getPointerPos(e);
-        const x = selectionBounds.x + selectionOffsetX;
-        const y = selectionBounds.y + selectionOffsetY;
-        if (pos.x >= x && pos.x <= x + selectionBounds.width &&
-            pos.y >= y && pos.y <= y + selectionBounds.height) {
-          isMovingSelection = true;
-          moveStartX = pos.x;
-          moveStartY = pos.y;
-          return;
-        } else {
-          // Click outside selection - commit it
-          commitSelection();
-        }
+      // If we have a selection, commit it first before starting new lasso
+      if (hasSelection) {
+        commitSelection();
       }
 
       isLassoDrawing = true;
@@ -479,23 +481,6 @@
 
     // Continue lasso drawing
     function continueLasso(e) {
-      if (isMovingSelection && hasSelection) {
-        const pos = getPointerPos(e);
-        const dx = pos.x - moveStartX;
-        const dy = pos.y - moveStartY;
-        selectionOffsetX += dx;
-        selectionOffsetY += dy;
-        moveStartX = pos.x;
-        moveStartY = pos.y;
-
-        // Update selection box position
-        selectionBox.style.left = (selectionBounds.x + selectionOffsetX) + 'px';
-        selectionBox.style.top = (selectionBounds.y + selectionOffsetY) + 'px';
-
-        drawSelectionPreview();
-        return;
-      }
-
       if (!isLassoDrawing) return;
 
       const pos = getPointerPos(e);
@@ -505,11 +490,6 @@
 
     // End lasso drawing
     function endLasso() {
-      if (isMovingSelection) {
-        isMovingSelection = false;
-        return;
-      }
-
       if (!isLassoDrawing) return;
       isLassoDrawing = false;
 
@@ -535,17 +515,32 @@
       // Only allow pen (stylus) input - disable finger/touch
       if (e.pointerType === 'touch') return;
 
+      // If we have an active selection, check if touching inside or outside
+      if (hasSelection && selectionBounds) {
+        const pos = getPointerPos(e);
+        const x = selectionBounds.x + selectionOffsetX;
+        const y = selectionBounds.y + selectionOffsetY;
+
+        if (pos.x >= x && pos.x <= x + selectionBounds.width &&
+            pos.y >= y && pos.y <= y + selectionBounds.height) {
+          // Touch inside selection - start moving (with any input, not just barrel button)
+          isMovingSelection = true;
+          moveStartX = pos.x;
+          moveStartY = pos.y;
+          e.preventDefault();
+          return;
+        } else {
+          // Touch outside selection - commit it and continue with normal stroke
+          commitSelection();
+        }
+      }
+
       // Check for barrel button - activate lasso mode
       if (isBarrelButton(e)) {
         isLassoMode = true;
         startLasso(e);
         e.preventDefault();
         return;
-      }
-
-      // If we have a selection and start drawing, commit the selection first
-      if (hasSelection) {
-        commitSelection();
       }
 
       isDrawing = true;
@@ -598,7 +593,25 @@
     }
 
     function continueStroke(e) {
-      // Handle lasso mode
+      // Handle moving selection (can happen outside of lasso mode now)
+      if (isMovingSelection && hasSelection) {
+        const pos = getPointerPos(e);
+        const dx = pos.x - moveStartX;
+        const dy = pos.y - moveStartY;
+        selectionOffsetX += dx;
+        selectionOffsetY += dy;
+        moveStartX = pos.x;
+        moveStartY = pos.y;
+
+        // Update selection box position
+        selectionBox.style.left = (selectionBounds.x + selectionOffsetX) + 'px';
+        selectionBox.style.top = (selectionBounds.y + selectionOffsetY) + 'px';
+
+        drawSelectionPreview();
+        return;
+      }
+
+      // Handle lasso drawing mode
       if (isLassoMode) {
         continueLasso(e);
         return;
@@ -634,6 +647,13 @@
     }
 
     function endStroke(scheduleReset = true) {
+      // Handle end of moving selection
+      if (isMovingSelection) {
+        isMovingSelection = false;
+        // Selection stays active - user can move again or touch outside to commit
+        return;
+      }
+
       // Handle lasso mode end
       if (isLassoMode) {
         endLasso();
