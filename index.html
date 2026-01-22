@@ -275,6 +275,8 @@
     // Speed threshold for eraser boost
     const FAST_SPEED_THRESHOLD = 1200; // pixels per second
     const FAST_SAMPLES_REQUIRED = 5; // Must sustain fast speed for this many samples
+    const MIN_TIME_DELTA = 8; // Minimum ms between samples to avoid timing glitches
+    const MAX_REALISTIC_SPEED = 8000; // Maximum realistic speed in px/s
 
     // Debug variables
     let dbgPeakSpeed = 0;
@@ -472,7 +474,9 @@ Avg Event Rate: ${dbgEventRateEl.textContent}
       if (activeEraser) {
         const now = Date.now();
         const dt = now - lastEraseTime;
-        if (dt > 0) {
+
+        // Only process if enough time has passed (avoid timing glitches)
+        if (dt >= MIN_TIME_DELTA) {
           const dx = pos.x - lastEraseX;
           const dy = pos.y - lastEraseY;
           const distance = Math.sqrt(dx * dx + dy * dy);
@@ -481,17 +485,20 @@ Avg Event Rate: ${dbgEventRateEl.textContent}
           // Update debug panel
           updateDebugPanel(speed, dt, distance);
 
-          // Track consecutive fast samples before boosting
-          if (speed > FAST_SPEED_THRESHOLD) {
-            fastSampleCount++;
-            // Boost eraser only after sustained fast speed
-            if (fastSampleCount >= FAST_SAMPLES_REQUIRED && eraserSizeMultiplier === 1) {
-              eraserSizeMultiplier = 4;
-              eraserCursor.style.borderColor = 'rgba(255, 100, 100, 0.8)';
+          // Ignore unrealistic speed spikes and track consecutive fast samples
+          if (speed <= MAX_REALISTIC_SPEED) {
+            if (speed > FAST_SPEED_THRESHOLD) {
+              fastSampleCount++;
+              // Boost eraser only after sustained fast speed
+              if (fastSampleCount >= FAST_SAMPLES_REQUIRED && eraserSizeMultiplier === 1) {
+                eraserSizeMultiplier = 4;
+                eraserCursor.style.borderColor = 'rgba(255, 100, 100, 0.8)';
+              }
+            } else {
+              fastSampleCount = 0; // Reset if speed drops
             }
-          } else {
-            fastSampleCount = 0; // Reset if speed drops
           }
+          // If speed > MAX_REALISTIC_SPEED, ignore this sample (don't count or reset)
 
           lastEraseX = pos.x;
           lastEraseY = pos.y;
