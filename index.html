@@ -188,7 +188,7 @@
     let eraserTapCount = 0;
     let lastEraserLiftTime = 0;
     let eraserResetTimeout = null;
-    const DOUBLE_TAP_THRESHOLD = 400; // ms between taps to count as double-tap
+    const DOUBLE_TAP_THRESHOLD = 100; // ms between taps to count as double-tap
 
     // Eraser cursor indicator
     const eraserCursor = document.getElementById('eraserCursor');
@@ -304,6 +304,12 @@
       // Update eraser cursor position
       updateEraserCursor(e.clientX, e.clientY, activeEraser);
 
+      // Keep eraser boosted while actively erasing - cancel any pending reset
+      if (activeEraser && eraserResetTimeout) {
+        clearTimeout(eraserResetTimeout);
+        eraserResetTimeout = null;
+      }
+
       ctx.beginPath();
       ctx.moveTo(lastX, lastY);
       ctx.lineTo(pos.x, pos.y);
@@ -318,9 +324,9 @@
       lastPressure = pos.pressure;
     }
 
-    function endStroke() {
+    function endStroke(scheduleReset = true) {
       // Track eraser lift time and schedule reset
-      if (activeEraser) {
+      if (activeEraser && scheduleReset) {
         lastEraserLiftTime = Date.now();
 
         // Schedule reset after threshold - if no new tap comes, reset everything
@@ -351,12 +357,12 @@
         updateEraserCursor(0, 0, false);
       }
     });
-    canvas.addEventListener('pointerup', endStroke);
-    canvas.addEventListener('pointerleave', (e) => {
-      endStroke();
+    canvas.addEventListener('pointerup', () => endStroke(true));
+    canvas.addEventListener('pointerleave', () => {
+      endStroke(false); // Don't schedule reset on leave - only on actual lift
       updateEraserCursor(0, 0, false); // Hide cursor when leaving canvas
     });
-    canvas.addEventListener('pointercancel', endStroke);
+    canvas.addEventListener('pointercancel', () => endStroke(false));
 
     canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
     canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
