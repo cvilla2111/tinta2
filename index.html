@@ -37,10 +37,10 @@
       left: 0;
     }
 
-    /* Minimal toolbar - appears on hover at top */
+    /* Minimal toolbar - toggle visibility with button */
     .toolbar {
       position: fixed;
-      top: -50px;
+      top: -70px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
@@ -53,23 +53,7 @@
       z-index: 100;
     }
 
-    .toolbar:hover,
     .toolbar.visible {
-      top: 0;
-    }
-
-    /* Hover zone to trigger toolbar */
-    .toolbar-trigger {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 20px;
-      z-index: 99;
-    }
-
-    .toolbar-trigger:hover + .toolbar,
-    .toolbar-trigger:hover ~ .toolbar {
       top: 0;
     }
 
@@ -172,6 +156,34 @@
       /* pointer-events stays none - movement handled through canvas */
     }
 
+    /* Toggle toolbar button */
+    .toolbar-toggle {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: #555;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 101;
+      transition: color 0.2s;
+    }
+
+    .toolbar-toggle:hover {
+      color: #333;
+    }
+
+    .toolbar-toggle svg {
+      width: 20px;
+      height: 20px;
+    }
+
   </style>
 </head>
 <body>
@@ -182,7 +194,10 @@
   </div>
   <div class="eraser-cursor" id="eraserCursor"></div>
 
-  <div class="toolbar-trigger"></div>
+  <button class="toolbar-toggle" id="toolbarToggle" title="Toggle toolbar">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+  </button>
+
   <div class="toolbar" id="toolbar">
     <!-- Colors -->
     <button class="color-btn active" style="background: #1a1a1a;" data-color="#1a1a1a" title="Black"></button>
@@ -767,6 +782,13 @@
     });
 
     toolbar.addEventListener('pointerdown', e => e.stopPropagation());
+
+    // Toolbar toggle button
+    const toolbarToggle = document.getElementById('toolbarToggle');
+    toolbarToggle.addEventListener('click', () => {
+      toolbar.classList.toggle('visible');
+    });
+    toolbarToggle.addEventListener('pointerdown', e => e.stopPropagation());
 
     // Keyboard shortcuts
     document.addEventListener('keydown', e => {
