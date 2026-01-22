@@ -497,11 +497,27 @@
       createSelection();
     }
 
+    // Tilt compensation factor (pixels per degree of tilt)
+    // Adjust this value based on stylus geometry - higher values = more compensation
+    const TILT_COMPENSATION = 0.4;
+
     function getPointerPos(e) {
       const rect = canvas.getBoundingClientRect();
+      let x = e.clientX - rect.left;
+      let y = e.clientY - rect.top;
+
+      // Apply tilt compensation if tilt data is available
+      // tiltX and tiltY are in degrees (-90 to 90)
+      if (e.pointerType === 'pen' && typeof e.tiltX === 'number' && typeof e.tiltY === 'number') {
+        // Compensate position based on tilt angle
+        // When tilted, offset the position opposite to the tilt direction
+        x -= e.tiltX * TILT_COMPENSATION;
+        y -= e.tiltY * TILT_COMPENSATION;
+      }
+
       return {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: x,
+        y: y,
         pressure: e.pressure || 0.5
       };
     }
