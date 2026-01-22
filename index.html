@@ -144,13 +144,43 @@
       display: block;
     }
 
+    /* Lasso selection overlay */
+    #lassoCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* Selection indicator */
+    .selection-box {
+      position: absolute;
+      border: 2px dashed #4a8ea1;
+      background: rgba(74, 142, 161, 0.1);
+      pointer-events: none;
+      z-index: 11;
+      display: none;
+    }
+
+    .selection-box.visible {
+      display: block;
+    }
+
+    .selection-box.moving {
+      cursor: move;
+      pointer-events: auto;
+    }
+
   </style>
 </head>
 <body>
   <div class="canvas-container">
     <canvas id="canvas"></canvas>
+    <canvas id="lassoCanvas"></canvas>
   </div>
   <div class="eraser-cursor" id="eraserCursor"></div>
+  <div class="selection-box" id="selectionBox"></div>
 
   <div class="toolbar-trigger"></div>
   <div class="toolbar" id="toolbar">
@@ -201,6 +231,27 @@
     // Eraser cursor indicator
     const eraserCursor = document.getElementById('eraserCursor');
 
+    // Lasso tool state
+    const lassoCanvas = document.getElementById('lassoCanvas');
+    const lassoCtx = lassoCanvas.getContext('2d');
+    const selectionBox = document.getElementById('selectionBox');
+    let isLassoMode = false;
+    let isLassoDrawing = false;
+    let lassoPath = []; // Array of {x, y} points
+    let hasSelection = false;
+    let selectionImageData = null;
+    let selectionBounds = null; // {x, y, width, height}
+    let isMovingSelection = false;
+    let moveStartX = 0;
+    let moveStartY = 0;
+    let selectionOffsetX = 0;
+    let selectionOffsetY = 0;
+
+    // Detect stylus barrel button (button 2 / right click on pen)
+    function isBarrelButton(e) {
+      return e.button === 2 || (e.buttons & 2) !== 0;
+    }
+
     function updateEraserCursor(x, y, show) {
       if (show) {
         const size = (getStrokeWidth(0.5) + 10) * 2 * eraserSizeMultiplier;
@@ -237,6 +288,235 @@
     initCanvas();
     // No resize listener - canvas stays fixed
 
+    // Initialize lasso canvas to same size
+    function initLassoCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const width = parseInt(canvas.style.width);
+      const height = parseInt(canvas.style.height);
+      lassoCanvas.width = width * dpr;
+      lassoCanvas.height = height * dpr;
+      lassoCtx.scale(dpr, dpr);
+      lassoCanvas.style.width = width + 'px';
+      lassoCanvas.style.height = height + 'px';
+    }
+    initLassoCanvas();
+
+    // Clear lasso overlay
+    function clearLassoCanvas() {
+      const width = parseInt(lassoCanvas.style.width);
+      const height = parseInt(lassoCanvas.style.height);
+      lassoCtx.clearRect(0, 0, width, height);
+    }
+
+    // Draw lasso path on overlay
+    function drawLassoPath() {
+      clearLassoCanvas();
+      if (lassoPath.length < 2) return;
+
+      lassoCtx.beginPath();
+      lassoCtx.moveTo(lassoPath[0].x, lassoPath[0].y);
+      for (let i = 1; i < lassoPath.length; i++) {
+        lassoCtx.lineTo(lassoPath[i].x, lassoPath[i].y);
+      }
+      lassoCtx.strokeStyle = '#4a8ea1';
+      lassoCtx.lineWidth = 2;
+      lassoCtx.setLineDash([5, 5]);
+      lassoCtx.stroke();
+      lassoCtx.setLineDash([]);
+    }
+
+    // Get bounding box of lasso path
+    function getLassoBounds() {
+      if (lassoPath.length === 0) return null;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of lassoPath) {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      }
+      return {
+        x: Math.floor(minX),
+        y: Math.floor(minY),
+        width: Math.ceil(maxX - minX),
+        height: Math.ceil(maxY - minY)
+      };
+    }
+
+    // Create selection from lasso path
+    function createSelection() {
+      if (lassoPath.length < 3) {
+        cancelSelection();
+        return;
+      }
+
+      const bounds = getLassoBounds();
+      if (!bounds || bounds.width < 5 || bounds.height < 5) {
+        cancelSelection();
+        return;
+      }
+
+      selectionBounds = bounds;
+      const dpr = window.devicePixelRatio || 1;
+
+      // Create a temporary canvas to extract selection with mask
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = bounds.width * dpr;
+      tempCanvas.height = bounds.height * dpr;
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.scale(dpr, dpr);
+
+      // Create clipping path from lasso
+      tempCtx.beginPath();
+      tempCtx.moveTo(lassoPath[0].x - bounds.x, lassoPath[0].y - bounds.y);
+      for (let i = 1; i < lassoPath.length; i++) {
+        tempCtx.lineTo(lassoPath[i].x - bounds.x, lassoPath[i].y - bounds.y);
+      }
+      tempCtx.closePath();
+      tempCtx.clip();
+
+      // Draw the main canvas content into the clipped area
+      tempCtx.drawImage(
+        canvas,
+        bounds.x * dpr, bounds.y * dpr, bounds.width * dpr, bounds.height * dpr,
+        0, 0, bounds.width, bounds.height
+      );
+
+      // Store the selection image
+      selectionImageData = tempCanvas;
+
+      // Clear the selected area from main canvas using the lasso path
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.moveTo(lassoPath[0].x, lassoPath[0].y);
+      for (let i = 1; i < lassoPath.length; i++) {
+        ctx.lineTo(lassoPath[i].x, lassoPath[i].y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      // Show selection box
+      selectionBox.style.left = bounds.x + 'px';
+      selectionBox.style.top = bounds.y + 'px';
+      selectionBox.style.width = bounds.width + 'px';
+      selectionBox.style.height = bounds.height + 'px';
+      selectionBox.classList.add('visible', 'moving');
+
+      hasSelection = true;
+      selectionOffsetX = 0;
+      selectionOffsetY = 0;
+
+      // Draw selection preview on lasso canvas
+      drawSelectionPreview();
+
+      // Clear lasso path display
+      clearLassoCanvas();
+    }
+
+    // Draw selection preview on lasso canvas
+    function drawSelectionPreview() {
+      if (!hasSelection || !selectionImageData || !selectionBounds) return;
+
+      clearLassoCanvas();
+      const x = selectionBounds.x + selectionOffsetX;
+      const y = selectionBounds.y + selectionOffsetY;
+
+      lassoCtx.drawImage(selectionImageData, x, y, selectionBounds.width, selectionBounds.height);
+    }
+
+    // Commit selection to main canvas
+    function commitSelection() {
+      if (!hasSelection || !selectionImageData || !selectionBounds) return;
+
+      const x = selectionBounds.x + selectionOffsetX;
+      const y = selectionBounds.y + selectionOffsetY;
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(selectionImageData, x, y, selectionBounds.width, selectionBounds.height);
+
+      cancelSelection();
+    }
+
+    // Cancel/clear selection
+    function cancelSelection() {
+      hasSelection = false;
+      selectionImageData = null;
+      selectionBounds = null;
+      lassoPath = [];
+      selectionOffsetX = 0;
+      selectionOffsetY = 0;
+      selectionBox.classList.remove('visible', 'moving');
+      clearLassoCanvas();
+    }
+
+    // Start lasso drawing
+    function startLasso(e) {
+      // If we have a selection and click inside it, start moving
+      if (hasSelection && selectionBounds) {
+        const pos = getPointerPos(e);
+        const x = selectionBounds.x + selectionOffsetX;
+        const y = selectionBounds.y + selectionOffsetY;
+        if (pos.x >= x && pos.x <= x + selectionBounds.width &&
+            pos.y >= y && pos.y <= y + selectionBounds.height) {
+          isMovingSelection = true;
+          moveStartX = pos.x;
+          moveStartY = pos.y;
+          return;
+        } else {
+          // Click outside selection - commit it
+          commitSelection();
+        }
+      }
+
+      isLassoDrawing = true;
+      lassoPath = [];
+      const pos = getPointerPos(e);
+      lassoPath.push({ x: pos.x, y: pos.y });
+      drawLassoPath();
+    }
+
+    // Continue lasso drawing
+    function continueLasso(e) {
+      if (isMovingSelection && hasSelection) {
+        const pos = getPointerPos(e);
+        const dx = pos.x - moveStartX;
+        const dy = pos.y - moveStartY;
+        selectionOffsetX += dx;
+        selectionOffsetY += dy;
+        moveStartX = pos.x;
+        moveStartY = pos.y;
+
+        // Update selection box position
+        selectionBox.style.left = (selectionBounds.x + selectionOffsetX) + 'px';
+        selectionBox.style.top = (selectionBounds.y + selectionOffsetY) + 'px';
+
+        drawSelectionPreview();
+        return;
+      }
+
+      if (!isLassoDrawing) return;
+
+      const pos = getPointerPos(e);
+      lassoPath.push({ x: pos.x, y: pos.y });
+      drawLassoPath();
+    }
+
+    // End lasso drawing
+    function endLasso() {
+      if (isMovingSelection) {
+        isMovingSelection = false;
+        return;
+      }
+
+      if (!isLassoDrawing) return;
+      isLassoDrawing = false;
+
+      // Create selection from path
+      createSelection();
+    }
+
     function getPointerPos(e) {
       const rect = canvas.getBoundingClientRect();
       return {
@@ -254,6 +534,19 @@
     function startStroke(e) {
       // Only allow pen (stylus) input - disable finger/touch
       if (e.pointerType === 'touch') return;
+
+      // Check for barrel button - activate lasso mode
+      if (isBarrelButton(e)) {
+        isLassoMode = true;
+        startLasso(e);
+        e.preventDefault();
+        return;
+      }
+
+      // If we have a selection and start drawing, commit the selection first
+      if (hasSelection) {
+        commitSelection();
+      }
 
       isDrawing = true;
       activeEraser = isEraser || isEraserTip(e); // Use eraser if tool selected OR using eraser tip
@@ -305,6 +598,12 @@
     }
 
     function continueStroke(e) {
+      // Handle lasso mode
+      if (isLassoMode) {
+        continueLasso(e);
+        return;
+      }
+
       if (!isDrawing) return;
 
       const pos = getPointerPos(e);
@@ -335,6 +634,13 @@
     }
 
     function endStroke(scheduleReset = true) {
+      // Handle lasso mode end
+      if (isLassoMode) {
+        endLasso();
+        isLassoMode = false;
+        return;
+      }
+
       // Track eraser lift time and schedule reset
       if (activeEraser && scheduleReset) {
         lastEraserLiftTime = Date.now();
@@ -376,6 +682,9 @@
 
     canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
     canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+    // Prevent context menu on right-click (barrel button)
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
 
     // Toolbar
     const toolbar = document.getElementById('toolbar');
@@ -423,7 +732,19 @@
 
     // Keyboard shortcuts
     document.addEventListener('keydown', e => {
-      if (e.key === 'e' || e.key === 'E') {
+      if (e.key === 'Escape') {
+        // Cancel selection or lasso
+        if (hasSelection) {
+          // Put selection back at original position
+          selectionOffsetX = 0;
+          selectionOffsetY = 0;
+          commitSelection();
+        } else if (isLassoDrawing) {
+          isLassoDrawing = false;
+          isLassoMode = false;
+          cancelSelection();
+        }
+      } else if (e.key === 'e' || e.key === 'E') {
         eraserBtn.click();
       } else if (e.key === 'c' || e.key === 'C') {
         document.getElementById('clearBtn').click();
@@ -434,6 +755,9 @@
       } else if (e.key >= '1' && e.key <= '4') {
         const idx = parseInt(e.key) - 1;
         if (colorBtns[idx]) colorBtns[idx].click();
+      } else if (e.key === 'Enter' && hasSelection) {
+        // Commit selection on Enter
+        commitSelection();
       }
     });
   </script>
