@@ -137,11 +137,94 @@
     .eraser-cursor.visible {
       display: block;
     }
+
+    /* Debug panel */
+    .debug-panel {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 11px;
+      padding: 12px;
+      border-radius: 8px;
+      z-index: 200;
+      min-width: 220px;
+      line-height: 1.6;
+    }
+
+    .debug-panel .title {
+      font-weight: bold;
+      color: #4af0c8;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      padding-bottom: 4px;
+    }
+
+    .debug-panel .row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .debug-panel .label {
+      color: #888;
+    }
+
+    .debug-panel .value {
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .debug-panel .value.warning {
+      color: #fbbf24;
+    }
+
+    .debug-panel .value.triggered {
+      color: #ff6b6b;
+    }
+
+    .debug-panel .copy-btn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 6px;
+      background: #4af0c8;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .debug-panel .copy-btn:hover {
+      background: #3dd9b3;
+    }
+
+    .debug-panel .copy-btn.copied {
+      background: #27ae60;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
   <canvas id="canvas"></canvas>
   <div class="eraser-cursor" id="eraserCursor"></div>
+
+  <!-- Debug Panel -->
+  <div class="debug-panel" id="debugPanel">
+    <div class="title">🔧 Eraser Debug</div>
+    <div class="row"><span class="label">Speed:</span><span class="value" id="dbgSpeed">0 px/s</span></div>
+    <div class="row"><span class="label">Peak Speed:</span><span class="value" id="dbgPeakSpeed">0 px/s</span></div>
+    <div class="row"><span class="label">Time Delta:</span><span class="value" id="dbgDt">0 ms</span></div>
+    <div class="row"><span class="label">Distance:</span><span class="value" id="dbgDistance">0 px</span></div>
+    <div class="row"><span class="label">Fast Samples:</span><span class="value" id="dbgSamples">0 / 5</span></div>
+    <div class="row"><span class="label">Multiplier:</span><span class="value" id="dbgMultiplier">1x</span></div>
+    <div class="row"><span class="label">Threshold:</span><span class="value" id="dbgThreshold">1200 px/s</span></div>
+    <div class="row"><span class="label">Avg Event Rate:</span><span class="value" id="dbgEventRate">0 Hz</span></div>
+    <button class="copy-btn" id="copyDebugBtn">📋 Copy Debug Info</button>
+  </div>
 
   <div class="toolbar-trigger"></div>
   <div class="toolbar" id="toolbar">
@@ -192,6 +275,100 @@
     // Speed threshold for eraser boost
     const FAST_SPEED_THRESHOLD = 1200; // pixels per second
     const FAST_SAMPLES_REQUIRED = 5; // Must sustain fast speed for this many samples
+
+    // Debug variables
+    let dbgPeakSpeed = 0;
+    let dbgEventCount = 0;
+    let dbgStartTime = 0;
+
+    // Debug DOM elements
+    const dbgSpeedEl = document.getElementById('dbgSpeed');
+    const dbgPeakSpeedEl = document.getElementById('dbgPeakSpeed');
+    const dbgDtEl = document.getElementById('dbgDt');
+    const dbgDistanceEl = document.getElementById('dbgDistance');
+    const dbgSamplesEl = document.getElementById('dbgSamples');
+    const dbgMultiplierEl = document.getElementById('dbgMultiplier');
+    const dbgThresholdEl = document.getElementById('dbgThreshold');
+    const dbgEventRateEl = document.getElementById('dbgEventRate');
+
+    // Initialize threshold display
+    dbgThresholdEl.textContent = FAST_SPEED_THRESHOLD + ' px/s';
+
+    function updateDebugPanel(speed, dt, distance) {
+      // Update current values
+      dbgSpeedEl.textContent = Math.round(speed) + ' px/s';
+      dbgSpeedEl.className = 'value' + (speed > FAST_SPEED_THRESHOLD ? ' warning' : '');
+
+      // Track peak speed
+      if (speed > dbgPeakSpeed) {
+        dbgPeakSpeed = speed;
+        dbgPeakSpeedEl.textContent = Math.round(dbgPeakSpeed) + ' px/s';
+      }
+
+      dbgDtEl.textContent = dt.toFixed(1) + ' ms';
+      dbgDistanceEl.textContent = distance.toFixed(1) + ' px';
+      dbgSamplesEl.textContent = fastSampleCount + ' / ' + FAST_SAMPLES_REQUIRED;
+      dbgSamplesEl.className = 'value' + (fastSampleCount >= FAST_SAMPLES_REQUIRED ? ' triggered' : '');
+
+      dbgMultiplierEl.textContent = eraserSizeMultiplier + 'x';
+      dbgMultiplierEl.className = 'value' + (eraserSizeMultiplier > 1 ? ' triggered' : '');
+
+      // Calculate event rate
+      dbgEventCount++;
+      const elapsed = (Date.now() - dbgStartTime) / 1000;
+      if (elapsed > 0) {
+        const rate = dbgEventCount / elapsed;
+        dbgEventRateEl.textContent = Math.round(rate) + ' Hz';
+      }
+    }
+
+    function resetDebugPanel() {
+      dbgPeakSpeed = 0;
+      dbgEventCount = 0;
+      dbgStartTime = Date.now();
+      dbgSpeedEl.textContent = '0 px/s';
+      dbgSpeedEl.className = 'value';
+      dbgPeakSpeedEl.textContent = '0 px/s';
+      dbgDtEl.textContent = '0 ms';
+      dbgDistanceEl.textContent = '0 px';
+      dbgSamplesEl.textContent = '0 / ' + FAST_SAMPLES_REQUIRED;
+      dbgSamplesEl.className = 'value';
+      dbgMultiplierEl.textContent = '1x';
+      dbgMultiplierEl.className = 'value';
+      dbgEventRateEl.textContent = '0 Hz';
+    }
+
+    // Copy debug info to clipboard
+    const copyDebugBtn = document.getElementById('copyDebugBtn');
+    copyDebugBtn.addEventListener('click', () => {
+      const deviceInfo = `Device: ${navigator.userAgent.includes('Surface') ? 'Surface' : 'Unknown'}`;
+      const screenInfo = `Screen: ${window.screen.width}x${window.screen.height} @ ${window.devicePixelRatio}x DPR`;
+      const debugInfo = `
+=== Eraser Debug Info ===
+${deviceInfo}
+${screenInfo}
+Viewport: ${window.innerWidth}x${window.innerHeight}
+
+Speed: ${dbgSpeedEl.textContent}
+Peak Speed: ${dbgPeakSpeedEl.textContent}
+Time Delta: ${dbgDtEl.textContent}
+Distance: ${dbgDistanceEl.textContent}
+Fast Samples: ${dbgSamplesEl.textContent}
+Multiplier: ${dbgMultiplierEl.textContent}
+Threshold: ${dbgThresholdEl.textContent}
+Avg Event Rate: ${dbgEventRateEl.textContent}
+=========================
+      `.trim();
+
+      navigator.clipboard.writeText(debugInfo).then(() => {
+        copyDebugBtn.textContent = '✓ Copied!';
+        copyDebugBtn.classList.add('copied');
+        setTimeout(() => {
+          copyDebugBtn.textContent = '📋 Copy Debug Info';
+          copyDebugBtn.classList.remove('copied');
+        }, 2000);
+      });
+    });
 
     // Eraser cursor indicator
     const eraserCursor = document.getElementById('eraserCursor');
@@ -265,6 +442,7 @@
         eraserSizeMultiplier = 1; // Reset on new stroke
         fastSampleCount = 0; // Reset sample counter
         eraserCursor.style.borderColor = 'rgba(0, 0, 0, 0.5)';
+        resetDebugPanel(); // Reset debug on new stroke
       }
 
       // Set composite operation for eraser (destination-out removes pixels)
@@ -299,6 +477,9 @@
           const dy = pos.y - lastEraseY;
           const distance = Math.sqrt(dx * dx + dy * dy);
           const speed = (distance / dt) * 1000; // pixels per second
+
+          // Update debug panel
+          updateDebugPanel(speed, dt, distance);
 
           // Track consecutive fast samples before boosting
           if (speed > FAST_SPEED_THRESHOLD) {
