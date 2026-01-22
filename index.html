@@ -790,6 +790,16 @@
     });
     toolbarToggle.addEventListener('pointerdown', e => e.stopPropagation());
 
+    // Close toolbar when touching outside
+    document.addEventListener('pointerdown', (e) => {
+      if (toolbar.classList.contains('visible') &&
+          !toolbar.contains(e.target) &&
+          e.target !== toolbarToggle &&
+          !toolbarToggle.contains(e.target)) {
+        toolbar.classList.remove('visible');
+      }
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
