@@ -530,8 +530,10 @@
           e.preventDefault();
           return;
         } else {
-          // Touch outside selection - commit it and continue with normal stroke
+          // Touch outside selection - commit it only, don't start a stroke
           commitSelection();
+          e.preventDefault();
+          return;
         }
       }
 
