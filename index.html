@@ -274,9 +274,10 @@
 
     // Speed threshold for eraser boost
     const FAST_SPEED_THRESHOLD = 1200; // pixels per second
-    const FAST_SAMPLES_REQUIRED = 5; // Must sustain fast speed for this many samples
+    const FAST_SAMPLES_REQUIRED = 8; // Must sustain fast speed for this many samples (increased for consistency)
     const MIN_TIME_DELTA = 8; // Minimum ms between samples to avoid timing glitches
     const MAX_REALISTIC_SPEED = 8000; // Maximum realistic speed in px/s
+    const REFERENCE_EVENT_RATE = 60; // Reference event rate (Hz) for normalization
 
     // Debug variables
     let dbgPeakSpeed = 0;
@@ -309,7 +310,7 @@
 
       dbgDtEl.textContent = dt.toFixed(1) + ' ms';
       dbgDistanceEl.textContent = distance.toFixed(1) + ' px';
-      dbgSamplesEl.textContent = fastSampleCount + ' / ' + FAST_SAMPLES_REQUIRED;
+      dbgSamplesEl.textContent = fastSampleCount + ' / ' + FAST_SAMPLES_REQUIRED + ' (raw)';
       dbgSamplesEl.className = 'value' + (fastSampleCount >= FAST_SAMPLES_REQUIRED ? ' triggered' : '');
 
       dbgMultiplierEl.textContent = eraserSizeMultiplier + 'x';
@@ -480,7 +481,13 @@ Avg Event Rate: ${dbgEventRateEl.textContent}
           const dx = pos.x - lastEraseX;
           const dy = pos.y - lastEraseY;
           const distance = Math.sqrt(dx * dx + dy * dy);
-          const speed = (distance / dt) * 1000; // pixels per second
+          const rawSpeed = (distance / dt) * 1000; // pixels per second
+
+          // Normalize speed based on event rate to ensure consistency across devices
+          // Lower event rates result in higher distances per sample, so we normalize
+          const currentEventRate = 1000 / dt; // Current instantaneous event rate in Hz
+          const normalizationFactor = REFERENCE_EVENT_RATE / Math.max(currentEventRate, 30);
+          const speed = rawSpeed / normalizationFactor; // Normalized speed
 
           // Update debug panel
           updateDebugPanel(speed, dt, distance);
