@@ -621,6 +621,7 @@
       lastX = pos.x;
       lastY = pos.y;
       lastPressure = pos.pressure;
+      smoothedPressure = pos.pressure; // Reset smoothed pressure for new stroke
 
       // Show eraser cursor
       updateEraserCursor(e.clientX, e.clientY, activeEraser);
@@ -663,6 +664,31 @@
       ctx.fill();
     }
 
+    // Pressure smoothing factor (0-1, higher = more smoothing)
+    const PRESSURE_SMOOTHING = 0.3;
+    let smoothedPressure = 0.5;
+
+    function drawSmoothSegment(fromX, fromY, toX, toY, fromPressure, toPressure) {
+      // Calculate midpoint for quadratic curve
+      const midX = (fromX + toX) / 2;
+      const midY = (fromY + toY) / 2;
+
+      // Smooth pressure
+      smoothedPressure = smoothedPressure * PRESSURE_SMOOTHING + toPressure * (1 - PRESSURE_SMOOTHING);
+
+      const fromWidth = getStrokeWidth(fromPressure);
+      const toWidth = getStrokeWidth(smoothedPressure);
+
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      ctx.quadraticCurveTo(fromX, fromY, midX, midY);
+      ctx.strokeStyle = activeEraser ? 'rgba(0,0,0,1)' : strokeColor;
+      ctx.lineWidth = activeEraser ? ((fromWidth + toWidth) / 2 + 10) * 2 * eraserSizeMultiplier : (fromWidth + toWidth) / 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+
     function continueStroke(e) {
       // Handle moving selection (can happen outside of lasso mode now)
       if (isMovingSelection && hasSelection) {
@@ -690,10 +716,6 @@
 
       if (!isDrawing) return;
 
-      const pos = getPointerPos(e);
-      const width = getStrokeWidth(pos.pressure);
-      const lastWidth = getStrokeWidth(lastPressure);
-
       // Update eraser cursor position
       updateEraserCursor(e.clientX, e.clientY, activeEraser);
 
@@ -703,18 +725,19 @@
         eraserResetTimeout = null;
       }
 
-      ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.strokeStyle = activeEraser ? 'rgba(0,0,0,1)' : strokeColor;
-      ctx.lineWidth = activeEraser ? ((width + lastWidth) / 2 + 10) * 2 * eraserSizeMultiplier : (width + lastWidth) / 2;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.stroke();
+      // Use coalesced events for smoother strokes (captures intermediate points)
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
 
-      lastX = pos.x;
-      lastY = pos.y;
-      lastPressure = pos.pressure;
+      for (const coalescedEvent of events) {
+        const pos = getPointerPos(coalescedEvent);
+
+        // Draw smooth segment using quadratic Bezier curve
+        drawSmoothSegment(lastX, lastY, pos.x, pos.y, lastPressure, pos.pressure);
+
+        lastX = pos.x;
+        lastY = pos.y;
+        lastPressure = pos.pressure;
+      }
     }
 
     function endStroke(scheduleReset = true) {
