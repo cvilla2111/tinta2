@@ -32,7 +32,7 @@
     .canvas-container {
       width: 100%;
       height: 100%;
-      overflow: auto;
+      overflow: hidden;
       position: absolute;
       top: 0;
       left: 0;
@@ -310,40 +310,32 @@
 
     initCanvas();
 
-    // Handle fullscreen changes - resize canvas to new viewport size while preserving content
+    // Handle fullscreen changes - resize canvas to match viewport size while preserving content
     function handleFullscreenChange() {
       const dpr = window.devicePixelRatio || 1;
       const newWidth = window.innerWidth;
       const newHeight = window.innerHeight;
-      const currentWidth = parseInt(canvas.style.width);
-      const currentHeight = parseInt(canvas.style.height);
 
-      // Only resize if the new size is larger
-      if (newWidth > currentWidth || newHeight > currentHeight) {
-        // Save current canvas content
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // Save current canvas content
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-        // Resize canvas
-        const finalWidth = Math.max(newWidth, currentWidth);
-        const finalHeight = Math.max(newHeight, currentHeight);
+      // Resize canvas to new viewport size
+      canvas.width = newWidth * dpr;
+      canvas.height = newHeight * dpr;
+      ctx.scale(dpr, dpr);
+      canvas.style.width = newWidth + 'px';
+      canvas.style.height = newHeight + 'px';
 
-        canvas.width = finalWidth * dpr;
-        canvas.height = finalHeight * dpr;
-        ctx.scale(dpr, dpr);
-        canvas.style.width = finalWidth + 'px';
-        canvas.style.height = finalHeight + 'px';
+      // Restore content
+      ctx.putImageData(imageData, 0, 0);
 
-        // Restore content
-        ctx.putImageData(imageData, 0, 0);
-
-        // Also resize lasso canvas
-        lassoCanvas.width = finalWidth * dpr;
-        lassoCanvas.height = finalHeight * dpr;
-        lassoCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
-        lassoCtx.scale(dpr, dpr);
-        lassoCanvas.style.width = finalWidth + 'px';
-        lassoCanvas.style.height = finalHeight + 'px';
-      }
+      // Also resize lasso canvas
+      lassoCanvas.width = newWidth * dpr;
+      lassoCanvas.height = newHeight * dpr;
+      lassoCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+      lassoCtx.scale(dpr, dpr);
+      lassoCanvas.style.width = newWidth + 'px';
+      lassoCanvas.style.height = newHeight + 'px';
     }
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
