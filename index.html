@@ -758,13 +758,13 @@
     });
 
     document.getElementById('sizeUp').addEventListener('click', () => {
-      baseSize = Math.min(20, baseSize + 1);
-      sizeDisplay.textContent = baseSize;
+      baseSize = Math.min(20, baseSize + 0.5);
+      sizeDisplay.textContent = baseSize % 1 === 0 ? baseSize : baseSize.toFixed(1);
     });
 
     document.getElementById('sizeDown').addEventListener('click', () => {
-      baseSize = Math.max(1, baseSize - 1);
-      sizeDisplay.textContent = baseSize;
+      baseSize = Math.max(0.5, baseSize - 0.5);
+      sizeDisplay.textContent = baseSize % 1 === 0 ? baseSize : baseSize.toFixed(1);
     });
 
     eraserBtn.addEventListener('click', () => {
