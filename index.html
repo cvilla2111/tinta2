@@ -622,6 +622,7 @@
       lastY = pos.y;
       lastPressure = pos.pressure;
       smoothedPressure = pos.pressure; // Reset smoothed pressure for new stroke
+      isFirstSegment = true; // Reset for smooth curve connections
 
       // Show eraser cursor
       updateEraserCursor(e.clientX, e.clientY, activeEraser);
@@ -668,6 +669,11 @@
     const PRESSURE_SMOOTHING = 0.3;
     let smoothedPressure = 0.5;
 
+    // Track previous midpoint for smooth curve connections
+    let prevMidX = 0;
+    let prevMidY = 0;
+    let isFirstSegment = true;
+
     function drawSmoothSegment(fromX, fromY, toX, toY, fromPressure, toPressure) {
       // Calculate midpoint for quadratic curve
       const midX = (fromX + toX) / 2;
@@ -680,13 +686,27 @@
       const toWidth = getStrokeWidth(smoothedPressure);
 
       ctx.beginPath();
-      ctx.moveTo(fromX, fromY);
-      ctx.quadraticCurveTo(fromX, fromY, midX, midY);
       ctx.strokeStyle = activeEraser ? 'rgba(0,0,0,1)' : strokeColor;
       ctx.lineWidth = activeEraser ? ((fromWidth + toWidth) / 2 + 10) * 2 * eraserSizeMultiplier : (fromWidth + toWidth) / 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+
+      if (isFirstSegment) {
+        // First segment: draw line from start to midpoint
+        ctx.moveTo(fromX, fromY);
+        ctx.lineTo(midX, midY);
+        isFirstSegment = false;
+      } else {
+        // Subsequent segments: draw curve from previous midpoint through current point to new midpoint
+        ctx.moveTo(prevMidX, prevMidY);
+        ctx.quadraticCurveTo(fromX, fromY, midX, midY);
+      }
+
       ctx.stroke();
+
+      // Store midpoint for next segment
+      prevMidX = midX;
+      prevMidY = midY;
     }
 
     function continueStroke(e) {
