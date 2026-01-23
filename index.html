@@ -219,6 +219,12 @@
     <!-- Tools -->
     <button class="btn" id="eraserBtn" title="Eraser">⌫</button>
     <button class="btn" id="clearBtn" title="Clear All">✕</button>
+
+    <div class="separator"></div>
+
+    <button class="btn" id="fullscreenBtn" title="Toggle Fullscreen">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+    </button>
   </div>
 
   <script>
@@ -819,6 +825,14 @@
       const rect = canvas.getBoundingClientRect();
       ctx.globalCompositeOperation = 'source-over';
       ctx.clearRect(0, 0, rect.width, rect.height);
+    });
+
+    document.getElementById('fullscreenBtn').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
     });
 
     toolbar.addEventListener('pointerdown', e => e.stopPropagation());
