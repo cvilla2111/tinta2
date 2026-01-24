@@ -197,6 +197,45 @@
       /* pointer-events stays none - movement handled through canvas */
     }
 
+    /* Rotation handle */
+    .rotation-handle {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: #4a8ea1;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      cursor: grab;
+      pointer-events: none;
+      z-index: 12;
+      display: none;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .rotation-handle.visible {
+      display: block;
+    }
+
+    .rotation-handle:active {
+      cursor: grabbing;
+    }
+
+    /* Rotation line connecting handle to selection */
+    .rotation-line {
+      position: absolute;
+      width: 2px;
+      background: #4a8ea1;
+      pointer-events: none;
+      z-index: 11;
+      display: none;
+      transform-origin: bottom center;
+    }
+
+    .rotation-line.visible {
+      display: block;
+    }
+
     /* Toggle toolbar button */
     .toolbar-toggle {
       position: fixed;
@@ -240,6 +279,8 @@
     <canvas id="canvas"></canvas>
     <canvas id="lassoCanvas"></canvas>
     <div class="selection-box" id="selectionBox"></div>
+    <div class="rotation-line" id="rotationLine"></div>
+    <div class="rotation-handle" id="rotationHandle"></div>
   </div>
   <div class="eraser-cursor" id="eraserCursor"></div>
 
@@ -340,6 +381,8 @@
     const lassoCanvas = document.getElementById('lassoCanvas');
     const lassoCtx = lassoCanvas.getContext('2d');
     const selectionBox = document.getElementById('selectionBox');
+    const rotationHandle = document.getElementById('rotationHandle');
+    const rotationLine = document.getElementById('rotationLine');
     let isLassoMode = false;
     let isLassoDrawing = false;
     let lassoPath = []; // Array of {x, y} points
@@ -347,10 +390,13 @@
     let selectionImageData = null;
     let selectionBounds = null; // {x, y, width, height}
     let isMovingSelection = false;
+    let isRotatingSelection = false;
     let moveStartX = 0;
     let moveStartY = 0;
     let selectionOffsetX = 0;
     let selectionOffsetY = 0;
+    let selectionRotation = 0; // Rotation angle in radians
+    const ROTATION_HANDLE_DISTANCE = 40; // Distance of handle from selection top
 
     // Detect stylus barrel button (button 2 / right click on pen)
     function isBarrelButton(e) {
@@ -553,37 +599,103 @@
       lassoPath = [];
     }
 
+    // Get selection center point
+    function getSelectionCenter() {
+      if (!selectionBounds) return { x: 0, y: 0 };
+      return {
+        x: selectionBounds.x + selectionOffsetX + selectionBounds.width / 2,
+        y: selectionBounds.y + selectionOffsetY + selectionBounds.height / 2
+      };
+    }
+
+    // Update rotation handle and line position
+    function updateRotationHandlePosition() {
+      if (!hasSelection || !selectionBounds) {
+        rotationHandle.classList.remove('visible');
+        rotationLine.classList.remove('visible');
+        return;
+      }
+
+      const center = getSelectionCenter();
+
+      // Position handle above selection, accounting for rotation
+      const handleX = center.x + Math.sin(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
+      const handleY = center.y - Math.cos(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
+
+      rotationHandle.style.left = handleX + 'px';
+      rotationHandle.style.top = handleY + 'px';
+      rotationHandle.classList.add('visible');
+
+      // Position and rotate the line connecting handle to selection
+      const lineLength = ROTATION_HANDLE_DISTANCE;
+      rotationLine.style.height = lineLength + 'px';
+      rotationLine.style.left = center.x + 'px';
+      rotationLine.style.top = (center.y - selectionBounds.height / 2 - lineLength) + 'px';
+      rotationLine.style.transform = `translateX(-50%) rotate(${selectionRotation}rad)`;
+      rotationLine.style.transformOrigin = `center ${lineLength + selectionBounds.height / 2}px`;
+      rotationLine.classList.add('visible');
+    }
+
     // Draw selection preview on lasso canvas
     function drawSelectionPreview() {
       if (!hasSelection || !selectionImageData || !selectionBounds) return;
 
       clearLassoCanvas();
-      const x = selectionBounds.x + selectionOffsetX;
-      const y = selectionBounds.y + selectionOffsetY;
+      const center = getSelectionCenter();
 
-      // Draw the DPR-scaled selection image at the current position
-      // Source is the full temp canvas, dest is in CSS pixels (lassoCtx is already scaled)
+      // Save context state
+      lassoCtx.save();
+
+      // Translate to center, rotate, then draw
+      lassoCtx.translate(center.x, center.y);
+      lassoCtx.rotate(selectionRotation);
+      lassoCtx.translate(-selectionBounds.width / 2, -selectionBounds.height / 2);
+
+      // Draw the DPR-scaled selection image
       lassoCtx.drawImage(
         selectionImageData,
         0, 0, selectionImageData.width, selectionImageData.height,
-        x, y, selectionBounds.width, selectionBounds.height
+        0, 0, selectionBounds.width, selectionBounds.height
       );
+
+      // Restore context state
+      lassoCtx.restore();
+
+      // Update rotation handle position
+      updateRotationHandlePosition();
+
+      // Update selection box with rotation
+      selectionBox.style.left = (selectionBounds.x + selectionOffsetX) + 'px';
+      selectionBox.style.top = (selectionBounds.y + selectionOffsetY) + 'px';
+      selectionBox.style.transform = `rotate(${selectionRotation}rad)`;
+      selectionBox.style.transformOrigin = 'center center';
     }
 
     // Commit selection to main canvas
     function commitSelection() {
       if (!hasSelection || !selectionImageData || !selectionBounds) return;
 
-      const x = selectionBounds.x + selectionOffsetX;
-      const y = selectionBounds.y + selectionOffsetY;
+      const center = getSelectionCenter();
 
       ctx.globalCompositeOperation = 'source-over';
-      // Draw DPR-scaled selection back to main canvas (ctx is already scaled)
+
+      // Save context state
+      ctx.save();
+
+      // Translate to center, rotate, then draw
+      ctx.translate(center.x, center.y);
+      ctx.rotate(selectionRotation);
+      ctx.translate(-selectionBounds.width / 2, -selectionBounds.height / 2);
+
+      // Draw DPR-scaled selection back to main canvas
       ctx.drawImage(
         selectionImageData,
         0, 0, selectionImageData.width, selectionImageData.height,
-        x, y, selectionBounds.width, selectionBounds.height
+        0, 0, selectionBounds.width, selectionBounds.height
       );
+
+      // Restore context state
+      ctx.restore();
 
       cancelSelection();
     }
@@ -596,7 +708,11 @@
       lassoPath = [];
       selectionOffsetX = 0;
       selectionOffsetY = 0;
+      selectionRotation = 0;
       selectionBox.classList.remove('visible', 'moving');
+      selectionBox.style.transform = '';
+      rotationHandle.classList.remove('visible');
+      rotationLine.classList.remove('visible');
       clearLassoCanvas();
     }
 
@@ -662,19 +778,63 @@
       return e.button === 5 || (e.buttons & 32) !== 0;
     }
 
+    // Check if point is near the rotation handle
+    function isNearRotationHandle(pos) {
+      if (!hasSelection || !selectionBounds) return false;
+
+      const center = getSelectionCenter();
+      const handleX = center.x + Math.sin(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
+      const handleY = center.y - Math.cos(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
+
+      const dx = pos.x - handleX;
+      const dy = pos.y - handleY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      return distance < 25; // 25px hit area for the handle
+    }
+
+    // Check if point is inside the rotated selection box
+    function isInsideRotatedSelection(pos) {
+      if (!hasSelection || !selectionBounds) return false;
+
+      const center = getSelectionCenter();
+
+      // Rotate the point back to unrotated space
+      const dx = pos.x - center.x;
+      const dy = pos.y - center.y;
+      const cos = Math.cos(-selectionRotation);
+      const sin = Math.sin(-selectionRotation);
+      const rotatedX = dx * cos - dy * sin + center.x;
+      const rotatedY = dx * sin + dy * cos + center.y;
+
+      // Check if in bounds
+      const x = selectionBounds.x + selectionOffsetX;
+      const y = selectionBounds.y + selectionOffsetY;
+
+      return rotatedX >= x && rotatedX <= x + selectionBounds.width &&
+             rotatedY >= y && rotatedY <= y + selectionBounds.height;
+    }
+
     function startStroke(e) {
       // Only allow pen (stylus) input - disable finger/touch
       if (e.pointerType === 'touch') return;
 
-      // If we have an active selection, check if touching inside or outside
+      // If we have an active selection, check for rotation handle, inside, or outside
       if (hasSelection && selectionBounds) {
         const pos = getPointerPos(e);
-        const x = selectionBounds.x + selectionOffsetX;
-        const y = selectionBounds.y + selectionOffsetY;
 
-        if (pos.x >= x && pos.x <= x + selectionBounds.width &&
-            pos.y >= y && pos.y <= y + selectionBounds.height) {
-          // Touch inside selection - start moving (with any input, not just barrel button)
+        // Check rotation handle first
+        if (isNearRotationHandle(pos)) {
+          isRotatingSelection = true;
+          moveStartX = pos.x;
+          moveStartY = pos.y;
+          e.preventDefault();
+          return;
+        }
+
+        // Check if inside selection (accounting for rotation)
+        if (isInsideRotatedSelection(pos)) {
+          // Touch inside selection - start moving
           isMovingSelection = true;
           moveStartX = pos.x;
           moveStartY = pos.y;
@@ -869,6 +1029,27 @@
     }
 
     function continueStroke(e) {
+      // Handle rotating selection
+      if (isRotatingSelection && hasSelection) {
+        const pos = getPointerPos(e);
+        const center = getSelectionCenter();
+
+        // Calculate angle from center to current position
+        const currentAngle = Math.atan2(pos.x - center.x, -(pos.y - center.y));
+
+        // Calculate angle from center to start position
+        const startAngle = Math.atan2(moveStartX - center.x, -(moveStartY - center.y));
+
+        // Update rotation
+        selectionRotation += currentAngle - startAngle;
+
+        moveStartX = pos.x;
+        moveStartY = pos.y;
+
+        drawSelectionPreview();
+        return;
+      }
+
       // Handle moving selection (can happen outside of lasso mode now)
       if (isMovingSelection && hasSelection) {
         const pos = getPointerPos(e);
@@ -931,6 +1112,13 @@
     }
 
     function endStroke(scheduleReset = true) {
+      // Handle end of rotating selection
+      if (isRotatingSelection) {
+        isRotatingSelection = false;
+        // Selection stays active - user can rotate again or touch outside to commit
+        return;
+      }
+
       // Handle end of moving selection
       if (isMovingSelection) {
         isMovingSelection = false;
