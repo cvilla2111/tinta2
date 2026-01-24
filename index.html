@@ -795,6 +795,44 @@
     let prevMidY = 0;
     let isFirstSegment = true;
 
+    // Predictive stroke - tracks raw position for preview
+    let lastRawX = 0;
+    let lastRawY = 0;
+    let lastRawPressure = 0.5;
+
+    // Draw predictive preview line on lasso canvas (temporary, gets overwritten)
+    function drawPredictivePreview(stabilizedX, stabilizedY, rawX, rawY, pressure) {
+      // Only draw if there's meaningful distance between stabilized and raw position
+      const dx = rawX - stabilizedX;
+      const dy = rawY - stabilizedY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Clear previous preview
+      clearLassoCanvas();
+
+      if (distance > 2 && !activeEraser) {
+        const width = getStrokeWidth(pressure);
+
+        lassoCtx.beginPath();
+        lassoCtx.strokeStyle = strokeColor;
+        lassoCtx.lineWidth = width;
+        lassoCtx.lineCap = 'round';
+        lassoCtx.lineJoin = 'round';
+        lassoCtx.globalAlpha = 0.5; // Semi-transparent preview
+        lassoCtx.moveTo(stabilizedX, stabilizedY);
+        lassoCtx.lineTo(rawX, rawY);
+        lassoCtx.stroke();
+        lassoCtx.globalAlpha = 1.0;
+      }
+    }
+
+    // Clear predictive preview
+    function clearPredictivePreview() {
+      if (!hasSelection && !isLassoDrawing) {
+        clearLassoCanvas();
+      }
+    }
+
     function drawSmoothSegment(fromX, fromY, toX, toY, fromPressure, toPressure) {
       // Calculate midpoint for quadratic curve
       const midX = (fromX + toX) / 2;
@@ -881,7 +919,15 @@
         lastX = pos.x;
         lastY = pos.y;
         lastPressure = pos.pressure;
+
+        // Track raw position for predictive preview
+        lastRawX = rawPos.x;
+        lastRawY = rawPos.y;
+        lastRawPressure = rawPos.pressure;
       }
+
+      // Draw predictive preview from stabilized to raw position
+      drawPredictivePreview(lastX, lastY, lastRawX, lastRawY, lastRawPressure);
     }
 
     function endStroke(scheduleReset = true) {
@@ -913,6 +959,7 @@
 
       isDrawing = false;
       updateEraserCursor(0, 0, false); // Hide eraser cursor
+      clearPredictivePreview(); // Clear the preview line
     }
 
     function getStrokeWidth(pressure) {
