@@ -884,8 +884,8 @@
         // If this tap is within threshold of last lift, count it
         if (timeSinceLastLift < DOUBLE_TAP_THRESHOLD && lastEraserLiftTime > 0) {
           eraserTapCount++;
-          // Boost eraser on double-tap
-          if (eraserTapCount >= 2 && eraserSizeMultiplier === 1) {
+          // Boost eraser on triple-tap
+          if (eraserTapCount >= 3 && eraserSizeMultiplier === 1) {
             eraserSizeMultiplier = 4;
             updateEraserCursor(e.clientX, e.clientY, true); // Update cursor size
           }
