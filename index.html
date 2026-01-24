@@ -236,6 +236,35 @@
       display: block;
     }
 
+    /* Duplicate handle */
+    .duplicate-handle {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      background: #27ae60;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      pointer-events: none;
+      z-index: 12;
+      display: none;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+      line-height: 20px;
+      text-align: center;
+    }
+
+    .duplicate-handle.visible {
+      display: block;
+    }
+
+    .duplicate-handle:hover {
+      background: #2ecc71;
+    }
+
     /* Toggle toolbar button */
     .toolbar-toggle {
       position: fixed;
@@ -281,6 +310,7 @@
     <div class="selection-box" id="selectionBox"></div>
     <div class="rotation-line" id="rotationLine"></div>
     <div class="rotation-handle" id="rotationHandle"></div>
+    <div class="duplicate-handle" id="duplicateHandle" title="Duplicate">+</div>
   </div>
   <div class="eraser-cursor" id="eraserCursor"></div>
 
@@ -383,6 +413,7 @@
     const selectionBox = document.getElementById('selectionBox');
     const rotationHandle = document.getElementById('rotationHandle');
     const rotationLine = document.getElementById('rotationLine');
+    const duplicateHandle = document.getElementById('duplicateHandle');
     let isLassoMode = false;
     let isLassoDrawing = false;
     let lassoPath = []; // Array of {x, y} points
@@ -608,23 +639,32 @@
       };
     }
 
-    // Update rotation handle and line position
+    // Update rotation handle, duplicate handle, and line position
     function updateRotationHandlePosition() {
       if (!hasSelection || !selectionBounds) {
         rotationHandle.classList.remove('visible');
         rotationLine.classList.remove('visible');
+        duplicateHandle.classList.remove('visible');
         return;
       }
 
       const center = getSelectionCenter();
 
-      // Position handle above selection, accounting for rotation
+      // Position rotation handle above selection, accounting for rotation
       const handleX = center.x + Math.sin(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
       const handleY = center.y - Math.cos(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
 
       rotationHandle.style.left = handleX + 'px';
       rotationHandle.style.top = handleY + 'px';
       rotationHandle.classList.add('visible');
+
+      // Position duplicate handle below selection, accounting for rotation
+      const dupHandleX = center.x - Math.sin(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
+      const dupHandleY = center.y + Math.cos(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
+
+      duplicateHandle.style.left = dupHandleX + 'px';
+      duplicateHandle.style.top = dupHandleY + 'px';
+      duplicateHandle.classList.add('visible');
 
       // Position and rotate the line connecting handle to selection
       const lineLength = ROTATION_HANDLE_DISTANCE;
@@ -713,7 +753,56 @@
       selectionBox.style.transform = '';
       rotationHandle.classList.remove('visible');
       rotationLine.classList.remove('visible');
+      duplicateHandle.classList.remove('visible');
       clearLassoCanvas();
+    }
+
+    // Duplicate selection - commits copy to canvas and keeps selection active
+    function duplicateSelection() {
+      if (!hasSelection || !selectionImageData || !selectionBounds) return;
+
+      const center = getSelectionCenter();
+
+      ctx.globalCompositeOperation = 'source-over';
+
+      // Save context state
+      ctx.save();
+
+      // Draw current selection state to main canvas (this becomes the duplicate)
+      ctx.translate(center.x, center.y);
+      ctx.rotate(selectionRotation);
+      ctx.translate(-selectionBounds.width / 2, -selectionBounds.height / 2);
+
+      ctx.drawImage(
+        selectionImageData,
+        0, 0, selectionImageData.width, selectionImageData.height,
+        0, 0, selectionBounds.width, selectionBounds.height
+      );
+
+      // Restore context state
+      ctx.restore();
+
+      // Selection stays active - user can continue moving/rotating the "new" copy
+      // Offset it slightly so user can see the duplicate was created
+      selectionOffsetX += 20;
+      selectionOffsetY += 20;
+
+      drawSelectionPreview();
+    }
+
+    // Check if point is near the duplicate handle
+    function isNearDuplicateHandle(pos) {
+      if (!hasSelection || !selectionBounds) return false;
+
+      const center = getSelectionCenter();
+      const handleX = center.x - Math.sin(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
+      const handleY = center.y + Math.cos(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
+
+      const dx = pos.x - handleX;
+      const dy = pos.y - handleY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      return distance < 25; // 25px hit area for the handle
     }
 
     // Start lasso drawing
@@ -828,6 +917,13 @@
           isRotatingSelection = true;
           moveStartX = pos.x;
           moveStartY = pos.y;
+          e.preventDefault();
+          return;
+        }
+
+        // Check duplicate handle
+        if (isNearDuplicateHandle(pos)) {
+          duplicateSelection();
           e.preventDefault();
           return;
         }
