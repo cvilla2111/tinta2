@@ -697,6 +697,7 @@
       lastPressure = pos.pressure;
       smoothedPressure = pos.pressure; // Reset smoothed pressure for new stroke
       isFirstSegment = true; // Reset for smooth curve connections
+      resetStabilization(); // Reset stabilization buffer for new stroke
 
       // Show eraser cursor
       updateEraserCursor(e.clientX, e.clientY, activeEraser);
@@ -742,6 +743,44 @@
     // Pressure smoothing factor (0-1, higher = more smoothing)
     const PRESSURE_SMOOTHING = 0.3;
     let smoothedPressure = 0.5;
+
+    // Stroke stabilization - moving average buffer
+    const STABILIZATION_LEVEL = 6; // Number of points to average (higher = smoother but more lag)
+    let stabilizationBuffer = [];
+
+    function getStabilizedPoint(x, y, pressure) {
+      // Add new point to buffer
+      stabilizationBuffer.push({ x, y, pressure });
+
+      // Keep buffer at max size
+      if (stabilizationBuffer.length > STABILIZATION_LEVEL) {
+        stabilizationBuffer.shift();
+      }
+
+      // Calculate weighted average (more recent points have higher weight)
+      let totalWeight = 0;
+      let avgX = 0;
+      let avgY = 0;
+      let avgPressure = 0;
+
+      for (let i = 0; i < stabilizationBuffer.length; i++) {
+        const weight = i + 1; // Linear weight: 1, 2, 3, ...
+        avgX += stabilizationBuffer[i].x * weight;
+        avgY += stabilizationBuffer[i].y * weight;
+        avgPressure += stabilizationBuffer[i].pressure * weight;
+        totalWeight += weight;
+      }
+
+      return {
+        x: avgX / totalWeight,
+        y: avgY / totalWeight,
+        pressure: avgPressure / totalWeight
+      };
+    }
+
+    function resetStabilization() {
+      stabilizationBuffer = [];
+    }
 
     // Track previous midpoint for smooth curve connections
     let prevMidX = 0;
@@ -823,7 +862,10 @@
       const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
 
       for (const coalescedEvent of events) {
-        const pos = getPointerPos(coalescedEvent);
+        const rawPos = getPointerPos(coalescedEvent);
+
+        // Apply stabilization to smooth out hand jitter
+        const pos = getStabilizedPoint(rawPos.x, rawPos.y, rawPos.pressure);
 
         // Draw smooth segment using quadratic Bezier curve
         drawSmoothSegment(lastX, lastY, pos.x, pos.y, lastPressure, pos.pressure);
