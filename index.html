@@ -3,10 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#ffffff">
-  <link rel="icon" href="https://pfst.cf2.poecdn.net/base/image/2a8f400339a17ba3f803f831a236ad73cda52234db8b2fb53fe6b09cdd42d427?w=1024&h=1024">
-  <title>Canvas</title>
+  <title>Ink Canvas</title>
   <style>
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #1a1a2e;
+      --accent: #4361ee;
+      --surface: #f8f9fa;
+      --border: #e9ecef;
+      --danger: #e63946;
+    }
+
+    .dark {
+      --bg-color: #1a1a2e;
+      --text-color: #f8f9fa;
+      --accent: #4cc9f0;
+      --surface: #16213e;
+      --border: #2d3a5c;
+      --danger: #ff6b6b;
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -17,1456 +33,826 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #fff;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-color);
+      color: var(--text-color);
       touch-action: none;
-      -webkit-user-select: none;
-      user-select: none;
     }
 
-    /* Thin border below titlebar */
-    body::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: rgba(0, 0, 0, 0.1);
-      z-index: 9999;
-    }
-
-    /* Dark mode - affects toolbar only, canvas stays white */
-    html.dark .toolbar-toggle {
-      color: #aaa;
-    }
-
-    html.dark .toolbar-toggle:hover {
-      color: #ddd;
-    }
-
-    #canvas {
-      cursor: crosshair;
-      touch-action: none;
-      display: block;
-    }
-
-    .canvas-container {
-      width: 100%;
+    .container {
+      display: flex;
+      flex-direction: column;
       height: 100%;
+      width: 100%;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      gap: 16px;
+    }
+
+    .toolbar-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-color);
+      opacity: 0.8;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #adb5bd;
+      transition: background 0.3s ease;
+    }
+
+    .status-dot.active {
+      background: #40c057;
+      box-shadow: 0 0 8px rgba(64, 192, 87, 0.5);
+    }
+
+    .status-dot.unsupported {
+      background: #fa5252;
+    }
+
+    .canvas-wrapper {
+      flex: 1;
+      position: relative;
       overflow: hidden;
+      background: #ffffff;
+    }
+
+    #inkCanvas {
       position: absolute;
       top: 0;
       left: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: crosshair;
     }
 
-    /* Minimal toolbar - toggle visibility with button */
-    .toolbar {
+    #inkCanvas.eraser-mode {
+      cursor: none;
+    }
+
+    .pen-indicator {
       position: fixed;
-      top: -70px;
+      bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
+      padding: 10px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      font-size: 13px;
       display: flex;
-      gap: 8px;
-      padding: 10px 16px;
-      background: rgba(245, 245, 245, 0.95);
-      border-radius: 0 0 12px 12px;
-      backdrop-filter: blur(10px);
-      transition: top 0.3s ease, background 0.3s ease;
-      z-index: 100;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      align-items: center;
+      gap: 10px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
     }
 
-    html.dark .toolbar {
-      background: rgba(30, 30, 30, 0.95);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    .pen-indicator.visible {
+      opacity: 1;
     }
 
-    .toolbar.visible {
-      top: 0;
+    .pen-indicator svg {
+      width: 18px;
+      height: 18px;
     }
 
-    .btn {
-      width: 32px;
-      height: 32px;
-      border: none;
-      border-radius: 6px;
-      background: rgba(0, 0, 0, 0.08);
-      color: #333;
+    .pressure-bar {
+      width: 60px;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .pressure-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      transition: width 0.05s ease;
+    }
+
+    /* Menu Toggle Button */
+    .menu-toggle {
+      position: fixed;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      width: 24px;
+      height: 60px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-right: none;
+      border-radius: 12px 0 0 12px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: background 0.2s, color 0.2s;
-      font-size: 16px;
+      transition: all 0.3s ease;
+      z-index: 100;
     }
 
-    .btn:hover {
-      background: rgba(0, 0, 0, 0.15);
+    .menu-toggle:hover {
+      width: 28px;
+      background: var(--accent);
     }
 
-    .btn.active {
-      background: rgba(0, 0, 0, 0.2);
+    .menu-toggle:hover svg {
+      stroke: white;
     }
 
-    html.dark .btn {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
+    .menu-toggle svg {
+      width: 14px;
+      height: 14px;
+      stroke: var(--text-color);
+      transition: transform 0.3s ease, stroke 0.3s ease;
     }
 
-    html.dark .btn:hover {
-      background: rgba(255, 255, 255, 0.2);
+    .menu-toggle.open svg {
+      transform: rotate(180deg);
     }
 
-    html.dark .btn.active {
-      background: rgba(255, 255, 255, 0.3);
+    /* Hidden Menu Panel */
+    .menu-panel {
+      position: fixed;
+      top: 50%;
+      right: -280px;
+      transform: translateY(-50%);
+      width: 260px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px 0 0 16px;
+      padding: 24px;
+      transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 99;
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
     }
 
-    .color-btn {
+    .menu-panel.open {
+      right: 0;
+    }
+
+    .menu-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .menu-title svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .menu-section {
+      margin-bottom: 24px;
+    }
+
+    .menu-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .menu-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      opacity: 0.6;
+      margin-bottom: 10px;
+    }
+
+    /* Tool Selection */
+    .tool-select {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tool-btn {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .tool-btn svg {
       width: 24px;
       height: 24px;
-      border-radius: 50%;
-      border: 2px solid transparent;
-      cursor: pointer;
-      transition: transform 0.15s, border-color 0.15s;
+      stroke: var(--text-color);
+      transition: stroke 0.2s ease;
     }
 
-    .color-btn:hover {
+    .tool-btn span {
+      font-size: 11px;
+      color: var(--text-color);
+    }
+
+    .tool-btn:hover {
+      border-color: var(--accent);
+      background: rgba(67, 97, 238, 0.05);
+    }
+
+    .tool-btn.active {
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+
+    .tool-btn.active svg {
+      stroke: white;
+    }
+
+    .tool-btn.active span {
+      color: white;
+    }
+
+    /* Size Slider */
+    .size-control {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .size-preview {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .size-dot {
+      border-radius: 50%;
+      background: var(--text-color);
+      transition: all 0.15s ease;
+    }
+
+    .slider-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .size-value {
+      font-size: 12px;
+      font-weight: 500;
+      text-align: right;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
       transform: scale(1.15);
     }
 
-    .color-btn.active {
-      border-color: #333;
-    }
-
-    html.dark .color-btn.active {
-      border-color: #fff;
-    }
-
-    .separator {
-      width: 1px;
-      background: rgba(0, 0, 0, 0.15);
-      margin: 0 4px;
-    }
-
-    html.dark .separator {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .size-indicator {
-      color: rgba(0, 0, 0, 0.6);
-      font-size: 11px;
-      font-family: system-ui, sans-serif;
-      min-width: 28px;
-      text-align: center;
-      align-self: center;
-    }
-
-    html.dark .size-indicator {
-      color: rgba(255, 255, 255, 0.7);
-    }
-
-    /* Eraser cursor indicator */
-    .eraser-cursor {
-      position: fixed;
-      border: 2px solid rgba(0, 0, 0, 0.5);
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 1000;
-      display: none;
-      transform: translate(-50%, -50%);
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .eraser-cursor.visible {
-      display: block;
-    }
-
-    /* Lasso selection overlay */
-    #lassoCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      pointer-events: none;
-      z-index: 10;
-    }
-
-    /* Selection indicator */
-    .selection-box {
-      position: absolute;
-      border: 2px dashed #4a8ea1;
-      background: transparent;
-      pointer-events: none;
-      z-index: 11;
-      display: none;
-    }
-
-    .selection-box.visible {
-      display: block;
-    }
-
-    .selection-box.moving {
-      cursor: move;
-      /* pointer-events stays none - movement handled through canvas */
-    }
-
-    /* Rotation handle */
-    .rotation-handle {
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      background: #4a8ea1;
-      border: 2px solid #fff;
-      border-radius: 50%;
-      cursor: grab;
-      pointer-events: none;
-      z-index: 12;
-      display: none;
-      transform: translate(-50%, -50%);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    .rotation-handle.visible {
-      display: block;
-    }
-
-    .rotation-handle:active {
-      cursor: grabbing;
-    }
-
-    /* Rotation line connecting handle to selection */
-    .rotation-line {
-      position: absolute;
-      width: 2px;
-      background: #4a8ea1;
-      pointer-events: none;
-      z-index: 11;
-      display: none;
-      transform-origin: bottom center;
-    }
-
-    .rotation-line.visible {
-      display: block;
-    }
-
-    /* Duplicate handle */
-    .duplicate-handle {
-      position: absolute;
-      width: 24px;
-      height: 24px;
-      background: #27ae60;
-      border: 2px solid #fff;
-      border-radius: 50%;
-      cursor: pointer;
-      pointer-events: none;
-      z-index: 12;
-      display: none;
-      transform: translate(-50%, -50%);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-      font-size: 16px;
-      font-weight: bold;
-      color: #fff;
-      line-height: 20px;
-      text-align: center;
-    }
-
-    .duplicate-handle.visible {
-      display: block;
-    }
-
-    .duplicate-handle:hover {
-      background: #2ecc71;
-    }
-
-    /* Toggle toolbar button */
-    .toolbar-toggle {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      width: 32px;
-      height: 32px;
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
       border: none;
       border-radius: 50%;
-      background: transparent;
-      color: #555;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Clear Button */
+    .clear-btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: var(--danger);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 101;
-      transition: color 0.2s;
+      gap: 8px;
+      transition: all 0.2s ease;
     }
 
-    .toolbar-toggle:hover {
-      color: #333;
+    .clear-btn:hover {
+      opacity: 0.9;
+      transform: scale(0.98);
     }
 
-    .toolbar-toggle:active {
-      color: #555;
+    .clear-btn svg {
+      width: 18px;
+      height: 18px;
     }
 
-    html.dark .toolbar-toggle:active {
-      color: #aaa;
+    /* Eraser cursor */
+    .eraser-cursor {
+      position: fixed;
+      pointer-events: none;
+      border: 2px solid var(--text-color);
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      z-index: 1000;
+      mix-blend-mode: difference;
     }
 
-    .toolbar-toggle svg {
-      width: 30px;
-      height: 30px;
+    .eraser-cursor.visible {
+      opacity: 0.8;
     }
 
+    /* Mode indicator */
+    .mode-indicator {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+
+    .mode-indicator.visible {
+      opacity: 1;
+    }
+
+    .mode-indicator svg {
+      width: 16px;
+      height: 16px;
+    }
   </style>
 </head>
 <body>
-  <div class="canvas-container">
-    <canvas id="canvas"></canvas>
-    <canvas id="lassoCanvas"></canvas>
-    <div class="selection-box" id="selectionBox"></div>
-    <div class="rotation-line" id="rotationLine"></div>
-    <div class="rotation-handle" id="rotationHandle"></div>
-    <div class="duplicate-handle" id="duplicateHandle" title="Duplicate">+</div>
+  <div class="container">
+    <div class="toolbar">
+      <div class="toolbar-section">
+        <div class="status">
+          <div class="status-dot" id="inkApiStatus"></div>
+          <span id="statusText">Checking Web Ink API...</span>
+        </div>
+      </div>
+    </div>
+    <div class="canvas-wrapper">
+      <canvas id="inkCanvas"></canvas>
+    </div>
   </div>
+
+  <!-- Menu Toggle Button -->
+  <div class="menu-toggle" id="menuToggle">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+  </div>
+
+  <!-- Hidden Menu Panel -->
+  <div class="menu-panel" id="menuPanel">
+    <div class="menu-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      Tools
+    </div>
+
+    <!-- Tool Selection -->
+    <div class="menu-section">
+      <div class="menu-label">Mode</div>
+      <div class="tool-select">
+        <button class="tool-btn active" id="penBtn" data-tool="pen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+            <path d="M2 2l7.586 7.586"/>
+          </svg>
+          <span>Pen</span>
+        </button>
+        <button class="tool-btn" id="eraserBtn" data-tool="eraser">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.4 2.8c.8-.8 2-.8 2.8 0L21 7.6c.8.8.8 2 0 2.8L11 20"/>
+            <path d="M6 11l6 6"/>
+          </svg>
+          <span>Eraser</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Pen Size -->
+    <div class="menu-section">
+      <div class="menu-label">Pen Size</div>
+      <div class="size-control">
+        <div class="size-preview">
+          <div class="size-dot" id="sizeDot"></div>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="sizeSlider" min="1" max="20" value="3">
+          <div class="size-value"><span id="sizeValue">3</span>px</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Clear Canvas -->
+    <div class="menu-section">
+      <button class="clear-btn" id="clearBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
+        Clear Canvas
+      </button>
+    </div>
+  </div>
+
+  <!-- Pen Indicator -->
+  <div class="pen-indicator" id="penIndicator">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+      <path d="M2 2l7.586 7.586"/>
+      <circle cx="11" cy="11" r="2"/>
+    </svg>
+    <span>Pressure:</span>
+    <div class="pressure-bar">
+      <div class="pressure-fill" id="pressureFill"></div>
+    </div>
+  </div>
+
+  <!-- Mode Indicator -->
+  <div class="mode-indicator" id="modeIndicator">
+    <svg id="modeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+    </svg>
+    <span id="modeText">Pen Mode</span>
+  </div>
+
+  <!-- Eraser Cursor -->
   <div class="eraser-cursor" id="eraserCursor"></div>
 
-  <button class="toolbar-toggle" id="toolbarToggle" title="Toggle toolbar">
-    <svg id="toggleIconCircle" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
-    <svg id="toggleIconLock" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg>
-  </button>
-
-  <div class="toolbar" id="toolbar">
-    <!-- Colors -->
-    <button class="color-btn active" style="background: #1a1a1a;" data-color="#1a1a1a" title="Black"></button>
-    <button class="color-btn" style="background: #e74c3c;" data-color="#e74c3c" title="Red"></button>
-    <button class="color-btn" style="background: #3498db;" data-color="#3498db" title="Blue"></button>
-    <button class="color-btn" style="background: #27ae60;" data-color="#27ae60" title="Green"></button>
-
-    <div class="separator"></div>
-
-    <!-- Size controls -->
-    <button class="btn" id="sizeDown" title="Smaller">−</button>
-    <span class="size-indicator" id="sizeDisplay">1.5</span>
-    <button class="btn" id="sizeUp" title="Larger">+</button>
-
-    <div class="separator"></div>
-
-    <!-- Tools -->
-    <button class="btn" id="eraserBtn" title="Eraser">⌫</button>
-    <button class="btn" id="clearBtn" title="Clear All">✕</button>
-
-    <div class="separator"></div>
-
-    <button class="btn" id="fullscreenBtn" title="Toggle Fullscreen">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-    </button>
-    <button class="btn" id="themeBtn" title="Toggle Dark/Light Mode">
-      <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-      <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-    </button>
-  </div>
-
   <script>
-    // Dark/Light mode detection and toggle
-    const sunIcon = document.getElementById('sunIcon');
-    const moonIcon = document.getElementById('moonIcon');
-
-    function updateThemeIcons() {
-      const isDark = document.documentElement.classList.contains('dark');
-      sunIcon.style.display = isDark ? 'none' : 'block';
-      moonIcon.style.display = isDark ? 'block' : 'none';
-    }
-
-    // Detect user's preferred color scheme
+    // Dark mode detection
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       document.documentElement.classList.add('dark');
     }
-    updateThemeIcons();
-
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
       if (event.matches) {
         document.documentElement.classList.add('dark');
       } else {
         document.documentElement.classList.remove('dark');
       }
-      updateThemeIcons();
     });
 
-    document.getElementById('themeBtn').addEventListener('click', () => {
-      document.documentElement.classList.toggle('dark');
-      updateThemeIcons();
-    });
-
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d', {
-      willReadFrequently: false,
-      desynchronized: true
-    });
-
-    // Web Ink API for reduced latency (experimental, Windows only)
-    let inkPresenter = null;
-    if ('ink' in navigator) {
-      navigator.ink.requestPresenter({ presentationArea: canvas })
-        .then(presenter => {
-          inkPresenter = presenter;
-          console.log('Web Ink API enabled for reduced latency');
-          console.log('Ink presenter:', presenter);
-          console.log('Expected improvement:', presenter.expectedImprovement);
-        })
-        .catch(err => {
-          console.log('Web Ink API not available:', err);
-        });
-    } else {
-      console.log('Web Ink API not supported in this browser');
-    }
+    // DOM Elements
+    const canvas = document.getElementById('inkCanvas');
+    const ctx = canvas.getContext('2d', { desynchronized: true });
+    const statusDot = document.getElementById('inkApiStatus');
+    const statusText = document.getElementById('statusText');
+    const clearBtn = document.getElementById('clearBtn');
+    const penIndicator = document.getElementById('penIndicator');
+    const pressureFill = document.getElementById('pressureFill');
+    const menuToggle = document.getElementById('menuToggle');
+    const menuPanel = document.getElementById('menuPanel');
+    const penBtn = document.getElementById('penBtn');
+    const eraserBtn = document.getElementById('eraserBtn');
+    const sizeSlider = document.getElementById('sizeSlider');
+    const sizeValue = document.getElementById('sizeValue');
+    const sizeDot = document.getElementById('sizeDot');
+    const eraserCursor = document.getElementById('eraserCursor');
+    const modeIndicator = document.getElementById('modeIndicator');
+    const modeIcon = document.getElementById('modeIcon');
+    const modeText = document.getElementById('modeText');
 
     // State
+    let inkPresenter = null;
     let isDrawing = false;
     let lastX = 0;
     let lastY = 0;
-    let lastPressure = 0.5;
-    let strokeColor = '#1a1a1a';
-    let baseSize = 1.5;
-    let isEraser = false;
-    let activeEraser = false; // True during stroke if using eraser tip or eraser tool
+    let currentTool = 'pen';
+    let menuOpen = false;
 
-    // Double-tap eraser boost
-    let eraserSizeMultiplier = 1;
-    let eraserTapCount = 0;
-    let lastEraserLiftTime = 0;
-    let eraserResetTimeout = null;
-    const DOUBLE_TAP_THRESHOLD = 150; // ms between taps to count as double-tap
+    // Ink style configuration
+    const inkStyle = {
+      color: '#1a1a2e',
+      diameter: 3
+    };
 
-    // Eraser cursor indicator
-    const eraserCursor = document.getElementById('eraserCursor');
+    // Update size preview dot
+    function updateSizeDot() {
+      const size = Math.max(4, inkStyle.diameter * 2);
+      sizeDot.style.width = size + 'px';
+      sizeDot.style.height = size + 'px';
+    }
+    updateSizeDot();
 
-    // Lasso tool state
-    const lassoCanvas = document.getElementById('lassoCanvas');
-    const lassoCtx = lassoCanvas.getContext('2d');
-    const selectionBox = document.getElementById('selectionBox');
-    const rotationHandle = document.getElementById('rotationHandle');
-    const rotationLine = document.getElementById('rotationLine');
-    const duplicateHandle = document.getElementById('duplicateHandle');
-    let isLassoMode = false;
-    let isLassoDrawing = false;
-    let lassoPath = []; // Array of {x, y} points
-    let hasSelection = false;
-    let selectionImageData = null;
-    let selectionBounds = null; // {x, y, width, height}
-    let isMovingSelection = false;
-    let isRotatingSelection = false;
-    let moveStartX = 0;
-    let moveStartY = 0;
-    let selectionOffsetX = 0;
-    let selectionOffsetY = 0;
-    let selectionRotation = 0; // Rotation angle in radians
-    const ROTATION_HANDLE_DISTANCE = 40; // Distance of handle from selection top
-
-    // Detect stylus barrel button (button 2 / right click on pen)
-    function isBarrelButton(e) {
-      return e.button === 2 || (e.buttons & 2) !== 0;
+    // Update eraser cursor size
+    function updateEraserCursor() {
+      const size = inkStyle.diameter * 4 + 10;
+      eraserCursor.style.width = size + 'px';
+      eraserCursor.style.height = size + 'px';
+      eraserCursor.style.marginLeft = -(size / 2) + 'px';
+      eraserCursor.style.marginTop = -(size / 2) + 'px';
     }
 
-    function updateEraserCursor(x, y, show) {
-      if (show) {
-        const size = (getStrokeWidth(0.5) + 10) * 2 * eraserSizeMultiplier;
-        eraserCursor.style.width = size + 'px';
-        eraserCursor.style.height = size + 'px';
-        eraserCursor.style.left = x + 'px';
-        eraserCursor.style.top = y + 'px';
-        eraserCursor.classList.add('visible');
-        // Change border color when boosted
-        eraserCursor.style.borderColor = eraserSizeMultiplier > 1 ? 'rgba(255, 100, 100, 0.8)' : 'rgba(0, 0, 0, 0.5)';
+    // Toggle menu
+    menuToggle.addEventListener('click', () => {
+      menuOpen = !menuOpen;
+      menuPanel.classList.toggle('open', menuOpen);
+      menuToggle.classList.toggle('open', menuOpen);
+    });
+
+    // Tool selection
+    function setTool(tool) {
+      currentTool = tool;
+      penBtn.classList.toggle('active', tool === 'pen');
+      eraserBtn.classList.toggle('active', tool === 'eraser');
+      canvas.classList.toggle('eraser-mode', tool === 'eraser');
+
+      // Show mode indicator briefly
+      if (tool === 'eraser') {
+        modeIcon.innerHTML = '<path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.4 2.8c.8-.8 2-.8 2.8 0L21 7.6c.8.8.8 2 0 2.8L11 20"/><path d="M6 11l6 6"/>';
+        modeText.textContent = 'Eraser Mode';
       } else {
-        eraserCursor.classList.remove('visible');
+        modeIcon.innerHTML = '<path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>';
+        modeText.textContent = 'Pen Mode';
       }
+      modeIndicator.classList.add('visible');
+      setTimeout(() => modeIndicator.classList.remove('visible'), 1500);
+
+      updateEraserCursor();
     }
 
-    // Fixed canvas size with High DPI support
-    function initCanvas() {
+    penBtn.addEventListener('click', () => setTool('pen'));
+    eraserBtn.addEventListener('click', () => setTool('eraser'));
+
+    // Size slider
+    sizeSlider.addEventListener('input', (e) => {
+      inkStyle.diameter = parseInt(e.target.value);
+      sizeValue.textContent = inkStyle.diameter;
+      updateSizeDot();
+      updateEraserCursor();
+    });
+
+    // Resize canvas (High DPI optimized)
+    function resizeCanvas() {
       const dpr = window.devicePixelRatio || 1;
-      // Use initial viewport size as fixed canvas size
-      const width = window.innerWidth;
-      const height = window.innerHeight;
+      const rect = canvas.parentElement.getBoundingClientRect();
 
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
 
-      ctx.scale(dpr, dpr);
-      canvas.style.width = width + 'px';
-      canvas.style.height = height + 'px';
-
-      // Canvas is transparent - white background handled by CSS
-      ctx.clearRect(0, 0, width, height);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
     }
 
-    initCanvas();
-
-    // Handle fullscreen changes - resize canvas to match viewport size while preserving content
-    function handleFullscreenChange() {
-      const dpr = window.devicePixelRatio || 1;
-      const newWidth = window.innerWidth;
-      const newHeight = window.innerHeight;
-
-      // Save current canvas content
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-      // Resize canvas to new viewport size
-      canvas.width = newWidth * dpr;
-      canvas.height = newHeight * dpr;
-      ctx.scale(dpr, dpr);
-      canvas.style.width = newWidth + 'px';
-      canvas.style.height = newHeight + 'px';
-
-      // Restore content
-      ctx.putImageData(imageData, 0, 0);
-
-      // Also resize lasso canvas
-      lassoCanvas.width = newWidth * dpr;
-      lassoCanvas.height = newHeight * dpr;
-      lassoCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
-      lassoCtx.scale(dpr, dpr);
-      lassoCanvas.style.width = newWidth + 'px';
-      lassoCanvas.style.height = newHeight + 'px';
-    }
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-
-    // Initialize lasso canvas to same size
-    function initLassoCanvas() {
-      const dpr = window.devicePixelRatio || 1;
-      const width = parseInt(canvas.style.width);
-      const height = parseInt(canvas.style.height);
-      lassoCanvas.width = width * dpr;
-      lassoCanvas.height = height * dpr;
-      lassoCtx.scale(dpr, dpr);
-      lassoCanvas.style.width = width + 'px';
-      lassoCanvas.style.height = height + 'px';
-    }
-    initLassoCanvas();
-
-    // Clear lasso overlay
-    function clearLassoCanvas() {
-      const width = parseInt(lassoCanvas.style.width);
-      const height = parseInt(lassoCanvas.style.height);
-      lassoCtx.clearRect(0, 0, width, height);
-    }
-
-    // Draw lasso path on overlay
-    function drawLassoPath() {
-      clearLassoCanvas();
-      if (lassoPath.length < 2) return;
-
-      lassoCtx.beginPath();
-      lassoCtx.moveTo(lassoPath[0].x, lassoPath[0].y);
-      for (let i = 1; i < lassoPath.length; i++) {
-        lassoCtx.lineTo(lassoPath[i].x, lassoPath[i].y);
+    // Initialize Web Ink API
+    async function initInkAPI() {
+      if ('ink' in navigator) {
+        try {
+          inkPresenter = await navigator.ink.requestPresenter({
+            presentationArea: canvas
+          });
+          statusDot.classList.add('active');
+          statusText.textContent = 'Web Ink API Active';
+        } catch (err) {
+          console.error('Failed to initialize Web Ink API:', err);
+          statusDot.classList.add('unsupported');
+          statusText.textContent = 'Web Ink API failed';
+        }
+      } else {
+        statusDot.classList.add('unsupported');
+        statusText.textContent = 'Web Ink API not supported';
       }
-      lassoCtx.strokeStyle = '#4a8ea1';
-      lassoCtx.lineWidth = 2;
-      lassoCtx.setLineDash([5, 5]);
-      lassoCtx.stroke();
-      lassoCtx.setLineDash([]);
     }
 
-    // Get bounding box of lasso path
-    function getLassoBounds() {
-      if (lassoPath.length === 0) return null;
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (const p of lassoPath) {
-        minX = Math.min(minX, p.x);
-        minY = Math.min(minY, p.y);
-        maxX = Math.max(maxX, p.x);
-        maxY = Math.max(maxY, p.y);
-      }
-      return {
-        x: Math.floor(minX),
-        y: Math.floor(minY),
-        width: Math.ceil(maxX - minX),
-        height: Math.ceil(maxY - minY)
-      };
-    }
-
-    // Create selection from lasso path
-    function createSelection() {
-      if (lassoPath.length < 3) {
-        cancelSelection();
-        return;
-      }
-
-      const bounds = getLassoBounds();
-      if (!bounds || bounds.width < 5 || bounds.height < 5) {
-        cancelSelection();
-        return;
-      }
-
-      selectionBounds = bounds;
-      const dpr = window.devicePixelRatio || 1;
-
-      // Create a temporary canvas at full DPR resolution to preserve quality
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = bounds.width * dpr;
-      tempCanvas.height = bounds.height * dpr;
-      const tempCtx = tempCanvas.getContext('2d');
-
-      // Scale context for DPR
-      tempCtx.scale(dpr, dpr);
-
-      // Create clipping path from lasso (in local CSS coordinates)
-      tempCtx.beginPath();
-      tempCtx.moveTo(lassoPath[0].x - bounds.x, lassoPath[0].y - bounds.y);
-      for (let i = 1; i < lassoPath.length; i++) {
-        tempCtx.lineTo(lassoPath[i].x - bounds.x, lassoPath[i].y - bounds.y);
-      }
-      tempCtx.closePath();
-      tempCtx.clip();
-
-      // Draw the main canvas content into the clipped area
-      // Source is in actual canvas pixels (scaled by DPR), dest is in CSS pixels (but context is scaled)
-      tempCtx.drawImage(
-        canvas,
-        bounds.x * dpr, bounds.y * dpr, bounds.width * dpr, bounds.height * dpr,
-        0, 0, bounds.width, bounds.height
-      );
-
-      // Store the selection image
-      selectionImageData = tempCanvas;
-
-      // Clear the selected area from main canvas using the lasso path
-      ctx.save();
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.beginPath();
-      ctx.moveTo(lassoPath[0].x, lassoPath[0].y);
-      for (let i = 1; i < lassoPath.length; i++) {
-        ctx.lineTo(lassoPath[i].x, lassoPath[i].y);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-
-      // Show selection box
-      selectionBox.style.left = bounds.x + 'px';
-      selectionBox.style.top = bounds.y + 'px';
-      selectionBox.style.width = bounds.width + 'px';
-      selectionBox.style.height = bounds.height + 'px';
-      selectionBox.classList.add('visible', 'moving');
-
-      hasSelection = true;
-      selectionOffsetX = 0;
-      selectionOffsetY = 0;
-
-      // Draw selection preview on lasso canvas
-      drawSelectionPreview();
-
-      // Clear lasso path display
-      lassoPath = [];
-    }
-
-    // Get selection center point
-    function getSelectionCenter() {
-      if (!selectionBounds) return { x: 0, y: 0 };
-      return {
-        x: selectionBounds.x + selectionOffsetX + selectionBounds.width / 2,
-        y: selectionBounds.y + selectionOffsetY + selectionBounds.height / 2
-      };
-    }
-
-    // Update rotation handle, duplicate handle, and line position
-    function updateRotationHandlePosition() {
-      if (!hasSelection || !selectionBounds) {
-        rotationHandle.classList.remove('visible');
-        rotationLine.classList.remove('visible');
-        duplicateHandle.classList.remove('visible');
-        return;
-      }
-
-      const center = getSelectionCenter();
-
-      // Position rotation handle above selection, accounting for rotation
-      const handleX = center.x + Math.sin(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
-      const handleY = center.y - Math.cos(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
-
-      rotationHandle.style.left = handleX + 'px';
-      rotationHandle.style.top = handleY + 'px';
-      rotationHandle.classList.add('visible');
-
-      // Position duplicate handle below selection, accounting for rotation
-      const dupHandleX = center.x - Math.sin(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
-      const dupHandleY = center.y + Math.cos(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
-
-      duplicateHandle.style.left = dupHandleX + 'px';
-      duplicateHandle.style.top = dupHandleY + 'px';
-      duplicateHandle.classList.add('visible');
-
-      // Position and rotate the line connecting handle to selection
-      const lineLength = ROTATION_HANDLE_DISTANCE;
-      rotationLine.style.height = lineLength + 'px';
-      rotationLine.style.left = center.x + 'px';
-      rotationLine.style.top = (center.y - selectionBounds.height / 2 - lineLength) + 'px';
-      rotationLine.style.transform = `translateX(-50%) rotate(${selectionRotation}rad)`;
-      rotationLine.style.transformOrigin = `center ${lineLength + selectionBounds.height / 2}px`;
-      rotationLine.classList.add('visible');
-    }
-
-    // Draw selection preview on lasso canvas
-    function drawSelectionPreview() {
-      if (!hasSelection || !selectionImageData || !selectionBounds) return;
-
-      clearLassoCanvas();
-      const center = getSelectionCenter();
-
-      // Save context state
-      lassoCtx.save();
-
-      // Translate to center, rotate, then draw
-      lassoCtx.translate(center.x, center.y);
-      lassoCtx.rotate(selectionRotation);
-      lassoCtx.translate(-selectionBounds.width / 2, -selectionBounds.height / 2);
-
-      // Draw the DPR-scaled selection image
-      lassoCtx.drawImage(
-        selectionImageData,
-        0, 0, selectionImageData.width, selectionImageData.height,
-        0, 0, selectionBounds.width, selectionBounds.height
-      );
-
-      // Restore context state
-      lassoCtx.restore();
-
-      // Update rotation handle position
-      updateRotationHandlePosition();
-
-      // Update selection box with rotation
-      selectionBox.style.left = (selectionBounds.x + selectionOffsetX) + 'px';
-      selectionBox.style.top = (selectionBounds.y + selectionOffsetY) + 'px';
-      selectionBox.style.transform = `rotate(${selectionRotation}rad)`;
-      selectionBox.style.transformOrigin = 'center center';
-    }
-
-    // Commit selection to main canvas
-    function commitSelection() {
-      if (!hasSelection || !selectionImageData || !selectionBounds) return;
-
-      const center = getSelectionCenter();
-
-      ctx.globalCompositeOperation = 'source-over';
-
-      // Save context state
-      ctx.save();
-
-      // Translate to center, rotate, then draw
-      ctx.translate(center.x, center.y);
-      ctx.rotate(selectionRotation);
-      ctx.translate(-selectionBounds.width / 2, -selectionBounds.height / 2);
-
-      // Draw DPR-scaled selection back to main canvas
-      ctx.drawImage(
-        selectionImageData,
-        0, 0, selectionImageData.width, selectionImageData.height,
-        0, 0, selectionBounds.width, selectionBounds.height
-      );
-
-      // Restore context state
-      ctx.restore();
-
-      cancelSelection();
-    }
-
-    // Cancel/clear selection
-    function cancelSelection() {
-      hasSelection = false;
-      selectionImageData = null;
-      selectionBounds = null;
-      lassoPath = [];
-      selectionOffsetX = 0;
-      selectionOffsetY = 0;
-      selectionRotation = 0;
-      selectionBox.classList.remove('visible', 'moving');
-      selectionBox.style.transform = '';
-      rotationHandle.classList.remove('visible');
-      rotationLine.classList.remove('visible');
-      duplicateHandle.classList.remove('visible');
-      clearLassoCanvas();
-    }
-
-    // Duplicate selection - commits copy to canvas and keeps selection active
-    function duplicateSelection() {
-      if (!hasSelection || !selectionImageData || !selectionBounds) return;
-
-      const center = getSelectionCenter();
-
-      ctx.globalCompositeOperation = 'source-over';
-
-      // Save context state
-      ctx.save();
-
-      // Draw current selection state to main canvas (this becomes the duplicate)
-      ctx.translate(center.x, center.y);
-      ctx.rotate(selectionRotation);
-      ctx.translate(-selectionBounds.width / 2, -selectionBounds.height / 2);
-
-      ctx.drawImage(
-        selectionImageData,
-        0, 0, selectionImageData.width, selectionImageData.height,
-        0, 0, selectionBounds.width, selectionBounds.height
-      );
-
-      // Restore context state
-      ctx.restore();
-
-      // Selection stays active - user can continue moving/rotating the "new" copy
-      // Offset it slightly so user can see the duplicate was created
-      selectionOffsetX += 20;
-      selectionOffsetY += 20;
-
-      drawSelectionPreview();
-    }
-
-    // Check if point is near the duplicate handle
-    function isNearDuplicateHandle(pos) {
-      if (!hasSelection || !selectionBounds) return false;
-
-      const center = getSelectionCenter();
-      const handleX = center.x - Math.sin(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
-      const handleY = center.y + Math.cos(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
-
-      const dx = pos.x - handleX;
-      const dy = pos.y - handleY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      return distance < 25; // 25px hit area for the handle
-    }
-
-    // Start lasso drawing
-    function startLasso(e) {
-      // If we have a selection, commit it first before starting new lasso
-      if (hasSelection) {
-        commitSelection();
-      }
-
-      isLassoDrawing = true;
-      lassoPath = [];
-      const pos = getPointerPos(e);
-      lassoPath.push({ x: pos.x, y: pos.y });
-      drawLassoPath();
-    }
-
-    // Continue lasso drawing
-    function continueLasso(e) {
-      if (!isLassoDrawing) return;
-
-      const pos = getPointerPos(e);
-      lassoPath.push({ x: pos.x, y: pos.y });
-      drawLassoPath();
-    }
-
-    // End lasso drawing
-    function endLasso() {
-      if (!isLassoDrawing) return;
-      isLassoDrawing = false;
-
-      // Create selection from path
-      createSelection();
-    }
-
-    // Tilt compensation factor (pixels per degree of tilt)
-    // Adjust this value based on stylus geometry - higher values = more compensation
-    const TILT_COMPENSATION = 0.04;
-
-    function getPointerPos(e) {
+    // Get coordinates from pointer event
+    function getCoords(e) {
       const rect = canvas.getBoundingClientRect();
-      let x = e.clientX - rect.left;
-      let y = e.clientY - rect.top;
-
-      // Apply tilt compensation if tilt data is available
-      // tiltX and tiltY are in degrees (-90 to 90)
-      if (e.pointerType === 'pen' && typeof e.tiltX === 'number' && typeof e.tiltY === 'number') {
-        // Compensate position based on tilt angle
-        // When tilted, offset the position opposite to the tilt direction
-        x -= e.tiltX * TILT_COMPENSATION;
-        y -= e.tiltY * TILT_COMPENSATION;
-      }
-
       return {
-        x: x,
-        y: y,
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
         pressure: e.pressure || 0.5
       };
     }
 
-    // Detect if using eraser end of stylus (button 5 or buttons bitmask 32)
-    function isEraserTip(e) {
-      return e.button === 5 || (e.buttons & 32) !== 0;
-    }
-
-    // Check if point is near the rotation handle
-    function isNearRotationHandle(pos) {
-      if (!hasSelection || !selectionBounds) return false;
-
-      const center = getSelectionCenter();
-      const handleX = center.x + Math.sin(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
-      const handleY = center.y - Math.cos(selectionRotation) * (selectionBounds.height / 2 + ROTATION_HANDLE_DISTANCE);
-
-      const dx = pos.x - handleX;
-      const dy = pos.y - handleY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      return distance < 25; // 25px hit area for the handle
-    }
-
-    // Check if point is inside the rotated selection box
-    function isInsideRotatedSelection(pos) {
-      if (!hasSelection || !selectionBounds) return false;
-
-      const center = getSelectionCenter();
-
-      // Rotate the point back to unrotated space
-      const dx = pos.x - center.x;
-      const dy = pos.y - center.y;
-      const cos = Math.cos(-selectionRotation);
-      const sin = Math.sin(-selectionRotation);
-      const rotatedX = dx * cos - dy * sin + center.x;
-      const rotatedY = dx * sin + dy * cos + center.y;
-
-      // Check if in bounds
-      const x = selectionBounds.x + selectionOffsetX;
-      const y = selectionBounds.y + selectionOffsetY;
-
-      return rotatedX >= x && rotatedX <= x + selectionBounds.width &&
-             rotatedY >= y && rotatedY <= y + selectionBounds.height;
-    }
-
-    function startStroke(e) {
-      // Only allow pen (stylus) input - disable finger/touch
-      if (e.pointerType === 'touch') return;
-
-      // If we have an active selection, check for rotation handle, inside, or outside
-      if (hasSelection && selectionBounds) {
-        const pos = getPointerPos(e);
-
-        // Check rotation handle first
-        if (isNearRotationHandle(pos)) {
-          isRotatingSelection = true;
-          moveStartX = pos.x;
-          moveStartY = pos.y;
-          e.preventDefault();
-          return;
-        }
-
-        // Check duplicate handle
-        if (isNearDuplicateHandle(pos)) {
-          duplicateSelection();
-          e.preventDefault();
-          return;
-        }
-
-        // Check if inside selection (accounting for rotation)
-        if (isInsideRotatedSelection(pos)) {
-          // Touch inside selection - start moving
-          isMovingSelection = true;
-          moveStartX = pos.x;
-          moveStartY = pos.y;
-          e.preventDefault();
-          return;
-        } else {
-          // Touch outside selection - commit it only, don't start a stroke
-          commitSelection();
-          e.preventDefault();
-          return;
-        }
-      }
-
-      // Check for barrel button - activate lasso mode
-      if (isBarrelButton(e)) {
-        isLassoMode = true;
-        startLasso(e);
+    // Pointer down handler
+    function handlePointerDown(e) {
+      if (e.pointerType !== 'pen') {
         e.preventDefault();
         return;
       }
 
       isDrawing = true;
-      activeEraser = isEraser || isEraserTip(e); // Use eraser if tool selected OR using eraser tip
+      const coords = getCoords(e);
+      lastX = coords.x;
+      lastY = coords.y;
 
-      const pos = getPointerPos(e);
-      lastX = pos.x;
-      lastY = pos.y;
-      lastPressure = pos.pressure;
-      smoothedPressure = pos.pressure; // Reset smoothed pressure for new stroke
-      isFirstSegment = true; // Reset for smooth curve connections
-      resetStabilization(); // Reset stabilization buffer for new stroke
-      webInkEventQueue = []; // Reset Web Ink API event queue
+      penIndicator.classList.add('visible');
+      pressureFill.style.width = (coords.pressure * 100) + '%';
 
-      // Show eraser cursor
-      updateEraserCursor(e.clientX, e.clientY, activeEraser);
+      if (currentTool === 'eraser') {
+        eraserCursor.classList.add('visible');
+        eraserCursor.style.left = e.clientX + 'px';
+        eraserCursor.style.top = e.clientY + 'px';
+      }
 
-      // Double-tap detection for eraser boost
-      if (activeEraser) {
-        // Clear any pending reset
-        if (eraserResetTimeout) {
-          clearTimeout(eraserResetTimeout);
-          eraserResetTimeout = null;
+      canvas.setPointerCapture(e.pointerId);
+    }
+
+    // Pointer move handler
+    function handlePointerMove(e) {
+      if (e.pointerType !== 'pen') {
+        e.preventDefault();
+        return;
+      }
+
+      // Update eraser cursor position
+      if (currentTool === 'eraser') {
+        eraserCursor.style.left = e.clientX + 'px';
+        eraserCursor.style.top = e.clientY + 'px';
+        if (isDrawing) {
+          eraserCursor.classList.add('visible');
         }
-
-        const now = Date.now();
-        const timeSinceLastLift = now - lastEraserLiftTime;
-
-        // If this tap is within threshold of last lift, count it
-        if (timeSinceLastLift < DOUBLE_TAP_THRESHOLD && lastEraserLiftTime > 0) {
-          eraserTapCount++;
-          // Boost eraser on triple-tap
-          if (eraserTapCount >= 3 && eraserSizeMultiplier === 1) {
-            eraserSizeMultiplier = 4;
-            updateEraserCursor(e.clientX, e.clientY, true); // Update cursor size
-          }
-        } else {
-          // Too slow, reset tap count (but keep multiplier if already boosted)
-          eraserTapCount = 1;
-        }
-      }
-
-      // Set composite operation for eraser (destination-out removes pixels)
-      if (activeEraser) {
-        ctx.globalCompositeOperation = 'destination-out';
-      } else {
-        ctx.globalCompositeOperation = 'source-over';
-      }
-
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, getStrokeWidth(pos.pressure) / 2, 0, Math.PI * 2);
-      ctx.fillStyle = activeEraser ? 'rgba(0,0,0,1)' : strokeColor;
-      ctx.fill();
-    }
-
-    // Pressure smoothing factor (0-1, higher = more smoothing)
-    const PRESSURE_SMOOTHING = 0.3;
-    let smoothedPressure = 0.5;
-
-    // Stroke stabilization - moving average buffer
-    const STABILIZATION_LEVEL = 6; // Number of points to average (higher = smoother but more lag)
-    let stabilizationBuffer = [];
-    let lastStabilizedEvent = null; // Store event corresponding to stabilized position for Web Ink API
-
-    function getStabilizedPoint(x, y, pressure, event) {
-      // Add new point to buffer with its event
-      stabilizationBuffer.push({ x, y, pressure, event });
-
-      // Keep buffer at max size
-      if (stabilizationBuffer.length > STABILIZATION_LEVEL) {
-        stabilizationBuffer.shift();
-      }
-
-      // The oldest event in buffer corresponds roughly to where we're drawing now
-      if (stabilizationBuffer.length > 0) {
-        lastStabilizedEvent = stabilizationBuffer[0].event;
-      }
-
-      // Calculate weighted average (more recent points have higher weight)
-      let totalWeight = 0;
-      let avgX = 0;
-      let avgY = 0;
-      let avgPressure = 0;
-
-      for (let i = 0; i < stabilizationBuffer.length; i++) {
-        const weight = i + 1; // Linear weight: 1, 2, 3, ...
-        avgX += stabilizationBuffer[i].x * weight;
-        avgY += stabilizationBuffer[i].y * weight;
-        avgPressure += stabilizationBuffer[i].pressure * weight;
-        totalWeight += weight;
-      }
-
-      return {
-        x: avgX / totalWeight,
-        y: avgY / totalWeight,
-        pressure: avgPressure / totalWeight
-      };
-    }
-
-    function resetStabilization() {
-      stabilizationBuffer = [];
-      lastStabilizedEvent = null;
-    }
-
-    // Track previous midpoint for smooth curve connections
-    let prevMidX = 0;
-    let prevMidY = 0;
-    let isFirstSegment = true;
-
-    // Predictive stroke - tracks raw position for preview
-    let lastRawX = 0;
-    let lastRawY = 0;
-    let lastRawPressure = 0.5;
-
-    // Web Ink API - track which event to use (delayed to show stabilization gap)
-    let webInkEventQueue = [];
-    const WEB_INK_DELAY = 4; // How many events behind to report to Web Ink API
-
-    // Draw predictive preview line on lasso canvas (temporary, gets overwritten)
-    function drawPredictivePreview(stabilizedX, stabilizedY, rawX, rawY, pressure) {
-      // Only draw if there's meaningful distance between stabilized and raw position
-      const dx = rawX - stabilizedX;
-      const dy = rawY - stabilizedY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      // Clear previous preview
-      clearLassoCanvas();
-
-      if (distance > 2 && !activeEraser) {
-        const width = getStrokeWidth(pressure);
-
-        lassoCtx.beginPath();
-        lassoCtx.strokeStyle = strokeColor;
-        lassoCtx.lineWidth = width;
-        lassoCtx.lineCap = 'round';
-        lassoCtx.lineJoin = 'round';
-        lassoCtx.globalAlpha = 0.5; // Semi-transparent preview
-        lassoCtx.moveTo(stabilizedX, stabilizedY);
-        lassoCtx.lineTo(rawX, rawY);
-        lassoCtx.stroke();
-        lassoCtx.globalAlpha = 1.0;
-      }
-    }
-
-    // Clear predictive preview
-    function clearPredictivePreview() {
-      if (!hasSelection && !isLassoDrawing) {
-        clearLassoCanvas();
-      }
-    }
-
-    function drawSmoothSegment(fromX, fromY, toX, toY, fromPressure, toPressure) {
-      // Calculate midpoint for quadratic curve
-      const midX = (fromX + toX) / 2;
-      const midY = (fromY + toY) / 2;
-
-      // Smooth pressure
-      smoothedPressure = smoothedPressure * PRESSURE_SMOOTHING + toPressure * (1 - PRESSURE_SMOOTHING);
-
-      const fromWidth = getStrokeWidth(fromPressure);
-      const toWidth = getStrokeWidth(smoothedPressure);
-
-      ctx.beginPath();
-      ctx.strokeStyle = activeEraser ? 'rgba(0,0,0,1)' : strokeColor;
-      ctx.lineWidth = activeEraser ? ((fromWidth + toWidth) / 2 + 10) * 2 * eraserSizeMultiplier : (fromWidth + toWidth) / 2;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      if (isFirstSegment) {
-        // First segment: draw line from start to midpoint
-        ctx.moveTo(fromX, fromY);
-        ctx.lineTo(midX, midY);
-        isFirstSegment = false;
-      } else {
-        // Subsequent segments: draw curve from previous midpoint through current point to new midpoint
-        ctx.moveTo(prevMidX, prevMidY);
-        ctx.quadraticCurveTo(fromX, fromY, midX, midY);
-      }
-
-      ctx.stroke();
-
-      // Store midpoint for next segment
-      prevMidX = midX;
-      prevMidY = midY;
-    }
-
-    function continueStroke(e) {
-      // Handle rotating selection
-      if (isRotatingSelection && hasSelection) {
-        const pos = getPointerPos(e);
-        const center = getSelectionCenter();
-
-        // Calculate angle from center to current position
-        const currentAngle = Math.atan2(pos.x - center.x, -(pos.y - center.y));
-
-        // Calculate angle from center to start position
-        const startAngle = Math.atan2(moveStartX - center.x, -(moveStartY - center.y));
-
-        // Update rotation
-        selectionRotation += currentAngle - startAngle;
-
-        moveStartX = pos.x;
-        moveStartY = pos.y;
-
-        drawSelectionPreview();
-        return;
-      }
-
-      // Handle moving selection (can happen outside of lasso mode now)
-      if (isMovingSelection && hasSelection) {
-        const pos = getPointerPos(e);
-        const dx = pos.x - moveStartX;
-        const dy = pos.y - moveStartY;
-        selectionOffsetX += dx;
-        selectionOffsetY += dy;
-        moveStartX = pos.x;
-        moveStartY = pos.y;
-
-        // Update selection box position
-        selectionBox.style.left = (selectionBounds.x + selectionOffsetX) + 'px';
-        selectionBox.style.top = (selectionBounds.y + selectionOffsetY) + 'px';
-
-        drawSelectionPreview();
-        return;
-      }
-
-      // Handle lasso drawing mode
-      if (isLassoMode) {
-        continueLasso(e);
-        return;
       }
 
       if (!isDrawing) return;
 
-      // Use Web Ink API FIRST (before canvas drawing) to show preview trail
-      if (inkPresenter && !activeEraser) {
-        try {
-          // Log first few calls to debug
-          if (!window.inkCallCount) window.inkCallCount = 0;
-          window.inkCallCount++;
-          if (window.inkCallCount <= 5) {
-            console.log('Web Ink call #' + window.inkCallCount, {
-              pointerType: e.pointerType,
-              pressure: e.pressure,
-              clientX: e.clientX,
-              clientY: e.clientY,
-              isPrimary: e.isPrimary
-            });
-          }
+      const coords = getCoords(e);
+      pressureFill.style.width = (coords.pressure * 100) + '%';
 
-          const inkStyle = {
-            color: '#FF0000',
-            diameter: 8
-          };
-          inkPresenter.updateInkTrailStartPoint(e, inkStyle);
-        } catch (err) {
-          console.error('Web Ink API error:', err);
+      const baseWidth = inkStyle.diameter;
+      const pressureWidth = baseWidth + (coords.pressure * 4);
+
+      if (currentTool === 'eraser') {
+        // Eraser mode - use destination-out composite
+        const eraserSize = pressureWidth * 3;
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+        ctx.lineWidth = eraserSize;
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(coords.x, coords.y);
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        // Pen mode - draw permanent trail
+        ctx.strokeStyle = inkStyle.color;
+        ctx.lineWidth = pressureWidth;
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(coords.x, coords.y);
+        ctx.stroke();
+
+        // Web Ink API for low-latency preview
+        if (inkPresenter) {
+          try {
+            inkPresenter.updateInkTrailStartPoint(e, {
+              color: inkStyle.color,
+              diameter: pressureWidth
+            });
+          } catch (err) {
+            console.error('Ink trail update failed:', err);
+          }
         }
       }
 
-      // Update eraser cursor position
-      updateEraserCursor(e.clientX, e.clientY, activeEraser);
-
-      // Keep eraser boosted while actively erasing - cancel any pending reset
-      if (activeEraser && eraserResetTimeout) {
-        clearTimeout(eraserResetTimeout);
-        eraserResetTimeout = null;
-      }
-
-      // Use coalesced events for smoother strokes (captures intermediate points)
-      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
-
-      for (const coalescedEvent of events) {
-        const rawPos = getPointerPos(coalescedEvent);
-
-        // Apply stabilization to smooth out hand jitter (pass event for Web Ink API)
-        const pos = getStabilizedPoint(rawPos.x, rawPos.y, rawPos.pressure, coalescedEvent);
-
-        // Draw smooth segment using quadratic Bezier curve
-        // TEMPORARILY DISABLED to test Web Ink API alone - uncomment to restore drawing
-        // drawSmoothSegment(lastX, lastY, pos.x, pos.y, lastPressure, pos.pressure);
-
-        lastX = pos.x;
-        lastY = pos.y;
-        lastPressure = pos.pressure;
-
-        // Track raw position for predictive preview
-        lastRawX = rawPos.x;
-        lastRawY = rawPos.y;
-        lastRawPressure = rawPos.pressure;
-      }
+      lastX = coords.x;
+      lastY = coords.y;
     }
 
-    function endStroke(scheduleReset = true) {
-      // Handle end of rotating selection
-      if (isRotatingSelection) {
-        isRotatingSelection = false;
-        // Selection stays active - user can rotate again or touch outside to commit
+    // Pointer up handler
+    function handlePointerUp(e) {
+      if (e.pointerType !== 'pen') {
+        e.preventDefault();
         return;
-      }
-
-      // Handle end of moving selection
-      if (isMovingSelection) {
-        isMovingSelection = false;
-        // Selection stays active - user can move again or touch outside to commit
-        return;
-      }
-
-      // Handle lasso mode end
-      if (isLassoMode) {
-        endLasso();
-        isLassoMode = false;
-        return;
-      }
-
-      // Track eraser lift time and schedule reset
-      if (activeEraser && scheduleReset) {
-        lastEraserLiftTime = Date.now();
-
-        // Schedule reset after threshold - if no new tap comes, reset everything
-        eraserResetTimeout = setTimeout(() => {
-          eraserSizeMultiplier = 1;
-          eraserTapCount = 0;
-          eraserResetTimeout = null;
-        }, DOUBLE_TAP_THRESHOLD);
       }
 
       isDrawing = false;
-      updateEraserCursor(0, 0, false); // Hide eraser cursor
-      clearPredictivePreview(); // Clear the preview line
-      webInkEventQueue = []; // Clear Web Ink API event queue
+      eraserCursor.classList.remove('visible');
+
+      setTimeout(() => {
+        if (!isDrawing) {
+          penIndicator.classList.remove('visible');
+        }
+      }, 1000);
+
+      canvas.releasePointerCapture(e.pointerId);
     }
 
-    function getStrokeWidth(pressure) {
-      const minWidth = baseSize * 0.3;
-      const maxWidth = baseSize * 2.5;
-      return minWidth + (maxWidth - minWidth) * pressure;
+    // Pointer cancel handler
+    function handlePointerCancel(e) {
+      if (e.pointerType !== 'pen') return;
+      isDrawing = false;
+      penIndicator.classList.remove('visible');
+      eraserCursor.classList.remove('visible');
     }
 
-    canvas.addEventListener('pointerdown', startStroke);
-    canvas.addEventListener('pointermove', (e) => {
-      continueStroke(e);
-      // Show eraser cursor on hover when eraser tool is selected
-      if (!isDrawing && (isEraser || isEraserTip(e))) {
-        updateEraserCursor(e.clientX, e.clientY, true);
-      } else if (!isDrawing) {
-        updateEraserCursor(0, 0, false);
+    // Prevent touch
+    function preventTouch(e) {
+      for (const touch of e.touches) {
+        if (touch.touchType !== 'stylus') {
+          e.preventDefault();
+          return;
+        }
       }
-    });
-    canvas.addEventListener('pointerup', () => endStroke(true));
-    canvas.addEventListener('pointerleave', () => {
-      endStroke(false); // Don't schedule reset on leave - only on actual lift
-      updateEraserCursor(0, 0, false); // Hide cursor when leaving canvas
-    });
-    canvas.addEventListener('pointercancel', () => endStroke(false));
+    }
 
-    canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
-    canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+    // Clear canvas
+    function clearCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
 
-    // Prevent context menu on right-click (barrel button)
+      // Close menu after clearing
+      menuOpen = false;
+      menuPanel.classList.remove('open');
+      menuToggle.classList.remove('open');
+    }
+
+    // Event listeners
+    canvas.addEventListener('pointerdown', handlePointerDown, { passive: false });
+    canvas.addEventListener('pointermove', handlePointerMove, { passive: false });
+    canvas.addEventListener('pointerup', handlePointerUp, { passive: false });
+    canvas.addEventListener('pointercancel', handlePointerCancel, { passive: false });
+    canvas.addEventListener('pointerleave', handlePointerUp, { passive: false });
+
+    canvas.addEventListener('touchstart', preventTouch, { passive: false });
+    canvas.addEventListener('touchmove', preventTouch, { passive: false });
+    canvas.addEventListener('touchend', preventTouch, { passive: false });
+
     canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-    // Toolbar
-    const toolbar = document.getElementById('toolbar');
-    const colorBtns = document.querySelectorAll('.color-btn');
-    const sizeDisplay = document.getElementById('sizeDisplay');
-    const eraserBtn = document.getElementById('eraserBtn');
+    clearBtn.addEventListener('click', clearCanvas);
 
-    colorBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        colorBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        strokeColor = btn.dataset.color;
-        isEraser = false;
-        eraserBtn.classList.remove('active');
-      });
-    });
+    window.addEventListener('resize', resizeCanvas);
 
-    document.getElementById('sizeUp').addEventListener('click', () => {
-      baseSize = Math.min(20, baseSize + 0.5);
-      sizeDisplay.textContent = baseSize % 1 === 0 ? baseSize : baseSize.toFixed(1);
-    });
-
-    document.getElementById('sizeDown').addEventListener('click', () => {
-      baseSize = Math.max(0.5, baseSize - 0.5);
-      sizeDisplay.textContent = baseSize % 1 === 0 ? baseSize : baseSize.toFixed(1);
-    });
-
-    eraserBtn.addEventListener('click', () => {
-      isEraser = !isEraser;
-      eraserBtn.classList.toggle('active', isEraser);
-      if (isEraser) {
-        colorBtns.forEach(b => b.classList.remove('active'));
-      } else {
-        document.querySelector(`[data-color="${strokeColor}"]`)?.classList.add('active');
-      }
-    });
-
-    document.getElementById('clearBtn').addEventListener('click', () => {
-      const rect = canvas.getBoundingClientRect();
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.clearRect(0, 0, rect.width, rect.height);
-    });
-
-    document.getElementById('fullscreenBtn').addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      } else {
-        document.exitFullscreen().catch(() => {});
-      }
-    });
-
-    toolbar.addEventListener('pointerdown', e => e.stopPropagation());
-
-    // Toolbar toggle button with three states: hidden, visible, locked
-    let toolbarLocked = false;
-    const toolbarToggle = document.getElementById('toolbarToggle');
-    const toggleIconCircle = document.getElementById('toggleIconCircle');
-    const toggleIconLock = document.getElementById('toggleIconLock');
-
-    function updateToggleIcon() {
-      if (toolbarLocked) {
-        toggleIconCircle.style.display = 'none';
-        toggleIconLock.style.display = 'block';
-      } else {
-        toggleIconCircle.style.display = 'block';
-        toggleIconLock.style.display = 'none';
-      }
-    }
-
-    toolbarToggle.addEventListener('click', () => {
-      if (!toolbar.classList.contains('visible')) {
-        // Hidden -> Visible
-        toolbar.classList.add('visible');
-        toolbarLocked = false;
-      } else if (!toolbarLocked) {
-        // Visible -> Locked
-        toolbarLocked = true;
-      } else {
-        // Locked -> Hidden
-        toolbar.classList.remove('visible');
-        toolbarLocked = false;
-      }
-      updateToggleIcon();
-    });
-    toolbarToggle.addEventListener('pointerdown', e => e.stopPropagation());
-
-    // Close toolbar when touching outside (only if not locked)
-    document.addEventListener('pointerdown', (e) => {
-      if (toolbar.classList.contains('visible') &&
-          !toolbarLocked &&
-          !toolbar.contains(e.target) &&
-          e.target !== toolbarToggle &&
-          !toolbarToggle.contains(e.target)) {
-        toolbar.classList.remove('visible');
-      }
-    });
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
-        // Cancel selection or lasso
-        if (hasSelection) {
-          // Put selection back at original position
-          selectionOffsetX = 0;
-          selectionOffsetY = 0;
-          commitSelection();
-        } else if (isLassoDrawing) {
-          isLassoDrawing = false;
-          isLassoMode = false;
-          cancelSelection();
-        }
-      } else if (e.key === 'e' || e.key === 'E') {
-        eraserBtn.click();
-      } else if (e.key === 'c' || e.key === 'C') {
-        document.getElementById('clearBtn').click();
-      } else if (e.key === '[') {
-        document.getElementById('sizeDown').click();
-      } else if (e.key === ']') {
-        document.getElementById('sizeUp').click();
-      } else if (e.key >= '1' && e.key <= '4') {
-        const idx = parseInt(e.key) - 1;
-        if (colorBtns[idx]) colorBtns[idx].click();
-      } else if (e.key === 'Enter' && hasSelection) {
-        // Commit selection on Enter
-        commitSelection();
-      }
-    });
+    // Initialize
+    resizeCanvas();
+    initInkAPI();
+    updateEraserCursor();
   </script>
 </body>
 </html>
