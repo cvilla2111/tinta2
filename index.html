@@ -399,6 +399,19 @@
       desynchronized: true
     });
 
+    // Web Ink API for reduced latency (experimental, Windows only)
+    let inkPresenter = null;
+    if ('ink' in navigator) {
+      navigator.ink.requestPresenter({ presentationArea: canvas })
+        .then(presenter => {
+          inkPresenter = presenter;
+          console.log('Web Ink API enabled for reduced latency');
+        })
+        .catch(err => {
+          console.log('Web Ink API not available:', err);
+        });
+    }
+
     // State
     let isDrawing = false;
     let lastX = 0;
@@ -1217,6 +1230,15 @@
 
       // Draw predictive preview from stabilized to raw position
       drawPredictivePreview(lastX, lastY, lastRawX, lastRawY, lastRawPressure);
+
+      // Use Web Ink API for OS-level low-latency ink trail (if available)
+      if (inkPresenter && !activeEraser) {
+        const inkStyle = {
+          color: strokeColor,
+          diameter: getStrokeWidth(lastRawPressure)
+        };
+        inkPresenter.updateInkTrailStartPoint(e, inkStyle);
+      }
     }
 
     function endStroke(scheduleReset = true) {
