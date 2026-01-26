@@ -1036,14 +1036,20 @@
     // Stroke stabilization - moving average buffer
     const STABILIZATION_LEVEL = 6; // Number of points to average (higher = smoother but more lag)
     let stabilizationBuffer = [];
+    let lastStabilizedEvent = null; // Store event corresponding to stabilized position for Web Ink API
 
-    function getStabilizedPoint(x, y, pressure) {
-      // Add new point to buffer
-      stabilizationBuffer.push({ x, y, pressure });
+    function getStabilizedPoint(x, y, pressure, event) {
+      // Add new point to buffer with its event
+      stabilizationBuffer.push({ x, y, pressure, event });
 
       // Keep buffer at max size
       if (stabilizationBuffer.length > STABILIZATION_LEVEL) {
         stabilizationBuffer.shift();
+      }
+
+      // The oldest event in buffer corresponds roughly to where we're drawing now
+      if (stabilizationBuffer.length > 0) {
+        lastStabilizedEvent = stabilizationBuffer[0].event;
       }
 
       // Calculate weighted average (more recent points have higher weight)
@@ -1069,6 +1075,7 @@
 
     function resetStabilization() {
       stabilizationBuffer = [];
+      lastStabilizedEvent = null;
     }
 
     // Track previous midpoint for smooth curve connections
@@ -1212,8 +1219,8 @@
       for (const coalescedEvent of events) {
         const rawPos = getPointerPos(coalescedEvent);
 
-        // Apply stabilization to smooth out hand jitter
-        const pos = getStabilizedPoint(rawPos.x, rawPos.y, rawPos.pressure);
+        // Apply stabilization to smooth out hand jitter (pass event for Web Ink API)
+        const pos = getStabilizedPoint(rawPos.x, rawPos.y, rawPos.pressure, coalescedEvent);
 
         // Draw smooth segment using quadratic Bezier curve
         drawSmoothSegment(lastX, lastY, pos.x, pos.y, lastPressure, pos.pressure);
@@ -1232,12 +1239,13 @@
       // drawPredictivePreview(lastX, lastY, lastRawX, lastRawY, lastRawPressure);
 
       // Use Web Ink API for OS-level low-latency ink trail (if available)
-      if (inkPresenter && !activeEraser) {
+      // Use the oldest event in stabilization buffer (where we've actually drawn to)
+      if (inkPresenter && !activeEraser && lastStabilizedEvent) {
         const inkStyle = {
           color: 'rgba(255, 0, 0, 1)',
           diameter: Math.max(getStrokeWidth(lastRawPressure) * 2, 8)
         };
-        inkPresenter.updateInkTrailStartPoint(e, inkStyle);
+        inkPresenter.updateInkTrailStartPoint(lastStabilizedEvent, inkStyle);
       }
     }
 
