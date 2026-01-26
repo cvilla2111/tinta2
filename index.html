@@ -1234,8 +1234,8 @@
       // Use Web Ink API for OS-level low-latency ink trail (if available)
       if (inkPresenter && !activeEraser) {
         const inkStyle = {
-          color: 'red',
-          diameter: getStrokeWidth(lastRawPressure)
+          color: 'rgba(255, 0, 0, 1)',
+          diameter: Math.max(getStrokeWidth(lastRawPressure) * 2, 8)
         };
         inkPresenter.updateInkTrailStartPoint(e, inkStyle);
       }
