@@ -1216,9 +1216,22 @@
       // Use Web Ink API FIRST (before canvas drawing) to show preview trail
       if (inkPresenter && !activeEraser) {
         try {
+          // Log first few calls to debug
+          if (!window.inkCallCount) window.inkCallCount = 0;
+          window.inkCallCount++;
+          if (window.inkCallCount <= 5) {
+            console.log('Web Ink call #' + window.inkCallCount, {
+              pointerType: e.pointerType,
+              pressure: e.pressure,
+              clientX: e.clientX,
+              clientY: e.clientY,
+              isPrimary: e.isPrimary
+            });
+          }
+
           const inkStyle = {
-            color: 'red',
-            diameter: 10
+            color: '#FF0000',
+            diameter: 8
           };
           inkPresenter.updateInkTrailStartPoint(e, inkStyle);
         } catch (err) {
@@ -1245,7 +1258,8 @@
         const pos = getStabilizedPoint(rawPos.x, rawPos.y, rawPos.pressure, coalescedEvent);
 
         // Draw smooth segment using quadratic Bezier curve
-        drawSmoothSegment(lastX, lastY, pos.x, pos.y, lastPressure, pos.pressure);
+        // TEMPORARILY DISABLED to test Web Ink API alone - uncomment to restore drawing
+        // drawSmoothSegment(lastX, lastY, pos.x, pos.y, lastPressure, pos.pressure);
 
         lastX = pos.x;
         lastY = pos.y;
