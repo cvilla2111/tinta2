@@ -92,16 +92,19 @@
     .canvas-wrapper {
       flex: 1;
       position: relative;
-      overflow: hidden;
+      overflow: auto;
+      background: #f0f0f0;
+    }
+
+    .canvas-container {
+      width: 1920px;
+      height: 1080px;
       background: #ffffff;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
     #inkCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      display: block;
       touch-action: none;
       cursor: crosshair;
     }
@@ -451,7 +454,9 @@
       </div>
     </div>
     <div class="canvas-wrapper">
-      <canvas id="inkCanvas"></canvas>
+      <div class="canvas-container">
+        <canvas id="inkCanvas"></canvas>
+      </div>
     </div>
   </div>
 
@@ -502,8 +507,8 @@
           <div class="size-dot" id="sizeDot"></div>
         </div>
         <div class="slider-container">
-          <input type="range" id="sizeSlider" min="1" max="20" value="3">
-          <div class="size-value"><span id="sizeValue">3</span>px</div>
+          <input type="range" id="sizeSlider" min="1" max="20" value="1">
+          <div class="size-value"><span id="sizeValue">1</span>px</div>
         </div>
       </div>
     </div>
@@ -592,7 +597,7 @@
     // Ink style configuration
     const inkStyle = {
       color: '#1a1a2e',
-      diameter: 3
+      diameter: 1
     };
 
     // Update size preview dot
@@ -651,15 +656,20 @@
       updateEraserCursor();
     });
 
-    // Resize canvas (High DPI optimized)
-    function resizeCanvas() {
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.parentElement.getBoundingClientRect();
+    // Fixed canvas size (High DPI optimized)
+    const CANVAS_WIDTH = 1920;
+    const CANVAS_HEIGHT = 1080;
 
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width = rect.width + 'px';
-      canvas.style.height = rect.height + 'px';
+    function initCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+
+      // Set fixed physical pixel dimensions
+      canvas.width = CANVAS_WIDTH * dpr;
+      canvas.height = CANVAS_HEIGHT * dpr;
+
+      // Set fixed CSS display size
+      canvas.style.width = CANVAS_WIDTH + 'px';
+      canvas.style.height = CANVAS_HEIGHT + 'px';
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.lineCap = 'round';
@@ -767,11 +777,11 @@
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
 
-        // Web Ink API for low-latency preview
+        // Web Ink API for low-latency preview (red trail)
         if (inkPresenter) {
           try {
             inkPresenter.updateInkTrailStartPoint(e, {
-              color: inkStyle.color,
+              color: '#e63946',
               diameter: pressureWidth
             });
           } catch (err) {
@@ -823,8 +833,7 @@
 
     // Clear canvas
     function clearCanvas() {
-      const dpr = window.devicePixelRatio || 1;
-      ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
       // Close menu after clearing
       menuOpen = false;
@@ -847,10 +856,8 @@
 
     clearBtn.addEventListener('click', clearCanvas);
 
-    window.addEventListener('resize', resizeCanvas);
-
-    // Initialize
-    resizeCanvas();
+    // Initialize (no resize listener - fixed size canvas)
+    initCanvas();
     initInkAPI();
     updateEraserCursor();
   </script>
