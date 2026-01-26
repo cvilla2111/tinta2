@@ -23,6 +23,18 @@
       user-select: none;
     }
 
+    /* Thin border below titlebar */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(0, 0, 0, 0.1);
+      z-index: 9999;
+    }
+
     /* Dark mode - affects toolbar only, canvas stays white */
     html.dark .toolbar-toggle {
       color: #aaa;
