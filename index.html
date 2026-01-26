@@ -406,10 +406,14 @@
         .then(presenter => {
           inkPresenter = presenter;
           console.log('Web Ink API enabled for reduced latency');
+          console.log('Ink presenter:', presenter);
+          console.log('Expected improvement:', presenter.expectedImprovement);
         })
         .catch(err => {
           console.log('Web Ink API not available:', err);
         });
+    } else {
+      console.log('Web Ink API not supported in this browser');
     }
 
     // State
@@ -1209,6 +1213,19 @@
 
       if (!isDrawing) return;
 
+      // Use Web Ink API FIRST (before canvas drawing) to show preview trail
+      if (inkPresenter && !activeEraser) {
+        try {
+          const inkStyle = {
+            color: 'red',
+            diameter: 10
+          };
+          inkPresenter.updateInkTrailStartPoint(e, inkStyle);
+        } catch (err) {
+          console.error('Web Ink API error:', err);
+        }
+      }
+
       // Update eraser cursor position
       updateEraserCursor(e.clientX, e.clientY, activeEraser);
 
@@ -1238,25 +1255,6 @@
         lastRawX = rawPos.x;
         lastRawY = rawPos.y;
         lastRawPressure = rawPos.pressure;
-      }
-
-      // Draw predictive preview from stabilized to raw position (disabled)
-      // drawPredictivePreview(lastX, lastY, lastRawX, lastRawY, lastRawPressure);
-
-      // Use Web Ink API for OS-level low-latency ink trail (if available)
-      // Queue events and use a delayed one to show the stabilization gap
-      if (inkPresenter && !activeEraser) {
-        webInkEventQueue.push(e);
-
-        // Keep queue at max size
-        if (webInkEventQueue.length > WEB_INK_DELAY) {
-          const delayedEvent = webInkEventQueue.shift();
-          const inkStyle = {
-            color: 'rgba(255, 0, 0, 1)',
-            diameter: Math.max(getStrokeWidth(lastRawPressure) * 2, 8)
-          };
-          inkPresenter.updateInkTrailStartPoint(delayedEvent, inkStyle);
-        }
       }
     }
 
