@@ -1228,13 +1228,13 @@
         lastRawPressure = rawPos.pressure;
       }
 
-      // Draw predictive preview from stabilized to raw position
-      drawPredictivePreview(lastX, lastY, lastRawX, lastRawY, lastRawPressure);
+      // Draw predictive preview from stabilized to raw position (disabled)
+      // drawPredictivePreview(lastX, lastY, lastRawX, lastRawY, lastRawPressure);
 
       // Use Web Ink API for OS-level low-latency ink trail (if available)
       if (inkPresenter && !activeEraser) {
         const inkStyle = {
-          color: strokeColor,
+          color: 'red',
           diameter: getStrokeWidth(lastRawPressure)
         };
         inkPresenter.updateInkTrailStartPoint(e, inkStyle);
