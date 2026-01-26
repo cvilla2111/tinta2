@@ -987,6 +987,7 @@
       smoothedPressure = pos.pressure; // Reset smoothed pressure for new stroke
       isFirstSegment = true; // Reset for smooth curve connections
       resetStabilization(); // Reset stabilization buffer for new stroke
+      webInkEventQueue = []; // Reset Web Ink API event queue
 
       // Show eraser cursor
       updateEraserCursor(e.clientX, e.clientY, activeEraser);
@@ -1087,6 +1088,10 @@
     let lastRawX = 0;
     let lastRawY = 0;
     let lastRawPressure = 0.5;
+
+    // Web Ink API - track which event to use (delayed to show stabilization gap)
+    let webInkEventQueue = [];
+    const WEB_INK_DELAY = 4; // How many events behind to report to Web Ink API
 
     // Draw predictive preview line on lasso canvas (temporary, gets overwritten)
     function drawPredictivePreview(stabilizedX, stabilizedY, rawX, rawY, pressure) {
@@ -1239,13 +1244,19 @@
       // drawPredictivePreview(lastX, lastY, lastRawX, lastRawY, lastRawPressure);
 
       // Use Web Ink API for OS-level low-latency ink trail (if available)
-      // Use the oldest event in stabilization buffer (where we've actually drawn to)
-      if (inkPresenter && !activeEraser && lastStabilizedEvent) {
-        const inkStyle = {
-          color: 'rgba(255, 0, 0, 1)',
-          diameter: Math.max(getStrokeWidth(lastRawPressure) * 2, 8)
-        };
-        inkPresenter.updateInkTrailStartPoint(lastStabilizedEvent, inkStyle);
+      // Queue events and use a delayed one to show the stabilization gap
+      if (inkPresenter && !activeEraser) {
+        webInkEventQueue.push(e);
+
+        // Keep queue at max size
+        if (webInkEventQueue.length > WEB_INK_DELAY) {
+          const delayedEvent = webInkEventQueue.shift();
+          const inkStyle = {
+            color: 'rgba(255, 0, 0, 1)',
+            diameter: Math.max(getStrokeWidth(lastRawPressure) * 2, 8)
+          };
+          inkPresenter.updateInkTrailStartPoint(delayedEvent, inkStyle);
+        }
       }
     }
 
@@ -1286,6 +1297,7 @@
       isDrawing = false;
       updateEraserCursor(0, 0, false); // Hide eraser cursor
       clearPredictivePreview(); // Clear the preview line
+      webInkEventQueue = []; // Clear Web Ink API event queue
     }
 
     function getStrokeWidth(pressure) {
