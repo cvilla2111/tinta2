@@ -2,27 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Ink Canvas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delegated Ink Trail</title>
   <style>
-    :root {
-      --bg-color: #ffffff;
-      --text-color: #1a1a2e;
-      --accent: #4361ee;
-      --surface: #f8f9fa;
-      --border: #e9ecef;
-      --danger: #e63946;
-    }
-
-    .dark {
-      --bg-color: #1a1a2e;
-      --text-color: #f8f9fa;
-      --accent: #4cc9f0;
-      --surface: #16213e;
-      --border: #2d3a5c;
-      --danger: #ff6b6b;
-    }
-
     * {
       margin: 0;
       padding: 0;
@@ -33,516 +15,57 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: var(--bg-color);
-      color: var(--text-color);
-      touch-action: none;
+      background-color: #ffffff;
     }
 
-    .container {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      width: 100%;
+    .dark body {
+      background-color: #ffffff;
     }
 
-    .toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 20px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      gap: 16px;
-    }
-
-    .toolbar-section {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--text-color);
-      opacity: 0.8;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #adb5bd;
-      transition: background 0.3s ease;
-    }
-
-    .status-dot.active {
-      background: #40c057;
-      box-shadow: 0 0 8px rgba(64, 192, 87, 0.5);
-    }
-
-    .status-dot.unsupported {
-      background: #fa5252;
-    }
-
-    .canvas-wrapper {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-      background: #ffffff;
-    }
-
-    #inkCanvas {
+    canvas {
       display: block;
       touch-action: none;
-      cursor: crosshair;
     }
 
-    #inkCanvas.eraser-mode {
-      cursor: none;
-    }
-
-    .pen-indicator {
+    #div {
+      background-color: lime;
       position: fixed;
-      bottom: 20px;
+      top: 1rem;
+      left: 1rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: #000;
+      box-shadow: 0 4px 20px rgba(0, 255, 0, 0.3);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    #instructions {
+      position: fixed;
+      bottom: 1.5rem;
       left: 50%;
       transform: translateX(-50%);
-      padding: 10px 20px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 24px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
       font-size: 13px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      opacity: 0;
-      transition: opacity 0.3s ease;
+      color: rgba(0, 0, 0, 0.5);
+      text-align: center;
       pointer-events: none;
+      user-select: none;
     }
 
-    .pen-indicator.visible {
-      opacity: 1;
-    }
-
-    .pen-indicator svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    .pressure-bar {
-      width: 60px;
-      height: 6px;
-      background: var(--border);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .pressure-fill {
-      height: 100%;
-      background: var(--accent);
-      border-radius: 3px;
-      transition: width 0.05s ease;
-    }
-
-    /* Menu Toggle Button */
-    .menu-toggle {
-      position: fixed;
-      top: 50%;
-      right: 0;
-      transform: translateY(-50%);
-      width: 24px;
-      height: 60px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-right: none;
-      border-radius: 12px 0 0 12px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-      z-index: 100;
-    }
-
-    .menu-toggle:hover {
-      width: 28px;
-      background: var(--accent);
-    }
-
-    .menu-toggle:hover svg {
-      stroke: white;
-    }
-
-    .menu-toggle svg {
-      width: 14px;
-      height: 14px;
-      stroke: var(--text-color);
-      transition: transform 0.3s ease, stroke 0.3s ease;
-    }
-
-    .menu-toggle.open svg {
-      transform: rotate(180deg);
-    }
-
-    /* Hidden Menu Panel */
-    .menu-panel {
-      position: fixed;
-      top: 50%;
-      right: -280px;
-      transform: translateY(-50%);
-      width: 260px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px 0 0 16px;
-      padding: 24px;
-      transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 99;
-      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
-    }
-
-    .menu-panel.open {
-      right: 0;
-    }
-
-    .menu-title {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 20px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .menu-title svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    .menu-section {
-      margin-bottom: 24px;
-    }
-
-    .menu-section:last-child {
-      margin-bottom: 0;
-    }
-
-    .menu-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      opacity: 0.6;
-      margin-bottom: 10px;
-    }
-
-    /* Tool Selection */
-    .tool-select {
-      display: flex;
-      gap: 8px;
-    }
-
-    .tool-btn {
-      flex: 1;
-      padding: 12px;
-      border: 2px solid var(--border);
-      border-radius: 12px;
-      background: transparent;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-    }
-
-    .tool-btn svg {
-      width: 24px;
-      height: 24px;
-      stroke: var(--text-color);
-      transition: stroke 0.2s ease;
-    }
-
-    .tool-btn span {
-      font-size: 11px;
-      color: var(--text-color);
-    }
-
-    .tool-btn:hover {
-      border-color: var(--accent);
-      background: rgba(67, 97, 238, 0.05);
-    }
-
-    .tool-btn.active {
-      border-color: var(--accent);
-      background: var(--accent);
-    }
-
-    .tool-btn.active svg {
-      stroke: white;
-    }
-
-    .tool-btn.active span {
-      color: white;
-    }
-
-    /* Size Slider */
-    .size-control {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .size-preview {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .size-dot {
-      border-radius: 50%;
-      background: var(--text-color);
-      transition: all 0.15s ease;
-    }
-
-    .slider-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .size-value {
-      font-size: 12px;
-      font-weight: 500;
-      text-align: right;
-    }
-
-    input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 6px;
-      border-radius: 3px;
-      background: var(--border);
-      outline: none;
-      cursor: pointer;
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--accent);
-      cursor: pointer;
-      transition: transform 0.15s ease;
-    }
-
-    input[type="range"]::-webkit-slider-thumb:hover {
-      transform: scale(1.15);
-    }
-
-    input[type="range"]::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      border: none;
-      border-radius: 50%;
-      background: var(--accent);
-      cursor: pointer;
-    }
-
-    /* Clear Button */
-    .clear-btn {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 12px;
-      background: var(--danger);
-      color: white;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: all 0.2s ease;
-    }
-
-    .clear-btn:hover {
-      opacity: 0.9;
-      transform: scale(0.98);
-    }
-
-    .clear-btn svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    /* Eraser cursor */
-    .eraser-cursor {
-      position: fixed;
-      pointer-events: none;
-      border: 2px solid var(--text-color);
-      border-radius: 50%;
-      opacity: 0;
-      transition: opacity 0.15s ease;
-      z-index: 1000;
-      mix-blend-mode: difference;
-    }
-
-    .eraser-cursor.visible {
-      opacity: 0.8;
-    }
-
-    /* Mode indicator */
-    .mode-indicator {
-      position: fixed;
-      top: 70px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 8px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      pointer-events: none;
-    }
-
-    .mode-indicator.visible {
-      opacity: 1;
-    }
-
-    .mode-indicator svg {
-      width: 16px;
-      height: 16px;
+    .dark #instructions {
+      color: rgba(0, 0, 0, 0.5);
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="toolbar">
-      <div class="toolbar-section">
-        <div class="status">
-          <div class="status-dot" id="inkApiStatus"></div>
-          <span id="statusText">Checking Web Ink API...</span>
-        </div>
-      </div>
-    </div>
-    <div class="canvas-wrapper" id="canvasWrapper">
-      <canvas id="inkCanvas"></canvas>
-    </div>
-  </div>
-
-  <!-- Menu Toggle Button -->
-  <div class="menu-toggle" id="menuToggle">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polyline points="15 18 9 12 15 6"/>
-    </svg>
-  </div>
-
-  <!-- Hidden Menu Panel -->
-  <div class="menu-panel" id="menuPanel">
-    <div class="menu-title">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-      </svg>
-      Tools
-    </div>
-
-    <!-- Tool Selection -->
-    <div class="menu-section">
-      <div class="menu-label">Mode</div>
-      <div class="tool-select">
-        <button class="tool-btn active" id="penBtn" data-tool="pen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
-            <path d="M2 2l7.586 7.586"/>
-          </svg>
-          <span>Pen</span>
-        </button>
-        <button class="tool-btn" id="eraserBtn" data-tool="eraser">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.4 2.8c.8-.8 2-.8 2.8 0L21 7.6c.8.8.8 2 0 2.8L11 20"/>
-            <path d="M6 11l6 6"/>
-          </svg>
-          <span>Eraser</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Pen Size -->
-    <div class="menu-section">
-      <div class="menu-label">Pen Size</div>
-      <div class="size-control">
-        <div class="size-preview">
-          <div class="size-dot" id="sizeDot"></div>
-        </div>
-        <div class="slider-container">
-          <input type="range" id="sizeSlider" min="1" max="20" value="1">
-          <div class="size-value"><span id="sizeValue">1</span>px</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Clear Canvas -->
-    <div class="menu-section">
-      <button class="clear-btn" id="clearBtn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="3 6 5 6 21 6"/>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-          <line x1="10" y1="11" x2="10" y2="17"/>
-          <line x1="14" y1="11" x2="14" y2="17"/>
-        </svg>
-        Clear Canvas
-      </button>
-    </div>
-  </div>
-
-  <!-- Pen Indicator -->
-  <div class="pen-indicator" id="penIndicator">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
-      <path d="M2 2l7.586 7.586"/>
-      <circle cx="11" cy="11" r="2"/>
-    </svg>
-    <span>Pressure:</span>
-    <div class="pressure-bar">
-      <div class="pressure-fill" id="pressureFill"></div>
-    </div>
-  </div>
-
-  <!-- Mode Indicator -->
-  <div class="mode-indicator" id="modeIndicator">
-    <svg id="modeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
-    </svg>
-    <span id="modeText">Pen Mode</span>
-  </div>
-
-  <!-- Eraser Cursor -->
-  <div class="eraser-cursor" id="eraserCursor"></div>
+  <canvas id="canvas"></canvas>
+  <div id="div">Delegated ink trail should match the color of this div.</div>
+  <div id="instructions">Touch and drag to draw • New touch clears canvas</div>
 
   <script>
     // Dark mode detection
@@ -557,303 +80,65 @@
       }
     });
 
-    // DOM Elements
-    const canvas = document.getElementById('inkCanvas');
-    const ctx = canvas.getContext('2d', { desynchronized: true });
-    const statusDot = document.getElementById('inkApiStatus');
-    const statusText = document.getElementById('statusText');
-    const clearBtn = document.getElementById('clearBtn');
-    const penIndicator = document.getElementById('penIndicator');
-    const pressureFill = document.getElementById('pressureFill');
-    const menuToggle = document.getElementById('menuToggle');
-    const menuPanel = document.getElementById('menuPanel');
-    const penBtn = document.getElementById('penBtn');
-    const eraserBtn = document.getElementById('eraserBtn');
-    const sizeSlider = document.getElementById('sizeSlider');
-    const sizeValue = document.getElementById('sizeValue');
-    const sizeDot = document.getElementById('sizeDot');
-    const eraserCursor = document.getElementById('eraserCursor');
-    const modeIndicator = document.getElementById('modeIndicator');
-    const modeIcon = document.getElementById('modeIcon');
-    const modeText = document.getElementById('modeText');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
 
-    // State
-    let inkPresenter = null;
+    const presenter = navigator.ink.requestPresenter({ presentationArea: canvas });
+    let moveCnt = 0;
+    let style = { color: 'lime', diameter: 10 };
     let isDrawing = false;
-    let lastX = 0;
-    let lastY = 0;
-    let currentTool = 'pen';
-    let menuOpen = false;
 
-    // Ink style configuration
-    const inkStyle = {
-      color: '#1a1a2e',
-      diameter: 1
-    };
-
-    // Update size preview dot
-    function updateSizeDot() {
-      const size = Math.max(4, inkStyle.diameter * 2);
-      sizeDot.style.width = size + 'px';
-      sizeDot.style.height = size + 'px';
-    }
-    updateSizeDot();
-
-    // Update eraser cursor size
-    function updateEraserCursor() {
-      const size = inkStyle.diameter * 4 + 10;
-      eraserCursor.style.width = size + 'px';
-      eraserCursor.style.height = size + 'px';
-      eraserCursor.style.marginLeft = -(size / 2) + 'px';
-      eraserCursor.style.marginTop = -(size / 2) + 'px';
+    function getRandomInt(min, max) {
+      min = Math.ceil(min);
+      max = Math.floor(max);
+      return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
-    // Toggle menu
-    menuToggle.addEventListener('click', () => {
-      menuOpen = !menuOpen;
-      menuPanel.classList.toggle('open', menuOpen);
-      menuToggle.classList.toggle('open', menuOpen);
-    });
-
-    // Tool selection
-    function setTool(tool) {
-      currentTool = tool;
-      penBtn.classList.toggle('active', tool === 'pen');
-      eraserBtn.classList.toggle('active', tool === 'eraser');
-      canvas.classList.toggle('eraser-mode', tool === 'eraser');
-
-      // Show mode indicator briefly
-      if (tool === 'eraser') {
-        modeIcon.innerHTML = '<path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.4 2.8c.8-.8 2-.8 2.8 0L21 7.6c.8.8.8 2 0 2.8L11 20"/><path d="M6 11l6 6"/>';
-        modeText.textContent = 'Eraser Mode';
-      } else {
-        modeIcon.innerHTML = '<path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>';
-        modeText.textContent = 'Pen Mode';
-      }
-      modeIndicator.classList.add('visible');
-      setTimeout(() => modeIndicator.classList.remove('visible'), 1500);
-
-      updateEraserCursor();
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     }
 
-    penBtn.addEventListener('click', () => setTool('pen'));
-    eraserBtn.addEventListener('click', () => setTool('eraser'));
-
-    // Size slider
-    sizeSlider.addEventListener('input', (e) => {
-      inkStyle.diameter = parseInt(e.target.value);
-      sizeValue.textContent = inkStyle.diameter;
-      updateSizeDot();
-      updateEraserCursor();
-    });
-
-    // Fixed canvas size (set once on load, fits viewport)
-    const canvasWrapper = document.getElementById('canvasWrapper');
-    let CANVAS_WIDTH;
-    let CANVAS_HEIGHT;
-
-    function initCanvas() {
-      // Get viewport size once and fix it
-      const rect = canvasWrapper.getBoundingClientRect();
-      CANVAS_WIDTH = Math.floor(rect.width);
-      CANVAS_HEIGHT = Math.floor(rect.height);
-
-      // Set fixed size (1:1 pixel ratio for performance)
-      canvas.width = CANVAS_WIDTH;
-      canvas.height = CANVAS_HEIGHT;
-
-      canvas.style.width = CANVAS_WIDTH + 'px';
-      canvas.style.height = CANVAS_HEIGHT + 'px';
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-    }
-
-    // Initialize Web Ink API
-    async function initInkAPI() {
-      if ('ink' in navigator) {
-        try {
-          inkPresenter = await navigator.ink.requestPresenter({
-            presentationArea: canvas
-          });
-          statusDot.classList.add('active');
-          statusText.textContent = 'Web Ink API Active';
-        } catch (err) {
-          console.error('Failed to initialize Web Ink API:', err);
-          statusDot.classList.add('unsupported');
-          statusText.textContent = 'Web Ink API failed';
-        }
-      } else {
-        statusDot.classList.add('unsupported');
-        statusText.textContent = 'Web Ink API not supported';
-      }
-    }
-
-    // Get coordinates from pointer event
-    function getCoords(e) {
-      const rect = canvas.getBoundingClientRect();
-      return {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-        pressure: e.pressure || 0.5
-      };
-    }
-
-    // Pointer down handler
-    function handlePointerDown(e) {
-      if (e.pointerType !== 'pen') {
-        e.preventDefault();
-        return;
-      }
-
+    canvas.addEventListener('pointerdown', (evt) => {
       isDrawing = true;
-      const coords = getCoords(e);
-      lastX = coords.x;
-      lastY = coords.y;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
 
-      penIndicator.classList.add('visible');
-      pressureFill.style.width = (coords.pressure * 100) + '%';
+    canvas.addEventListener('pointerup', () => {
+      isDrawing = false;
+    });
 
-      if (currentTool === 'eraser') {
-        eraserCursor.classList.add('visible');
-        eraserCursor.style.left = e.clientX + 'px';
-        eraserCursor.style.top = e.clientY + 'px';
-      }
+    canvas.addEventListener('pointerleave', () => {
+      isDrawing = false;
+    });
 
-      canvas.setPointerCapture(e.pointerId);
-    }
-
-    // Pointer move handler
-    function handlePointerMove(e) {
-      if (e.pointerType !== 'pen') {
-        e.preventDefault();
-        return;
-      }
-
-      // Update eraser cursor position
-      if (currentTool === 'eraser') {
-        eraserCursor.style.left = e.clientX + 'px';
-        eraserCursor.style.top = e.clientY + 'px';
-        if (isDrawing) {
-          eraserCursor.classList.add('visible');
-        }
-      }
-
+    canvas.addEventListener('pointermove', async (evt) => {
       if (!isDrawing) return;
 
-      const coords = getCoords(e);
-      pressureFill.style.width = (coords.pressure * 100) + '%';
+      const pointSize = 10;
+      ctx.fillStyle = style.color;
+      ctx.fillRect(evt.pageX, evt.pageY, pointSize, pointSize);
 
-      const baseWidth = inkStyle.diameter;
-      const pressureWidth = baseWidth + (coords.pressure * 4);
+      if (moveCnt === 20) {
+        const r = getRandomInt(0, 255);
+        const g = getRandomInt(0, 255);
+        const b = getRandomInt(0, 255);
 
-      if (currentTool === 'eraser') {
-        // Eraser mode - use destination-out composite
-        const eraserSize = pressureWidth * 3;
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.strokeStyle = 'rgba(0,0,0,1)';
-        ctx.lineWidth = eraserSize;
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(coords.x, coords.y);
-        ctx.stroke();
-        ctx.restore();
-      } else {
-        // Pen mode - draw permanent trail
-        ctx.strokeStyle = inkStyle.color;
-        ctx.lineWidth = pressureWidth;
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(coords.x, coords.y);
-        ctx.stroke();
+        style = { color: `rgb(${r} ${g} ${b} / 100%)`, diameter: 10 };
+        moveCnt = 0;
 
-        // Web Ink API for low-latency preview (red trail)
-        if (inkPresenter) {
-          try {
-            inkPresenter.updateInkTrailStartPoint(e, {
-              color: '#e63946',
-              diameter: pressureWidth
-            });
-          } catch (err) {
-            console.error('Ink trail update failed:', err);
-          }
-        }
+        const divEl = document.getElementById('div');
+        divEl.style.backgroundColor = `rgb(${r} ${g} ${b} / 60%)`;
+        divEl.style.boxShadow = `0 4px 20px rgba(${r}, ${g}, ${b}, 0.4)`;
+        divEl.style.color = (r * 0.299 + g * 0.587 + b * 0.114) > 150 ? '#000' : '#fff';
       }
+      moveCnt += 1;
 
-      lastX = coords.x;
-      lastY = coords.y;
-    }
+      (await presenter).updateInkTrailStartPoint(evt, style);
+    });
 
-    // Pointer up handler
-    function handlePointerUp(e) {
-      if (e.pointerType !== 'pen') {
-        e.preventDefault();
-        return;
-      }
-
-      isDrawing = false;
-      eraserCursor.classList.remove('visible');
-
-      setTimeout(() => {
-        if (!isDrawing) {
-          penIndicator.classList.remove('visible');
-        }
-      }, 1000);
-
-      canvas.releasePointerCapture(e.pointerId);
-    }
-
-    // Pointer cancel handler
-    function handlePointerCancel(e) {
-      if (e.pointerType !== 'pen') return;
-      isDrawing = false;
-      penIndicator.classList.remove('visible');
-      eraserCursor.classList.remove('visible');
-    }
-
-    // Prevent touch
-    function preventTouch(e) {
-      for (const touch of e.touches) {
-        if (touch.touchType !== 'stylus') {
-          e.preventDefault();
-          return;
-        }
-      }
-    }
-
-    // Clear canvas
-    function clearCanvas() {
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-      // Close menu after clearing
-      menuOpen = false;
-      menuPanel.classList.remove('open');
-      menuToggle.classList.remove('open');
-    }
-
-    // Event listeners
-    canvas.addEventListener('pointerdown', handlePointerDown, { passive: false });
-    canvas.addEventListener('pointermove', handlePointerMove, { passive: false });
-    canvas.addEventListener('pointerup', handlePointerUp, { passive: false });
-    canvas.addEventListener('pointercancel', handlePointerCancel, { passive: false });
-    canvas.addEventListener('pointerleave', handlePointerUp, { passive: false });
-
-    canvas.addEventListener('touchstart', preventTouch, { passive: false });
-    canvas.addEventListener('touchmove', preventTouch, { passive: false });
-    canvas.addEventListener('touchend', preventTouch, { passive: false });
-
-    canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-    clearBtn.addEventListener('click', clearCanvas);
-
-    // Initialize (no resize listener - fixed size canvas)
-    initCanvas();
-    initInkAPI();
-    updateEraserCursor();
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
   </script>
 </body>
 </html>
