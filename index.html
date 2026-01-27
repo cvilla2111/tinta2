@@ -27,23 +27,6 @@
       touch-action: none;
     }
 
-    #div {
-      background-color: lime;
-      position: fixed;
-      top: 1rem;
-      left: 1rem;
-      padding: 0.75rem 1.25rem;
-      border-radius: 8px;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      font-size: 14px;
-      font-weight: 500;
-      color: #000;
-      box-shadow: 0 4px 20px rgba(0, 255, 0, 0.3);
-      transition: background-color 0.3s ease, box-shadow 0.3s ease;
-      user-select: none;
-      pointer-events: none;
-    }
-
     #instructions {
       position: fixed;
       bottom: 1.5rem;
@@ -60,12 +43,174 @@
     .dark #instructions {
       color: rgba(0, 0, 0, 0.5);
     }
+
+    #eraser-cursor {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 20px;
+      height: 20px;
+      border: 1px solid #000;
+      border-radius: 50%;
+      pointer-events: none;
+      display: none;
+      will-change: transform;
+      z-index: 9999;
+    }
+
+    #menu-toggle {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 0 0 4px 4px;
+      cursor: pointer;
+      z-index: 10000;
+      transition: background 0.2s;
+    }
+
+    #menu-toggle:hover {
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    #menu {
+      position: fixed;
+      top: -60px;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: rgba(255, 255, 255, 0.95);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 0 16px;
+      z-index: 9998;
+      transition: top 0.3s ease;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+    }
+
+    #menu.open {
+      top: 0;
+    }
+
+    #menu-toggle.menu-open {
+      top: 60px;
+    }
+
+    .menu-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .menu-group label {
+      color: #555;
+      font-weight: 500;
+    }
+
+    .size-stepper {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .size-btn {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+
+    .size-btn:hover {
+      background: #eee;
+    }
+
+    .size-btn:active {
+      background: #ddd;
+    }
+
+    #pen-size-display {
+      min-width: 42px;
+      text-align: center;
+      font-weight: 500;
+      color: #333;
+    }
+
+    .color-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+
+    .color-btn:hover {
+      transform: scale(1.15);
+    }
+
+    .color-btn.active {
+      border-color: #333;
+    }
+
+    #clear-btn {
+      padding: 6px 14px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    #clear-btn:hover {
+      background: #c0392b;
+    }
   </style>
 </head>
 <body>
   <canvas id="canvas"></canvas>
-  <div id="div">Delegated ink trail should match the color of this div.</div>
-  <div id="instructions">Touch and drag to draw • New touch clears canvas</div>
+  <div id="eraser-cursor"></div>
+
+  <div id="menu-toggle"></div>
+  <div id="menu">
+    <div class="menu-group">
+      <label>Size</label>
+      <div class="size-stepper">
+        <button class="size-btn" id="size-down">−</button>
+        <span id="pen-size-display">6</span>
+        <button class="size-btn" id="size-up">+</button>
+      </div>
+    </div>
+    <div class="menu-group">
+      <label>Color</label>
+      <button class="color-btn active" data-color="#000000" style="background: #000000;"></button>
+      <button class="color-btn" data-color="#e74c3c" style="background: #e74c3c;"></button>
+      <button class="color-btn" data-color="#3498db" style="background: #3498db;"></button>
+      <button class="color-btn" data-color="#2ecc71" style="background: #2ecc71;"></button>
+      <button class="color-btn" data-color="#9b59b6" style="background: #9b59b6;"></button>
+    </div>
+    <button id="clear-btn">Clear</button>
+  </div>
+
+  <div id="instructions">Draw with pen tip • Erase with pen eraser or right-click</div>
 
   <script>
     // Dark mode detection
@@ -82,59 +227,207 @@
 
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    const eraserCursor = document.getElementById('eraser-cursor');
+    const menuToggle = document.getElementById('menu-toggle');
+    const menu = document.getElementById('menu');
+    const sizeDown = document.getElementById('size-down');
+    const sizeUp = document.getElementById('size-up');
+    const penSizeDisplay = document.getElementById('pen-size-display');
+    const colorBtns = document.querySelectorAll('.color-btn');
+    const clearBtn = document.getElementById('clear-btn');
 
     const presenter = navigator.ink.requestPresenter({ presentationArea: canvas });
-    let moveCnt = 0;
-    let style = { color: 'lime', diameter: 10 };
     let isDrawing = false;
+    let isErasing = false;
+    let lastX = 0;
+    let lastY = 0;
+    let prevX = 0;
+    let prevY = 0;
+    let smoothedPressure = 0.5;
+    const PRESSURE_SMOOTHING = 0.12; // Lower = smoother (0-1)
+    const inkStyle = { color: 'red', diameter: 2 }; // Delegated ink trail always red
 
-    function getRandomInt(min, max) {
-      min = Math.ceil(min);
-      max = Math.floor(max);
-      return Math.floor(Math.random() * (max - min + 1)) + min;
+    // Stroke settings
+    let penColor = '#000000';
+    let penMaxSize = 6;
+    const MIN_STROKE_WIDTH = 0.5;
+
+    // Menu toggle
+    menuToggle.addEventListener('click', () => {
+      menu.classList.toggle('open');
+      menuToggle.classList.toggle('menu-open');
+    });
+
+    // Pen size step controls
+    const MIN_PEN_SIZE = 0.5;
+    const MAX_PEN_SIZE = 20;
+    const SIZE_STEP = 0.5;
+
+    function updateSizeDisplay() {
+      penSizeDisplay.textContent = penMaxSize % 1 === 0 ? penMaxSize : penMaxSize.toFixed(1);
     }
+
+    sizeDown.addEventListener('click', () => {
+      penMaxSize = Math.max(MIN_PEN_SIZE, penMaxSize - SIZE_STEP);
+      updateSizeDisplay();
+    });
+
+    sizeUp.addEventListener('click', () => {
+      penMaxSize = Math.min(MAX_PEN_SIZE, penMaxSize + SIZE_STEP);
+      updateSizeDisplay();
+    });
+
+    // Color buttons
+    colorBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        colorBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        penColor = btn.dataset.color;
+      });
+    });
+
+    // Clear canvas
+    clearBtn.addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    // Eraser size management
+    const ERASER_BASE_SIZE = 20;
+    const ERASER_LARGE_SIZE = 80;
+    let eraserSize = ERASER_BASE_SIZE;
+    let eraserTapCount = 0;
+    let lastEraserTapTime = 0;
+    const TAP_TIMEOUT = 500; // ms between taps to count as consecutive
+
+    // Set up stroke style
+    ctx.strokeStyle = penColor;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
     function resizeCanvas() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      // Restore stroke style after resize (canvas reset clears it)
+      ctx.strokeStyle = penColor;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+    }
+
+    // Prevent context menu on right-click
+    canvas.addEventListener('contextmenu', (evt) => evt.preventDefault());
+
+    function checkEraser(evt) {
+      // Multiple detection methods for stylus eraser:
+      // 1. button 5 = eraser button
+      // 2. buttons bitmask 32 = eraser
+      // 3. pointerType "eraser" (some devices)
+      // 4. right-click (button 2) for mouse fallback
+      return evt.button === 5 ||
+             evt.button === 2 ||
+             (evt.buttons & 32) !== 0 ||
+             evt.pointerType === 'eraser';
+    }
+
+    function updateEraserCursor(x, y) {
+      const offset = eraserSize / 2;
+      eraserCursor.style.width = eraserSize + 'px';
+      eraserCursor.style.height = eraserSize + 'px';
+      eraserCursor.style.transform = `translate(${x - offset}px, ${y - offset}px)`;
+      eraserCursor.style.borderColor = eraserSize === ERASER_LARGE_SIZE ? 'red' : '#000';
     }
 
     canvas.addEventListener('pointerdown', (evt) => {
+      // Only allow pen/stylus input, not finger touch
+      if (evt.pointerType === 'touch') return;
+
       isDrawing = true;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      isErasing = checkEraser(evt);
+      lastX = evt.pageX;
+      lastY = evt.pageY;
+      prevX = evt.pageX;
+      prevY = evt.pageY;
+      smoothedPressure = evt.pressure > 0 ? evt.pressure : 0.5;
+
+      if (isErasing) {
+        // Track eraser taps for size toggle
+        const now = Date.now();
+        if (now - lastEraserTapTime < TAP_TIMEOUT) {
+          eraserTapCount++;
+        } else {
+          eraserTapCount = 1;
+        }
+        lastEraserTapTime = now;
+
+        // Toggle eraser size after 3 taps
+        if (eraserTapCount >= 3) {
+          eraserSize = eraserSize === ERASER_BASE_SIZE ? ERASER_LARGE_SIZE : ERASER_BASE_SIZE;
+          eraserTapCount = 0;
+        }
+
+        eraserCursor.style.display = 'block';
+        updateEraserCursor(evt.pageX, evt.pageY);
+      }
     });
 
     canvas.addEventListener('pointerup', () => {
+      // Reset large eraser back to normal when stylus leaves screen
+      if (isErasing && eraserSize === ERASER_LARGE_SIZE) {
+        eraserSize = ERASER_BASE_SIZE;
+      }
       isDrawing = false;
+      isErasing = false;
+      eraserCursor.style.display = 'none';
+      ctx.globalCompositeOperation = 'source-over';
     });
 
     canvas.addEventListener('pointerleave', () => {
       isDrawing = false;
+      isErasing = false;
+      eraserCursor.style.display = 'none';
+      ctx.globalCompositeOperation = 'source-over';
     });
 
     canvas.addEventListener('pointermove', async (evt) => {
       if (!isDrawing) return;
 
-      const pointSize = 10;
-      ctx.fillStyle = style.color;
-      ctx.fillRect(evt.pageX, evt.pageY, pointSize, pointSize);
+      // Calculate midpoint for smooth quadratic curve
+      const midX = (lastX + evt.pageX) / 2;
+      const midY = (lastY + evt.pageY) / 2;
 
-      if (moveCnt === 20) {
-        const r = getRandomInt(0, 255);
-        const g = getRandomInt(0, 255);
-        const b = getRandomInt(0, 255);
+      ctx.beginPath();
+      ctx.moveTo(prevX, prevY);
+      ctx.quadraticCurveTo(lastX, lastY, midX, midY);
 
-        style = { color: `rgb(${r} ${g} ${b} / 100%)`, diameter: 10 };
-        moveCnt = 0;
+      // Get pressure (0-1), default to 0.5 for devices without pressure
+      const rawPressure = evt.pressure > 0 ? evt.pressure : 0.5;
+      // Smooth pressure to prevent stepped changes
+      smoothedPressure = smoothedPressure + (rawPressure - smoothedPressure) * PRESSURE_SMOOTHING;
 
-        const divEl = document.getElementById('div');
-        divEl.style.backgroundColor = `rgb(${r} ${g} ${b} / 60%)`;
-        divEl.style.boxShadow = `0 4px 20px rgba(${r}, ${g}, ${b}, 0.4)`;
-        divEl.style.color = (r * 0.299 + g * 0.587 + b * 0.114) > 150 ? '#000' : '#fff';
+      if (isErasing) {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = eraserSize;
+        updateEraserCursor(evt.pageX, evt.pageY);
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = penColor;
+        // Apply smoothed pressure to stroke width
+        ctx.lineWidth = MIN_STROKE_WIDTH + smoothedPressure * (penMaxSize - MIN_STROKE_WIDTH);
       }
-      moveCnt += 1;
 
-      (await presenter).updateInkTrailStartPoint(evt, style);
+      ctx.stroke();
+
+      prevX = midX;
+      prevY = midY;
+      lastX = evt.pageX;
+      lastY = evt.pageY;
+
+      // Update ink style diameter based on smoothed pressure (trail always red)
+      const pressureDiameter = MIN_STROKE_WIDTH + smoothedPressure * (penMaxSize - MIN_STROKE_WIDTH);
+      const currentInkStyle = { color: 'red', diameter: pressureDiameter };
+      const currentEraserStyle = { color: 'white', diameter: eraserSize };
+      (await presenter).updateInkTrailStartPoint(evt, isErasing ? currentEraserStyle : currentInkStyle);
     });
 
     window.addEventListener('resize', resizeCanvas);
