@@ -165,27 +165,12 @@
       transform: scale(1.1);
     }
 
-    #color-input,
-    #trail-color-input {
+    #color-input {
       position: absolute;
       opacity: 0;
       width: 0;
       height: 0;
       pointer-events: none;
-    }
-
-    #trail-color-btn {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: 2px solid #333;
-      cursor: pointer;
-      background: #ff0000;
-      transition: transform 0.15s;
-    }
-
-    #trail-color-btn:hover {
-      transform: scale(1.1);
     }
 
     #clear-btn {
@@ -278,9 +263,14 @@
     </div>
     <button id="clear-btn">Clear</button>
     <div class="menu-group">
+      <label>Pressure</label>
+      <label class="toggle-switch">
+        <input type="checkbox" id="pressure-toggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="menu-group">
       <label>Trail</label>
-      <button id="trail-color-btn"></button>
-      <input type="color" id="trail-color-input" value="#ff0000">
       <label class="toggle-switch">
         <input type="checkbox" id="trail-toggle" checked>
         <span class="toggle-slider"></span>
@@ -317,9 +307,8 @@
     const colorPickerBtn = document.getElementById('color-picker-btn');
     const colorInput = document.getElementById('color-input');
     const clearBtn = document.getElementById('clear-btn');
+    const pressureToggle = document.getElementById('pressure-toggle');
     const trailToggle = document.getElementById('trail-toggle');
-    const trailColorBtn = document.getElementById('trail-color-btn');
-    const trailColorInput = document.getElementById('trail-color-input');
 
     const presenter = navigator.ink.requestPresenter({ presentationArea: canvas });
     let isDrawing = false;
@@ -330,10 +319,10 @@
     let prevY = 0;
     let smoothedPressure = 0.5;
     const PRESSURE_SMOOTHING = 0.12; // Lower = smoother (0-1)
+    const inkStyle = { color: 'red', diameter: 2 }; // Delegated ink trail always red
 
     // Stroke settings
     let penColor = '#000000';
-    let trailColor = '#ff0000';
     let penMaxSize = 5;
     let minStrokeWidth = 0.50;
 
@@ -387,16 +376,6 @@
     colorInput.addEventListener('input', (e) => {
       penColor = e.target.value;
       colorPickerBtn.style.background = penColor;
-    });
-
-    // Trail color picker
-    trailColorBtn.addEventListener('click', () => {
-      trailColorInput.click();
-    });
-
-    trailColorInput.addEventListener('input', (e) => {
-      trailColor = e.target.value;
-      trailColorBtn.style.background = trailColor;
     });
 
     // Clear canvas
@@ -520,6 +499,11 @@
       // Smooth pressure to prevent stepped changes
       smoothedPressure = smoothedPressure + (curvedPressure - smoothedPressure) * PRESSURE_SMOOTHING;
 
+      // Calculate stroke width based on pressure toggle
+      const strokeWidth = pressureToggle.checked
+        ? minStrokeWidth + smoothedPressure * (penMaxSize - minStrokeWidth)
+        : penMaxSize;
+
       if (isErasing) {
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineWidth = eraserSize;
@@ -527,8 +511,7 @@
       } else {
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = penColor;
-        // Apply smoothed pressure to stroke width
-        ctx.lineWidth = minStrokeWidth + smoothedPressure * (penMaxSize - minStrokeWidth);
+        ctx.lineWidth = strokeWidth;
       }
 
       ctx.stroke();
@@ -540,8 +523,8 @@
 
       // Update ink trail if enabled
       if (trailToggle.checked) {
-        const pressureDiameter = minStrokeWidth + smoothedPressure * (penMaxSize - minStrokeWidth);
-        const currentInkStyle = { color: trailColor, diameter: pressureDiameter };
+        const pressureDiameter = pressureToggle.checked ? strokeWidth : penMaxSize;
+        const currentInkStyle = { color: 'red', diameter: pressureDiameter };
         const currentEraserStyle = { color: 'white', diameter: eraserSize };
         (await presenter).updateInkTrailStartPoint(evt, isErasing ? currentEraserStyle : currentInkStyle);
       }
