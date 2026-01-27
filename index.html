@@ -183,6 +183,50 @@
     #clear-btn:hover {
       background: #c0392b;
     }
+
+    .toggle-switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.2s;
+      border-radius: 20px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.2s;
+      border-radius: 50%;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: #e74c3c;
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(16px);
+    }
   </style>
 </head>
 <body>
@@ -195,7 +239,7 @@
       <label>Size</label>
       <div class="size-stepper">
         <button class="size-btn" id="size-down">−</button>
-        <span id="pen-size-display">6</span>
+        <span id="pen-size-display">4</span>
         <button class="size-btn" id="size-up">+</button>
       </div>
     </div>
@@ -208,6 +252,13 @@
       <button class="color-btn" data-color="#9b59b6" style="background: #9b59b6;"></button>
     </div>
     <button id="clear-btn">Clear</button>
+    <div class="menu-group">
+      <label>Trail</label>
+      <label class="toggle-switch">
+        <input type="checkbox" id="trail-toggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
   </div>
 
   <div id="instructions">Draw with pen tip • Erase with pen eraser or right-click</div>
@@ -235,6 +286,7 @@
     const penSizeDisplay = document.getElementById('pen-size-display');
     const colorBtns = document.querySelectorAll('.color-btn');
     const clearBtn = document.getElementById('clear-btn');
+    const trailToggle = document.getElementById('trail-toggle');
 
     const presenter = navigator.ink.requestPresenter({ presentationArea: canvas });
     let isDrawing = false;
@@ -249,8 +301,8 @@
 
     // Stroke settings
     let penColor = '#000000';
-    let penMaxSize = 6;
-    const MIN_STROKE_WIDTH = 0.5;
+    let penMaxSize = 4;
+    const MIN_STROKE_WIDTH = 0.15;
 
     // Menu toggle
     menuToggle.addEventListener('click', () => {
@@ -402,8 +454,10 @@
 
       // Get pressure (0-1), default to 0.5 for devices without pressure
       const rawPressure = evt.pressure > 0 ? evt.pressure : 0.5;
+      // Apply pressure curve for more dramatic taper (power of 2)
+      const curvedPressure = Math.pow(rawPressure, 2);
       // Smooth pressure to prevent stepped changes
-      smoothedPressure = smoothedPressure + (rawPressure - smoothedPressure) * PRESSURE_SMOOTHING;
+      smoothedPressure = smoothedPressure + (curvedPressure - smoothedPressure) * PRESSURE_SMOOTHING;
 
       if (isErasing) {
         ctx.globalCompositeOperation = 'destination-out';
@@ -423,11 +477,13 @@
       lastX = evt.pageX;
       lastY = evt.pageY;
 
-      // Update ink style diameter based on smoothed pressure (trail always red)
-      const pressureDiameter = MIN_STROKE_WIDTH + smoothedPressure * (penMaxSize - MIN_STROKE_WIDTH);
-      const currentInkStyle = { color: 'red', diameter: pressureDiameter };
-      const currentEraserStyle = { color: 'white', diameter: eraserSize };
-      (await presenter).updateInkTrailStartPoint(evt, isErasing ? currentEraserStyle : currentInkStyle);
+      // Update ink trail if enabled
+      if (trailToggle.checked) {
+        const pressureDiameter = MIN_STROKE_WIDTH + smoothedPressure * (penMaxSize - MIN_STROKE_WIDTH);
+        const currentInkStyle = { color: 'red', diameter: pressureDiameter };
+        const currentEraserStyle = { color: 'white', diameter: eraserSize };
+        (await presenter).updateInkTrailStartPoint(evt, isErasing ? currentEraserStyle : currentInkStyle);
+      }
     });
 
     window.addEventListener('resize', resizeCanvas);
