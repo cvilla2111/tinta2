@@ -656,22 +656,19 @@
       updateEraserCursor();
     });
 
-    // Fixed canvas size (High DPI optimized)
+    // Fixed canvas size (1:1 pixel ratio for performance)
     const CANVAS_WIDTH = 1920;
     const CANVAS_HEIGHT = 1080;
 
     function initCanvas() {
-      const dpr = window.devicePixelRatio || 1;
+      // Use 1:1 pixel ratio for fixed canvas (better performance)
+      canvas.width = CANVAS_WIDTH;
+      canvas.height = CANVAS_HEIGHT;
 
-      // Set fixed physical pixel dimensions
-      canvas.width = CANVAS_WIDTH * dpr;
-      canvas.height = CANVAS_HEIGHT * dpr;
-
-      // Set fixed CSS display size
       canvas.style.width = CANVAS_WIDTH + 'px';
       canvas.style.height = CANVAS_HEIGHT + 'px';
 
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.imageSmoothingEnabled = true;
