@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Delegated Ink Trail</title>
+  <title>Delegated Ink Trail with DPR Detection</title>
   <style>
     * {
       margin: 0;
@@ -13,81 +13,436 @@
 
     body {
       overflow: hidden;
-      background-color: white;
+      background: #ffffff;
     }
 
     canvas {
       display: block;
       touch-action: none;
     }
+
+    #dpr-info {
+      position: fixed;
+      bottom: 1rem;
+      left: 1rem;
+      padding: 0.5rem 1rem;
+      background: rgba(0, 0, 0, 0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 6px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.7);
+      z-index: 10;
+    }
+
+    #dpr-info span {
+      color: #009944;
+      font-weight: bold;
+    }
+
+    #toolbar-trigger {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 20px;
+      z-index: 100;
+    }
+
+    #toolbar {
+      position: fixed;
+      top: -60px;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: rgba(0, 0, 0, 0.08);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      z-index: 99;
+      transition: top 0.3s ease;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    #toolbar-trigger:hover + #toolbar,
+    #toolbar:hover {
+      top: 0;
+    }
+
+    #toolbar label {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.7);
+    }
+
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .stepper button {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.1);
+      color: rgba(0, 0, 0, 0.7);
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stepper button:hover {
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .stepper button:active {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .stepper-value {
+      min-width: 50px;
+      text-align: center;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 16px;
+      font-weight: bold;
+      color: #000000;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: background 0.2s ease;
+    }
+
+    .stepper-value:hover {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    #color-popup {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 200;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    #color-popup.show {
+      display: flex;
+    }
+
+    .color-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .color-row label {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.7);
+      min-width: 55px;
+    }
+
+    .color-row input[type="color"] {
+      width: 32px;
+      height: 24px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .stepper-wrapper {
+      position: relative;
+    }
+
+    #eraser-indicator {
+      position: fixed;
+      pointer-events: none;
+      border: 1px solid rgba(0, 0, 0, 0.5);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
+  <div id="toolbar-trigger"></div>
+  <div id="toolbar">
+    <label>Pen Size:</label>
+    <div class="stepper">
+      <button id="size-decrease">−</button>
+      <div class="stepper-wrapper">
+        <span id="size-value" class="stepper-value">4</span>
+        <div id="color-popup">
+          <div class="color-row">
+            <label>Pen:</label>
+            <input type="color" id="pen-color-picker" value="#000000">
+          </div>
+          <div class="color-row">
+            <label>Preview:</label>
+            <input type="color" id="preview-color-picker" value="#ff0000">
+          </div>
+        </div>
+      </div>
+      <button id="size-increase">+</button>
+    </div>
+  </div>
   <canvas id="canvas"></canvas>
+  <div id="eraser-indicator"></div>
+  <div id="dpr-info">Device Pixel Ratio: <span id="dpr-value">1</span></div>
 
   <script>
-    const ctx = canvas.getContext("2d");
-    const presenter = navigator.ink.requestPresenter({ presentationArea: canvas });
-    const strokeSize = 10;
-    const style = { color: "red", diameter: strokeSize * 0.3 };
-    const activePointers = new Set();
-    let lastX = null;
-    let lastY = null;
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const dprValueEl = document.getElementById('dpr-value');
+
+    // DPR Detection
+    let dpr = window.devicePixelRatio || 1;
+
+    function setupCanvas() {
+      // Get the current DPR
+      dpr = window.devicePixelRatio || 1;
+      dprValueEl.textContent = dpr.toFixed(2);
+
+      // Get the display size
+      const displayWidth = window.innerWidth;
+      const displayHeight = window.innerHeight;
+
+      // Set the canvas buffer size accounting for DPR
+      canvas.width = Math.floor(displayWidth * dpr);
+      canvas.height = Math.floor(displayHeight * dpr);
+
+      // Set the CSS display size
+      canvas.style.width = displayWidth + 'px';
+      canvas.style.height = displayHeight + 'px';
+
+      // Scale the context to account for DPR
+      ctx.scale(dpr, dpr);
+    }
+
+    // Initial setup
+    setupCanvas();
+
+    // Handle resize and DPR changes
+    window.addEventListener('resize', setupCanvas);
+
+    // Listen for DPR changes (e.g., moving window between monitors)
+    if (window.matchMedia) {
+      const mediaQuery = window.matchMedia(`(resolution: ${dpr}dppx)`);
+      mediaQuery.addEventListener('change', () => {
+        setupCanvas();
+      });
+    }
+
+    // Ink presenter setup
+    let presenter = null;
+    if (navigator.ink) {
+      navigator.ink.requestPresenter({ presentationArea: canvas })
+        .then(p => { presenter = p; })
+        .catch(err => console.log('Ink API not supported:', err));
+    }
+
+    let strokeColor = '#000000';
+    let strokeWidth = 4;
+    const previewStyle = { color: '#ff0000', diameter: strokeWidth };
+    const sizeValueEl = document.getElementById('size-value');
+    const colorPopup = document.getElementById('color-popup');
+    const penColorPicker = document.getElementById('pen-color-picker');
+    const previewColorPicker = document.getElementById('preview-color-picker');
+
+    // Toggle color popup when clicking size value
+    sizeValueEl.addEventListener('click', (evt) => {
+      evt.stopPropagation();
+      colorPopup.classList.toggle('show');
+    });
+
+    // Close popup when clicking outside
+    document.addEventListener('click', (evt) => {
+      if (!colorPopup.contains(evt.target) && evt.target !== sizeValueEl) {
+        colorPopup.classList.remove('show');
+      }
+    });
+
+    // Prevent popup from closing when interacting with color pickers
+    colorPopup.addEventListener('click', (evt) => {
+      evt.stopPropagation();
+    });
+
+    // Update pen stroke color
+    penColorPicker.addEventListener('input', (evt) => {
+      strokeColor = evt.target.value;
+      sizeValueEl.style.color = strokeColor;
+    });
+
+    // Update preview stroke color
+    previewColorPicker.addEventListener('input', (evt) => {
+      previewStyle.color = evt.target.value;
+    });
+
+    // Pen size stepper controls
+    document.getElementById('size-decrease').addEventListener('click', () => {
+      if (strokeWidth > 0.5) {
+        strokeWidth = Math.round((strokeWidth - 0.5) * 10) / 10;
+        sizeValueEl.textContent = strokeWidth;
+        previewStyle.diameter = strokeWidth;
+      }
+    });
+
+    document.getElementById('size-increase').addEventListener('click', () => {
+      strokeWidth = Math.round((strokeWidth + 0.5) * 10) / 10;
+      sizeValueEl.textContent = strokeWidth;
+      previewStyle.diameter = strokeWidth;
+    });
+    let isPenDown = false;
+    let isErasing = false;
+    let lastX = 0;
+    let lastY = 0;
+    const defaultEraserSize = 20;
+    const bigEraserSize = defaultEraserSize * 6;
+    let currentEraserSize = defaultEraserSize;
+    let eraserTapCount = 0;
+    let lastEraserTapTime = 0;
+    const tapTimeWindow = 500; // ms between taps to count as consecutive
+    const eraserIndicator = document.getElementById('eraser-indicator');
+    eraserIndicator.style.width = currentEraserSize + 'px';
+    eraserIndicator.style.height = currentEraserSize + 'px';
 
     // Set up stroke style
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.lineWidth = strokeSize;
-    ctx.strokeStyle = "black";
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = strokeWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
-    canvas.addEventListener("pointerdown", (evt) => {
-      evt.preventDefault();
-      activePointers.add(evt.pointerId);
-      canvas.setPointerCapture(evt.pointerId);
-      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      lastX = evt.pageX;
-      lastY = evt.pageY;
-      ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
+    canvas.addEventListener('pointerdown', (evt) => {
+      if (evt.pointerType === 'pen') {
+        isPenDown = true;
+        // Check if using eraser end (button 32 = eraser)
+        isErasing = (evt.buttons & 32) !== 0;
+        lastX = evt.pageX;
+        lastY = evt.pageY;
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+
+        if (isErasing) {
+          const now = Date.now();
+          // Check if tap is within time window
+          if (now - lastEraserTapTime < tapTimeWindow) {
+            eraserTapCount++;
+          } else {
+            eraserTapCount = 1;
+          }
+          lastEraserTapTime = now;
+
+          // Activate big eraser on 3 taps
+          if (eraserTapCount >= 3) {
+            currentEraserSize = bigEraserSize;
+            eraserIndicator.style.borderColor = 'red';
+          }
+
+          eraserIndicator.style.width = currentEraserSize + 'px';
+          eraserIndicator.style.height = currentEraserSize + 'px';
+          eraserIndicator.style.display = 'block';
+          eraserIndicator.style.left = evt.pageX + 'px';
+          eraserIndicator.style.top = evt.pageY + 'px';
+        }
+      }
     });
 
-    canvas.addEventListener("pointerup", (evt) => {
-      activePointers.delete(evt.pointerId);
-      canvas.releasePointerCapture(evt.pointerId);
-      lastX = null;
-      lastY = null;
+    function resetEraser() {
+      currentEraserSize = defaultEraserSize;
+      eraserIndicator.style.width = currentEraserSize + 'px';
+      eraserIndicator.style.height = currentEraserSize + 'px';
+      eraserIndicator.style.borderColor = 'rgba(0, 0, 0, 0.5)';
+      eraserIndicator.style.display = 'none';
+    }
+
+    canvas.addEventListener('pointerup', (evt) => {
+      if (evt.pointerType === 'pen') {
+        isPenDown = false;
+        if (isErasing) {
+          resetEraser();
+        }
+        isErasing = false;
+      }
     });
 
-    canvas.addEventListener("pointercancel", (evt) => {
-      activePointers.delete(evt.pointerId);
-      lastX = null;
-      lastY = null;
+    canvas.addEventListener('pointerleave', (evt) => {
+      if (evt.pointerType === 'pen') {
+        isPenDown = false;
+        if (isErasing) {
+          resetEraser();
+        }
+        isErasing = false;
+      }
     });
 
-    canvas.addEventListener("lostpointercapture", (evt) => {
-      activePointers.delete(evt.pointerId);
-      lastX = null;
-      lastY = null;
+    canvas.addEventListener('pointermove', async (evt) => {
+      // Only respond to pen input when touching the screen
+      if (evt.pointerType !== 'pen' || !isPenDown) return;
+
+      const x = evt.pageX;
+      const y = evt.pageY;
+
+      if (isErasing) {
+        // Eraser mode - erase strokes with filled circle
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+
+        // Draw filled circles along the path for complete coverage
+        const radius = currentEraserSize / 2;
+        const dx = x - lastX;
+        const dy = y - lastY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const steps = Math.max(1, Math.ceil(dist / (radius / 2)));
+
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const cx = lastX + dx * t;
+          const cy = lastY + dy * t;
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+
+        // Update eraser indicator position
+        eraserIndicator.style.left = x + 'px';
+        eraserIndicator.style.top = y + 'px';
+      } else {
+        // Draw stroke from last position to current
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = strokeWidth;
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+
+        if (presenter) {
+          presenter.updateInkTrailStartPoint(evt, previewStyle);
+        }
+      }
+
+      lastX = x;
+      lastY = y;
     });
-
-    canvas.addEventListener("pointermove", async (evt) => {
-      evt.preventDefault();
-      // Only draw when pointer is actively down (touching screen)
-      if (!activePointers.has(evt.pointerId)) return;
-
-      ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
-      ctx.lineTo(evt.pageX, evt.pageY);
-      ctx.stroke();
-
-      lastX = evt.pageX;
-      lastY = evt.pageY;
-
-      (await presenter).updateInkTrailStartPoint(evt, style);
-    });
-
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
   </script>
 </body>
 </html>
