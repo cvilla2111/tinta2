@@ -3,744 +3,629 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Low Latency Stylus Annotation</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Drawing Canvas</title>
   <style>
-    :root {
-      --bg-primary: #f8f7f4;
-      --bg-secondary: #eae8e3;
-      --text-primary: #2d2a26;
-      --text-secondary: #6b6660;
-      --accent: #e85d04;
-      --accent-hover: #dc2f02;
-      --toolbar-bg: rgba(255, 255, 255, 0.92);
-      --shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-      --border: rgba(0, 0, 0, 0.08);
-    }
-
-    .dark {
-      --bg-primary: #1a1917;
-      --bg-secondary: #2d2a26;
-      --text-primary: #f8f7f4;
-      --text-secondary: #a8a39c;
-      --toolbar-bg: rgba(45, 42, 38, 0.95);
-      --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-      --border: rgba(255, 255, 255, 0.1);
-    }
-
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
 
-    body {
-      font-family: 'Space Grotesk', sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      height: 100vh;
-      height: 100dvh;
+    html, body {
+      width: 100%;
+      height: 100%;
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
-    header {
-      padding: 12px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: var(--toolbar-bg);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      z-index: 10;
-    }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .logo-icon {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .logo-icon svg {
-      width: 18px;
-      height: 18px;
-      stroke: white;
-      fill: none;
-      stroke-width: 2.5;
-    }
-
-    h1 {
-      font-size: 1.1rem;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-    }
-
-    .badge-group {
-      display: flex;
-      gap: 8px;
-    }
-
-    .latency-badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
-      padding: 4px 10px;
-      background: var(--bg-secondary);
-      border-radius: 20px;
-      color: var(--text-secondary);
-    }
-
-    .latency-badge span {
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    .vector-badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
-      padding: 4px 10px;
-      background: #16a34a20;
-      border-radius: 20px;
-      color: #16a34a;
-      font-weight: 600;
+    body {
+      background: #fff;
     }
 
     .canvas-container {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-      background: var(--bg-secondary);
-      overflow: hidden;
-    }
-
-    .canvas-wrapper {
       position: relative;
       width: 100%;
       height: 100%;
-      max-width: 1200px;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-      overflow: hidden;
     }
 
-    .svg-container {
+    canvas {
       position: absolute;
-      inset: 0;
-      touch-action: none;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       cursor: crosshair;
     }
 
-    .svg-container svg {
-      width: 100%;
-      height: 100%;
-      display: block;
+    /* Main canvas - permanent strokes */
+    #canvas {
+      background: #fff;
+      z-index: 1;
     }
 
+    /* Preview canvas - GPU accelerated trail */
+    #preview {
+      z-index: 2;
+      pointer-events: none;
+      /* Force GPU compositing layer */
+      will-change: transform, opacity;
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
 
-    .toolbar {
-      position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
+    /* Input canvas - captures events */
+    #input {
+      z-index: 3;
+      background: transparent;
+    }
+
+    /* Minimal floating controls */
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
       display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 12px;
-      background: var(--toolbar-bg);
-      backdrop-filter: blur(16px);
-      border-radius: 16px;
-      box-shadow: var(--shadow), 0 0 0 1px var(--border);
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 100;
     }
 
-    .tool-group {
-      display: flex;
-      align-items: center;
-      gap: 4px;
+    #controls:hover,
+    #controls.visible {
+      opacity: 1;
     }
 
-    .divider {
-      width: 1px;
-      height: 24px;
-      background: var(--border);
-      margin: 0 6px;
-    }
-
-    .tool-btn {
+    .ctrl-btn {
       width: 40px;
       height: 40px;
       border: none;
-      background: transparent;
-      border-radius: 10px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.08);
+      color: #333;
+      font-size: 18px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.15s ease;
-      color: var(--text-secondary);
+      transition: background 0.2s, transform 0.2s;
+      backdrop-filter: blur(10px);
     }
 
-    .tool-btn:hover {
-      background: var(--bg-secondary);
-      color: var(--text-primary);
-    }
-
-    .tool-btn.active {
-      background: var(--accent);
-      color: white;
-    }
-
-    .tool-btn svg {
-      width: 20px;
-      height: 20px;
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-
-    .color-picker {
-      position: relative;
-    }
-
-    .color-swatch {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: 3px solid var(--bg-primary);
-      box-shadow: 0 0 0 1px var(--border);
-      cursor: pointer;
-      transition: transform 0.15s ease;
-    }
-
-    .color-swatch:hover {
+    .ctrl-btn:hover {
+      background: rgba(0, 0, 0, 0.15);
       transform: scale(1.1);
     }
 
-    .color-options {
-      position: absolute;
-      bottom: 52px;
-      left: 50%;
-      transform: translateX(-50%) scale(0.9);
-      opacity: 0;
-      pointer-events: none;
+    .ctrl-btn:active {
+      transform: scale(0.95);
+    }
+
+    .stepper {
       display: flex;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      padding: 4px;
+      backdrop-filter: blur(10px);
+    }
+
+    .step-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: #333;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .step-btn:hover {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    .step-btn:active {
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .step-value {
+      min-width: 36px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      font-family: system-ui, sans-serif;
+    }
+
+    .switch {
+      display: flex;
+      align-items: center;
       gap: 6px;
-      padding: 10px;
-      background: var(--toolbar-bg);
-      backdrop-filter: blur(16px);
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-      transition: all 0.2s ease;
-    }
-
-    .color-options.show {
-      transform: translateX(-50%) scale(1);
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .color-option {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: none;
+      background: rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      padding: 6px 10px;
       cursor: pointer;
-      transition: transform 0.15s ease;
+      backdrop-filter: blur(10px);
     }
 
-    .color-option:hover {
-      transform: scale(1.15);
+    .switch input {
+      display: none;
     }
 
-    .size-slider {
-      width: 80px;
-      height: 6px;
-      -webkit-appearance: none;
-      appearance: none;
-      background: var(--bg-secondary);
-      border-radius: 3px;
-      cursor: pointer;
-    }
-
-    .size-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 18px;
+    .switch-slider {
+      width: 32px;
       height: 18px;
-      background: var(--accent);
-      border-radius: 50%;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(232, 93, 4, 0.3);
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 9px;
+      position: relative;
+      transition: background 0.2s;
     }
 
-    .size-slider::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      background: var(--accent);
-      border-radius: 50%;
-      border: none;
-      cursor: pointer;
-    }
-
-    .stats {
+    .switch-slider::after {
+      content: '';
       position: absolute;
-      top: 12px;
-      right: 12px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.65rem;
-      padding: 8px 12px;
-      background: rgba(0, 0, 0, 0.7);
-      color: #fff;
-      border-radius: 8px;
-      line-height: 1.6;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
 
-    .stats-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
+    .switch input:checked + .switch-slider {
+      background: #4a90d9;
     }
 
-    .stats-label {
-      opacity: 0.6;
+    .switch input:checked + .switch-slider::after {
+      transform: translateX(14px);
     }
 
-    .stats-value {
-      color: #4ade80;
+    .switch-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      font-family: system-ui, sans-serif;
     }
 
-    .predicted {
-      color: #fbbf24;
+    body.eraser-mode #input {
+      cursor: cell;
     }
 
-    @media (max-width: 600px) {
-      header {
-        padding: 10px 14px;
-      }
-
-      h1 {
-        font-size: 0.95rem;
-      }
-
-      .latency-badge, .vector-badge {
-        display: none;
-      }
-
-      .toolbar {
-        bottom: 12px;
-        padding: 6px 10px;
-        gap: 4px;
-      }
-
-      .tool-btn {
-        width: 36px;
-        height: 36px;
-      }
-
-      .size-slider {
-        width: 60px;
-      }
+    body.eraser-mode #eraser-btn {
+      background: rgba(0, 0, 0, 0.25);
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="logo">
-      <div class="logo-icon">
-        <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
-      </div>
-      <h1>Stylus Annotation</h1>
-    </div>
-    <div class="badge-group">
-      <div class="vector-badge">SVG Vector</div>
-      <div class="latency-badge">Latency: <span>~8ms</span></div>
-    </div>
-  </header>
-
   <div class="canvas-container">
-    <div class="canvas-wrapper">
-      <div class="svg-container" id="mainLayer">
-        <svg id="mainSvg" xmlns="http://www.w3.org/2000/svg">
-          <rect width="100%" height="100%" fill="#ffffff"/>
-          <g id="strokesGroup"></g>
-          <path id="currentStroke" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div class="stats" id="stats">
-        <div class="stats-row">
-          <span class="stats-label">Coalesced:</span>
-          <span class="stats-value" id="coalescedCount">0</span>
-        </div>
-        <div class="stats-row">
-          <span class="stats-label">Pressure:</span>
-          <span class="stats-value" id="pressureVal">0.00</span>
-        </div>
-      </div>
+    <canvas id="canvas"></canvas>
+    <canvas id="preview"></canvas>
+    <canvas id="input"></canvas>
+  </div>
 
-      <div class="toolbar">
-        <div class="tool-group">
-          <button class="tool-btn active" id="penTool" title="Pen">
-            <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
-          </button>
-          <button class="tool-btn" id="eraserTool" title="Eraser">
-            <svg viewBox="0 0 24 24"><path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.4 2.8c.8-.8 2-.8 2.8 0L21 7.6c.8.8.8 2 0 2.8L11 20"/><path d="M6 11l5 5"/></svg>
-          </button>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="color-picker">
-          <div class="color-swatch" id="colorSwatch" style="background: #2d2a26;"></div>
-          <div class="color-options" id="colorOptions">
-            <button class="color-option" style="background: #2d2a26;" data-color="#2d2a26"></button>
-            <button class="color-option" style="background: #e85d04;" data-color="#e85d04"></button>
-            <button class="color-option" style="background: #2563eb;" data-color="#2563eb"></button>
-            <button class="color-option" style="background: #16a34a;" data-color="#16a34a"></button>
-            <button class="color-option" style="background: #9333ea;" data-color="#9333ea"></button>
-          </div>
-        </div>
-
-        <input type="range" class="size-slider" id="sizeSlider" min="1" max="20" value="3">
-
-        <div class="divider"></div>
-
-        <button class="tool-btn" id="undoBtn" title="Undo">
-          <svg viewBox="0 0 24 24"><path d="M3 10h10a5 5 0 0 1 5 5v2"/><path d="M7 6L3 10l4 4"/></svg>
-        </button>
-        <button class="tool-btn" id="clearBtn" title="Clear">
-          <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-        </button>
-        <button class="tool-btn" id="exportBtn" title="Export SVG">
-          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </button>
-      </div>
+  <div id="controls">
+    <div class="stepper" title="Stroke Size">
+      <button class="step-btn" id="size-down">−</button>
+      <span class="step-value" id="size-value">2</span>
+      <button class="step-btn" id="size-up">+</button>
     </div>
+    <label class="switch" title="Pressure Sensitivity (P)">
+      <input type="checkbox" id="pressure-toggle">
+      <span class="switch-slider"></span>
+      <span class="switch-label">P</span>
+    </label>
+    <button class="ctrl-btn" id="eraser-btn" title="Toggle Eraser (E)">✏️</button>
+    <button class="ctrl-btn" id="clear-btn" title="Clear Canvas (C)">🗑️</button>
+    <button class="ctrl-btn" id="save-btn" title="Save Image (S)">💾</button>
   </div>
 
   <script>
-    // Dark mode detection
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.documentElement.classList.add('dark');
-    }
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
-      document.documentElement.classList.toggle('dark', event.matches);
+    // Canvas layers
+    const mainCanvas = document.getElementById('canvas');
+    const previewCanvas = document.getElementById('preview');
+    const inputCanvas = document.getElementById('input');
+
+    // Contexts with optimizations
+    const mainCtx = mainCanvas.getContext('2d', {
+      alpha: true, // Enable alpha for real eraser (destination-out)
+      desynchronized: true // Reduces latency by bypassing compositor
+    });
+    const previewCtx = previewCanvas.getContext('2d', {
+      alpha: true,
+      desynchronized: true
     });
 
-    // SVG elements
-    const mainLayer = document.getElementById('mainLayer');
-    const mainSvg = document.getElementById('mainSvg');
-    const strokesGroup = document.getElementById('strokesGroup');
-    const currentStrokePath = document.getElementById('currentStroke');
+    const controls = document.getElementById('controls');
 
-    // Drawing state
     let isDrawing = false;
-    let currentTool = 'pen';
-    let currentColor = '#2d2a26';
-    let currentSize = 3;
-    let points = [];
-    let strokeHistory = []; // Array of SVG path elements
+    let lastX = 0;
+    let lastY = 0;
+    let lastPressure = 0.5;
+    let isEraser = false;
+    let controlsTimeout;
+    let dpr = 1;
+    let strokeSize = 2;
+    let pressureEnabled = false;
 
-    // Stats
-    const coalescedEl = document.getElementById('coalescedCount');
-    const pressureEl = document.getElementById('pressureVal');
+    // Trail points for smooth preview
+    let trailPoints = [];
+    const TRAIL_LENGTH = 8;
+    const TRAIL_FADE_SPEED = 0.15;
 
-    function getPoint(e) {
-      const rect = mainLayer.getBoundingClientRect();
+    // Animation frame handle
+    let animationId = null;
+
+    function resizeCanvas() {
+      dpr = window.devicePixelRatio || 1;
+      const rect = mainCanvas.parentElement.getBoundingClientRect();
+
+      // Save current drawing
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = mainCanvas.width;
+      tempCanvas.height = mainCanvas.height;
+      tempCanvas.getContext('2d').drawImage(mainCanvas, 0, 0);
+
+      // Resize all canvases
+      [mainCanvas, previewCanvas, inputCanvas].forEach(c => {
+        c.width = rect.width * dpr;
+        c.height = rect.height * dpr;
+        c.style.width = rect.width + 'px';
+        c.style.height = rect.height + 'px';
+      });
+
+      mainCtx.scale(dpr, dpr);
+      previewCtx.scale(dpr, dpr);
+
+      // Fill main with white
+      mainCtx.fillStyle = '#ffffff';
+      mainCtx.fillRect(0, 0, rect.width, rect.height);
+
+      // Restore drawing
+      if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+        mainCtx.drawImage(tempCanvas, 0, 0, rect.width, rect.height);
+      }
+
+      setupContext(mainCtx);
+      setupContext(previewCtx);
+    }
+
+    function setupContext(ctx) {
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 2;
+    }
+
+    function getPointerPos(e) {
+      const rect = inputCanvas.getBoundingClientRect();
       return {
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
-        pressure: e.pressure || 0.5
+        pressure: e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5
       };
     }
 
-    function getStrokeWidth(pressure) {
-      return currentSize * (0.6 + pressure * 0.8);
-    }
+    // Get coalesced events for smoother strokes
+    function getCoalescedPoints(e) {
+      const points = [];
+      const rect = inputCanvas.getBoundingClientRect();
 
-    // Build SVG path data from points using quadratic bezier curves
-    function buildPathData(pts) {
-      if (pts.length === 0) return '';
-      if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
-
-      let d = `M ${pts[0].x} ${pts[0].y}`;
-
-      if (pts.length === 2) {
-        d += ` L ${pts[1].x} ${pts[1].y}`;
-        return d;
-      }
-
-      // Use quadratic bezier curves through midpoints for smoothness
-      for (let i = 1; i < pts.length - 1; i++) {
-        const p0 = pts[i];
-        const p1 = pts[i + 1];
-        const midX = (p0.x + p1.x) / 2;
-        const midY = (p0.y + p1.y) / 2;
-
-        if (i === 1) {
-          d += ` Q ${p0.x} ${p0.y} ${midX} ${midY}`;
-        } else {
-          d += ` Q ${p0.x} ${p0.y} ${midX} ${midY}`;
+      // Use coalesced events if available (contains all intermediate points)
+      if (e.getCoalescedEvents) {
+        const coalesced = e.getCoalescedEvents();
+        for (const ce of coalesced) {
+          points.push({
+            x: ce.clientX - rect.left,
+            y: ce.clientY - rect.top,
+            pressure: ce.pressure > 0 ? ce.pressure : 0.5
+          });
         }
       }
 
-      // End at last point
-      const last = pts[pts.length - 1];
-      const secondLast = pts[pts.length - 2];
-      d += ` Q ${secondLast.x} ${secondLast.y} ${last.x} ${last.y}`;
+      // Always include current point
+      if (points.length === 0) {
+        points.push(getPointerPos(e));
+      }
 
-      return d;
+      return points;
     }
 
-    // Calculate average pressure for variable stroke width (simplified for SVG)
-    function getAveragePressure(pts) {
-      if (pts.length === 0) return 0.5;
-      const sum = pts.reduce((acc, p) => acc + p.pressure, 0);
-      return sum / pts.length;
-    }
 
-    function updateCurrentStroke() {
-      const pathData = buildPathData(points);
-      const avgPressure = getAveragePressure(points);
-      const strokeWidth = getStrokeWidth(avgPressure);
+    // Track if eraser is triggered by stylus top
+    let stylusEraser = false;
 
-      currentStrokePath.setAttribute('d', pathData);
-      currentStrokePath.setAttribute('stroke', currentColor);
-      currentStrokePath.setAttribute('stroke-width', strokeWidth);
-    }
+    // Eraser cursor position
+    let eraserCursorX = 0;
+    let eraserCursorY = 0;
+    let eraserCursorVisible = false;
 
-    function commitStroke() {
-      if (points.length < 2) return;
+    // Eraser tap tracking for 4x mode
+    let eraserTapCount = 0;
+    let eraserTapTimer = null;
+    let eraser4xMode = false;
+    const ERASER_TAP_TIMEOUT = 500; // ms between taps
 
-      const pathData = buildPathData(points);
-      const avgPressure = getAveragePressure(points);
-      const strokeWidth = getStrokeWidth(avgPressure);
+    function startDrawing(e) {
+      e.preventDefault();
+      // Ignore touch/finger input, only allow pen and mouse
+      if (e.pointerType === 'touch') return;
 
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', pathData);
-      path.setAttribute('stroke', currentColor);
-      path.setAttribute('stroke-width', strokeWidth);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke-linecap', 'round');
-      path.setAttribute('stroke-linejoin', 'round');
+      // Detect stylus eraser (button 5 or buttons 32 indicates eraser end)
+      stylusEraser = (e.pointerType === 'pen' && (e.button === 5 || e.buttons === 32));
 
-      strokesGroup.appendChild(path);
-      strokeHistory.push(path);
+      // Track eraser taps for 4x mode
+      if (stylusEraser) {
+        eraserTapCount++;
+        clearTimeout(eraserTapTimer);
+        eraserTapTimer = setTimeout(() => {
+          eraserTapCount = 0;
+        }, ERASER_TAP_TIMEOUT);
 
-      // Clear current stroke
-      currentStrokePath.setAttribute('d', '');
-    }
-
-    function handlePointerDown(e) {
-      if (e.pointerType === 'touch' && e.isPrimary === false) return;
+        if (eraserTapCount >= 3) {
+          eraser4xMode = true;
+          eraserTapCount = 0;
+        }
+      }
 
       isDrawing = true;
-      points = [getPoint(e)];
+      const pos = getPointerPos(e);
+      lastX = pos.x;
+      lastY = pos.y;
+      lastPressure = pos.pressure;
+      trailPoints = [{ ...pos, alpha: 1 }];
 
-      if (currentTool === 'eraser') {
-        checkEraserHit(points[0]);
+      // Draw initial dot on main canvas
+      mainCtx.beginPath();
+      mainCtx.arc(lastX, lastY, getLineWidth(pos.pressure) / 2, 0, Math.PI * 2);
+      if (isEraserActive()) {
+        mainCtx.globalCompositeOperation = 'destination-out';
+        mainCtx.fillStyle = 'rgba(0,0,0,1)';
+      } else {
+        mainCtx.globalCompositeOperation = 'source-over';
+        mainCtx.fillStyle = '#000000';
       }
+      mainCtx.fill();
 
-      mainLayer.setPointerCapture(e.pointerId);
+      // Start render loop
+      if (!animationId) {
+        animationId = requestAnimationFrame(renderPreviewTrail);
+      }
     }
 
-    function handlePointerMove(e) {
+    function isEraserActive() {
+      return isEraser || stylusEraser;
+    }
+
+    function getLineWidth(pressure) {
+      const basePressure = pressureEnabled ? Math.max(0.1, pressure) : 0.5;
+      if (isEraserActive()) {
+        const eraserSize = 40 * basePressure;
+        return eraser4xMode ? eraserSize * 4 : eraserSize;
+      }
+      return strokeSize + (basePressure * strokeSize);
+    }
+
+    function updateStrokeSize(delta) {
+      strokeSize = Math.max(0.5, Math.min(20, strokeSize + delta));
+      document.getElementById('size-value').textContent = strokeSize;
+      showControls();
+    }
+
+    function draw(e) {
       if (!isDrawing) return;
+      e.preventDefault();
 
-      // Process coalesced events
-      const coalescedEvents = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
-      coalescedEl.textContent = coalescedEvents.length;
+      // Get all coalesced points for accurate main stroke
+      const coalescedPoints = getCoalescedPoints(e);
 
-      for (const event of coalescedEvents) {
-        const point = getPoint(event);
-        points.push(point);
-        pressureEl.textContent = point.pressure.toFixed(2);
+      // Draw all coalesced points to main canvas
+      for (const pos of coalescedPoints) {
+        const lineWidth = getLineWidth(pos.pressure);
 
-        if (currentTool === 'eraser') {
-          checkEraserHit(point);
+        mainCtx.beginPath();
+        mainCtx.moveTo(lastX, lastY);
+        mainCtx.lineTo(pos.x, pos.y);
+        mainCtx.lineWidth = lineWidth;
+        if (isEraserActive()) {
+          mainCtx.globalCompositeOperation = 'destination-out';
+          mainCtx.strokeStyle = 'rgba(0,0,0,1)';
+        } else {
+          mainCtx.globalCompositeOperation = 'source-over';
+          mainCtx.strokeStyle = '#000000';
         }
+        mainCtx.stroke();
+
+        lastX = pos.x;
+        lastY = pos.y;
+        lastPressure = pos.pressure;
       }
 
-      if (currentTool === 'pen') {
-        updateCurrentStroke();
+      // Add current position to trail
+      const currentPos = coalescedPoints[coalescedPoints.length - 1];
+      trailPoints.push({ ...currentPos, alpha: 1 });
+
+      // Limit trail length
+      while (trailPoints.length > TRAIL_LENGTH) {
+        trailPoints.shift();
       }
     }
 
-    function handlePointerUp(e) {
-      if (!isDrawing) return;
+    function renderPreviewTrail() {
+      const rect = previewCanvas.getBoundingClientRect();
+
+      // Clear preview canvas
+      previewCtx.clearRect(0, 0, rect.width, rect.height);
+
+      // Draw eraser circle indicator
+      if (eraserCursorVisible && isEraserActive()) {
+        const eraserRadius = getLineWidth(pressureEnabled ? lastPressure : 0.5) / 2;
+        previewCtx.beginPath();
+        previewCtx.arc(eraserCursorX, eraserCursorY, eraserRadius, 0, Math.PI * 2);
+        previewCtx.strokeStyle = eraser4xMode ? 'rgba(255, 60, 60, 0.8)' : 'rgba(100, 100, 100, 0.6)';
+        previewCtx.lineWidth = eraser4xMode ? 2 : 1.5;
+        previewCtx.stroke();
+      }
+
+      if (isDrawing && trailPoints.length > 1 && !isEraserActive()) {
+        // Draw trail with fading opacity
+        for (let i = 1; i < trailPoints.length; i++) {
+          const prev = trailPoints[i - 1];
+          const curr = trailPoints[i];
+
+          // Calculate alpha based on position in trail
+          const trailAlpha = (i / trailPoints.length) * 0.4 * curr.alpha;
+          const lineWidth = getLineWidth(curr.pressure);
+
+          previewCtx.beginPath();
+          previewCtx.moveTo(prev.x, prev.y);
+          previewCtx.lineTo(curr.x, curr.y);
+          previewCtx.lineWidth = lineWidth;
+          previewCtx.strokeStyle = `rgba(255, 60, 60, ${trailAlpha})`;
+          previewCtx.stroke();
+        }
+
+        // Fade out trail points
+        trailPoints = trailPoints.map(p => ({
+          ...p,
+          alpha: p.alpha - TRAIL_FADE_SPEED
+        })).filter(p => p.alpha > 0);
+      }
+
+      // Continue animation if drawing, trail exists, or eraser cursor visible
+      if (isDrawing || trailPoints.some(p => p.alpha > 0) || (eraserCursorVisible && isEraserActive())) {
+        animationId = requestAnimationFrame(renderPreviewTrail);
+      } else {
+        animationId = null;
+        previewCtx.clearRect(0, 0, rect.width, rect.height);
+      }
+    }
+
+    function stopDrawing(e) {
+      if (e) e.preventDefault();
       isDrawing = false;
-
-      if (currentTool === 'pen') {
-        commitStroke();
-      }
-
-      points = [];
+      stylusEraser = false;
+      // Trail will fade out naturally via animation loop
     }
 
-    function handlePointerCancel() {
-      isDrawing = false;
-      currentStrokePath.setAttribute('d', '');
-      points = [];
+    function resetEraserMode() {
+      // Reset 4x mode when stylus leaves canvas
+      eraser4xMode = false;
+      eraserTapCount = 0;
+      clearTimeout(eraserTapTimer);
     }
 
-    // Eraser: check if point hits any stroke (optimized)
-    function checkEraserHit(point) {
-      const eraserRadius = currentSize * 4;
-      const r2 = eraserRadius * eraserRadius;
+    function showControls() {
+      controls.classList.add('visible');
+      clearTimeout(controlsTimeout);
+      controlsTimeout = setTimeout(() => {
+        controls.classList.remove('visible');
+      }, 2000);
+    }
 
-      for (let i = strokeHistory.length - 1; i >= 0; i--) {
-        const path = strokeHistory[i];
+    function toggleEraser() {
+      isEraser = !isEraser;
+      document.body.classList.toggle('eraser-mode', isEraser);
+      document.getElementById('eraser-btn').textContent = isEraser ? '🖊️' : '✏️';
+      showControls();
+    }
 
-        // Fast bounding box check first
-        const bbox = path.getBBox();
-        if (point.x < bbox.x - eraserRadius ||
-            point.x > bbox.x + bbox.width + eraserRadius ||
-            point.y < bbox.y - eraserRadius ||
-            point.y > bbox.y + bbox.height + eraserRadius) {
-          continue; // Skip - not even close
-        }
+    function clearCanvas() {
+      const rect = mainCanvas.getBoundingClientRect();
+      mainCtx.fillStyle = '#ffffff';
+      mainCtx.fillRect(0, 0, rect.width, rect.height);
+      previewCtx.clearRect(0, 0, rect.width, rect.height);
+      trailPoints = [];
+      showControls();
+    }
 
-        // Sample limited points along the path
-        const pathLength = path.getTotalLength();
-        const step = Math.max(20, pathLength / 15); // Fixed step size
+    function saveCanvas() {
+      const link = document.createElement('a');
+      link.download = 'drawing.png';
+      link.href = mainCanvas.toDataURL('image/png');
+      link.click();
+      showControls();
+    }
 
-        for (let len = 0; len <= pathLength; len += step) {
-          const samplePoint = path.getPointAtLength(len);
-          const dx = samplePoint.x - point.x;
-          const dy = samplePoint.y - point.y;
+    function updateEraserCursor(e) {
+      const pos = getPointerPos(e);
+      eraserCursorX = pos.x;
+      eraserCursorY = pos.y;
+      eraserCursorVisible = true;
 
-          if (dx * dx + dy * dy < r2) {
-            path.remove();
-            strokeHistory.splice(i, 1);
-            break;
-          }
-        }
+      // Start render loop if not running (for eraser cursor)
+      if (!animationId && isEraserActive()) {
+        animationId = requestAnimationFrame(renderPreviewTrail);
       }
+    }
+
+    function hideEraserCursor() {
+      eraserCursorVisible = false;
     }
 
     // Event listeners
-    mainLayer.addEventListener('pointerdown', handlePointerDown);
-    mainLayer.addEventListener('pointermove', handlePointerMove);
-    mainLayer.addEventListener('pointerup', handlePointerUp);
-    mainLayer.addEventListener('pointercancel', handlePointerCancel);
-    mainLayer.addEventListener('pointerleave', handlePointerUp);
-
-    mainLayer.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
-    mainLayer.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
-
-    // Tool buttons
-    const penBtn = document.getElementById('penTool');
-    const eraserBtn = document.getElementById('eraserTool');
-
-    penBtn.addEventListener('click', () => {
-      currentTool = 'pen';
-      penBtn.classList.add('active');
-      eraserBtn.classList.remove('active');
-      mainLayer.style.cursor = 'crosshair';
+    inputCanvas.addEventListener('pointerdown', startDrawing);
+    inputCanvas.addEventListener('pointermove', (e) => {
+      draw(e);
+      updateEraserCursor(e);
     });
-
-    eraserBtn.addEventListener('click', () => {
-      currentTool = 'eraser';
-      eraserBtn.classList.add('active');
-      penBtn.classList.remove('active');
-      mainLayer.style.cursor = 'cell';
+    inputCanvas.addEventListener('pointerup', stopDrawing);
+    inputCanvas.addEventListener('pointerleave', (e) => {
+      stopDrawing(e);
+      hideEraserCursor();
+      resetEraserMode();
     });
+    inputCanvas.addEventListener('pointercancel', stopDrawing);
 
-    // Color picker
-    const colorSwatch = document.getElementById('colorSwatch');
-    const colorOptions = document.getElementById('colorOptions');
+    // Prevent default touch behaviors
+    inputCanvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    inputCanvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
-    colorSwatch.addEventListener('click', (e) => {
-      e.stopPropagation();
-      colorOptions.classList.toggle('show');
-    });
-
-    document.querySelectorAll('.color-option').forEach(btn => {
-      btn.addEventListener('click', () => {
-        currentColor = btn.dataset.color;
-        colorSwatch.style.background = currentColor;
-        colorOptions.classList.remove('show');
-
-        currentTool = 'pen';
-        penBtn.classList.add('active');
-        eraserBtn.classList.remove('active');
-      });
-    });
-
-    document.addEventListener('click', () => {
-      colorOptions.classList.remove('show');
-    });
-
-    // Size slider
-    const sizeSlider = document.getElementById('sizeSlider');
-    sizeSlider.addEventListener('input', () => {
-      currentSize = parseInt(sizeSlider.value);
-    });
-
-    // Undo
-    document.getElementById('undoBtn').addEventListener('click', () => {
-      if (strokeHistory.length === 0) return;
-      const lastStroke = strokeHistory.pop();
-      lastStroke.remove();
-    });
-
-    // Clear
-    document.getElementById('clearBtn').addEventListener('click', () => {
-      strokeHistory.forEach(path => path.remove());
-      strokeHistory = [];
-    });
-
-    // Export SVG
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      const svgClone = mainSvg.cloneNode(true);
-
-      // Remove the current stroke path (empty during export)
-      const currentPath = svgClone.querySelector('#currentStroke');
-      if (currentPath) currentPath.remove();
-
-      // Set proper dimensions
-      const rect = mainSvg.getBoundingClientRect();
-      svgClone.setAttribute('width', rect.width);
-      svgClone.setAttribute('height', rect.height);
-      svgClone.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
-
-      const svgData = new XMLSerializer().serializeToString(svgClone);
-      const blob = new Blob([svgData], { type: 'image/svg+xml' });
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'annotation.svg';
-      link.click();
-
-      URL.revokeObjectURL(url);
+    // Control buttons
+    document.getElementById('eraser-btn').addEventListener('click', toggleEraser);
+    document.getElementById('clear-btn').addEventListener('click', clearCanvas);
+    document.getElementById('save-btn').addEventListener('click', saveCanvas);
+    document.getElementById('size-up').addEventListener('click', () => updateStrokeSize(0.5));
+    document.getElementById('size-down').addEventListener('click', () => updateStrokeSize(-0.5));
+    document.getElementById('pressure-toggle').addEventListener('change', (e) => {
+      pressureEnabled = e.target.checked;
+      showControls();
     });
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'p' || e.key === 'P') penBtn.click();
-      if (e.key === 'e' || e.key === 'E') eraserBtn.click();
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-        e.preventDefault();
-        document.getElementById('undoBtn').click();
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault();
-        document.getElementById('exportBtn').click();
+      if (e.key.toLowerCase() === 'e') toggleEraser();
+      if (e.key.toLowerCase() === 'c') clearCanvas();
+      if (e.key.toLowerCase() === 's') { e.preventDefault(); saveCanvas(); }
+      if (e.key.toLowerCase() === 'p') {
+        const toggle = document.getElementById('pressure-toggle');
+        toggle.checked = !toggle.checked;
+        pressureEnabled = toggle.checked;
+        showControls();
       }
     });
+
+    // Show controls on mouse near bottom-right
+    document.addEventListener('pointermove', (e) => {
+      if (e.clientX > window.innerWidth - 150 && e.clientY > window.innerHeight - 100) {
+        showControls();
+      }
+    });
+
+    // Initialize
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
   </script>
 </body>
 </html>
