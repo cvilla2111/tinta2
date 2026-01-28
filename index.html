@@ -2,301 +2,433 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Delegated Ink Trail</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Low Latency Stylus Annotation</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg-primary: #f8f7f4;
+      --bg-secondary: #eae8e3;
+      --text-primary: #2d2a26;
+      --text-secondary: #6b6660;
+      --accent: #e85d04;
+      --accent-hover: #dc2f02;
+      --toolbar-bg: rgba(255, 255, 255, 0.92);
+      --shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      --border: rgba(0, 0, 0, 0.08);
+    }
+
+    .dark {
+      --bg-primary: #1a1917;
+      --bg-secondary: #2d2a26;
+      --text-primary: #f8f7f4;
+      --text-secondary: #a8a39c;
+      --toolbar-bg: rgba(45, 42, 38, 0.95);
+      --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+      --border: rgba(255, 255, 255, 0.1);
+    }
+
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
 
-    html, body {
-      width: 100%;
-      height: 100%;
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      height: 100dvh;
       overflow: hidden;
-      background-color: #ffffff;
+      display: flex;
+      flex-direction: column;
     }
 
-    .dark body {
-      background-color: #ffffff;
+    header {
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--toolbar-bg);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 10;
     }
 
-    canvas {
-      display: block;
-      touch-action: none;
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
-    #instructions {
-      position: fixed;
-      bottom: 1.5rem;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      font-size: 13px;
-      color: rgba(0, 0, 0, 0.5);
-      text-align: center;
-      pointer-events: none;
-      user-select: none;
-    }
-
-    .dark #instructions {
-      color: rgba(0, 0, 0, 0.5);
-    }
-
-    #eraser-cursor {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 20px;
-      height: 20px;
-      border: 1px solid #000;
-      border-radius: 50%;
-      pointer-events: none;
-      display: none;
-      will-change: transform;
-      z-index: 9999;
-    }
-
-    #menu-toggle {
-      position: fixed;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 40px;
-      height: 6px;
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 0 0 4px 4px;
-      cursor: pointer;
-      z-index: 10000;
-      transition: background 0.2s;
-    }
-
-    #menu-toggle:hover {
-      background: rgba(0, 0, 0, 0.4);
-    }
-
-    #menu {
-      position: fixed;
-      top: -60px;
-      left: 0;
-      right: 0;
-      height: 60px;
-      background: rgba(255, 255, 255, 0.95);
-      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 20px;
-      padding: 0 16px;
-      z-index: 9998;
-      transition: top 0.3s ease;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      font-size: 13px;
     }
 
-    #menu.open {
-      top: 0;
+    .logo-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: white;
+      fill: none;
+      stroke-width: 2.5;
     }
 
-    #menu-toggle.menu-open {
-      top: 60px;
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
-    .menu-group {
+    .badge-group {
       display: flex;
-      align-items: center;
       gap: 8px;
     }
 
-    .menu-group label {
-      color: #555;
-      font-weight: 500;
+    .latency-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      padding: 4px 10px;
+      background: var(--bg-secondary);
+      border-radius: 20px;
+      color: var(--text-secondary);
     }
 
-    .size-stepper {
+    .latency-badge span {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .vector-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      padding: 4px 10px;
+      background: #16a34a20;
+      border-radius: 20px;
+      color: #16a34a;
+      font-weight: 600;
+    }
+
+    .canvas-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: var(--bg-secondary);
+      overflow: hidden;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 1200px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .svg-container {
+      position: absolute;
+      inset: 0;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .svg-container svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+
+    .toolbar {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      background: var(--toolbar-bg);
+      backdrop-filter: blur(16px);
+      border-radius: 16px;
+      box-shadow: var(--shadow), 0 0 0 1px var(--border);
+    }
+
+    .tool-group {
       display: flex;
       align-items: center;
       gap: 4px;
     }
 
-    .size-btn {
-      width: 28px;
-      height: 28px;
-      border: 1px solid #ccc;
-      background: #fff;
-      border-radius: 4px;
+    .divider {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      margin: 0 6px;
+    }
+
+    .tool-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: transparent;
+      border-radius: 10px;
       cursor: pointer;
-      font-size: 16px;
-      font-weight: bold;
-      color: #333;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: background 0.15s;
+      transition: all 0.15s ease;
+      color: var(--text-secondary);
     }
 
-    .size-btn:hover {
-      background: #eee;
+    .tool-btn:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
     }
 
-    .size-btn:active {
-      background: #ddd;
-    }
-
-    #pen-size-display,
-    #min-size-display {
-      min-width: 42px;
-      text-align: center;
-      font-weight: 500;
-      color: #333;
-    }
-
-    #color-picker-btn {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: 2px solid #333;
-      cursor: pointer;
-      background: #000000;
-      transition: transform 0.15s;
-    }
-
-    #color-picker-btn:hover {
-      transform: scale(1.1);
-    }
-
-    #color-input,
-    #trail-color-input {
-      position: absolute;
-      opacity: 0;
-      width: 0;
-      height: 0;
-      pointer-events: none;
-    }
-
-    #trail-color-btn {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: 2px solid #333;
-      cursor: pointer;
-      background: #ff0000;
-      transition: transform 0.15s;
-    }
-
-    #trail-color-btn:hover {
-      transform: scale(1.1);
-    }
-
-    #clear-btn {
-      padding: 6px 14px;
-      background: #e74c3c;
+    .tool-btn.active {
+      background: var(--accent);
       color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      transition: background 0.2s;
     }
 
-    #clear-btn:hover {
-      background: #c0392b;
-    }
-
-    .toggle-switch {
-      position: relative;
-      width: 36px;
+    .tool-btn svg {
+      width: 20px;
       height: 20px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
-    .toggle-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
+    .color-picker {
+      position: relative;
     }
 
-    .toggle-slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: #ccc;
-      transition: 0.2s;
-      border-radius: 20px;
-    }
-
-    .toggle-slider:before {
-      position: absolute;
-      content: "";
-      height: 14px;
-      width: 14px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: 0.2s;
+    .color-swatch {
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
+      border: 3px solid var(--bg-primary);
+      box-shadow: 0 0 0 1px var(--border);
+      cursor: pointer;
+      transition: transform 0.15s ease;
     }
 
-    .toggle-switch input:checked + .toggle-slider {
-      background-color: #e74c3c;
+    .color-swatch:hover {
+      transform: scale(1.1);
     }
 
-    .toggle-switch input:checked + .toggle-slider:before {
-      transform: translateX(16px);
+    .color-options {
+      position: absolute;
+      bottom: 52px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.9);
+      opacity: 0;
+      pointer-events: none;
+      display: flex;
+      gap: 6px;
+      padding: 10px;
+      background: var(--toolbar-bg);
+      backdrop-filter: blur(16px);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      transition: all 0.2s ease;
+    }
+
+    .color-options.show {
+      transform: translateX(-50%) scale(1);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .color-option {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .color-option:hover {
+      transform: scale(1.15);
+    }
+
+    .size-slider {
+      width: 80px;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: var(--bg-secondary);
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .size-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(232, 93, 4, 0.3);
+    }
+
+    .size-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: var(--accent);
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+    }
+
+    .stats {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      border-radius: 8px;
+      line-height: 1.6;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .stats-label {
+      opacity: 0.6;
+    }
+
+    .stats-value {
+      color: #4ade80;
+    }
+
+    .predicted {
+      color: #fbbf24;
+    }
+
+    @media (max-width: 600px) {
+      header {
+        padding: 10px 14px;
+      }
+
+      h1 {
+        font-size: 0.95rem;
+      }
+
+      .latency-badge, .vector-badge {
+        display: none;
+      }
+
+      .toolbar {
+        bottom: 12px;
+        padding: 6px 10px;
+        gap: 4px;
+      }
+
+      .tool-btn {
+        width: 36px;
+        height: 36px;
+      }
+
+      .size-slider {
+        width: 60px;
+      }
     }
   </style>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
-  <div id="eraser-cursor"></div>
+  <header>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+      </div>
+      <h1>Stylus Annotation</h1>
+    </div>
+    <div class="badge-group">
+      <div class="vector-badge">SVG Vector</div>
+      <div class="latency-badge">Latency: <span>~8ms</span></div>
+    </div>
+  </header>
 
-  <div id="menu-toggle"></div>
-  <div id="menu">
-    <div class="menu-group">
-      <label>Min</label>
-      <div class="size-stepper">
-        <button class="size-btn" id="min-size-down">−</button>
-        <span id="min-size-display">0.50</span>
-        <button class="size-btn" id="min-size-up">+</button>
+  <div class="canvas-container">
+    <div class="canvas-wrapper">
+      <div class="svg-container" id="mainLayer">
+        <svg id="mainSvg" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100%" height="100%" fill="#ffffff"/>
+          <g id="strokesGroup"></g>
+          <path id="currentStroke" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </div>
-    </div>
-    <div class="menu-group">
-      <label>Max</label>
-      <div class="size-stepper">
-        <button class="size-btn" id="size-down">−</button>
-        <span id="pen-size-display">5</span>
-        <button class="size-btn" id="size-up">+</button>
+      <div class="stats" id="stats">
+        <div class="stats-row">
+          <span class="stats-label">Coalesced:</span>
+          <span class="stats-value" id="coalescedCount">0</span>
+        </div>
+        <div class="stats-row">
+          <span class="stats-label">Pressure:</span>
+          <span class="stats-value" id="pressureVal">0.00</span>
+        </div>
       </div>
-    </div>
-    <div class="menu-group">
-      <label>Color</label>
-      <button id="color-picker-btn"></button>
-      <input type="color" id="color-input" value="#000000">
-    </div>
-    <button id="clear-btn">Clear</button>
-    <div class="menu-group">
-      <label>Pressure</label>
-      <label class="toggle-switch">
-        <input type="checkbox" id="pressure-toggle" checked>
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-    <div class="menu-group">
-      <label>Trail</label>
-      <label class="toggle-switch">
-        <input type="checkbox" id="trail-toggle" checked>
-        <span class="toggle-slider"></span>
-      </label>
-      <button id="trail-color-btn"></button>
-      <input type="color" id="trail-color-input" value="#ff0000">
+
+      <div class="toolbar">
+        <div class="tool-group">
+          <button class="tool-btn active" id="penTool" title="Pen">
+            <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+          </button>
+          <button class="tool-btn" id="eraserTool" title="Eraser">
+            <svg viewBox="0 0 24 24"><path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.4 2.8c.8-.8 2-.8 2.8 0L21 7.6c.8.8.8 2 0 2.8L11 20"/><path d="M6 11l5 5"/></svg>
+          </button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="color-picker">
+          <div class="color-swatch" id="colorSwatch" style="background: #2d2a26;"></div>
+          <div class="color-options" id="colorOptions">
+            <button class="color-option" style="background: #2d2a26;" data-color="#2d2a26"></button>
+            <button class="color-option" style="background: #e85d04;" data-color="#e85d04"></button>
+            <button class="color-option" style="background: #2563eb;" data-color="#2563eb"></button>
+            <button class="color-option" style="background: #16a34a;" data-color="#16a34a"></button>
+            <button class="color-option" style="background: #9333ea;" data-color="#9333ea"></button>
+          </div>
+        </div>
+
+        <input type="range" class="size-slider" id="sizeSlider" min="1" max="20" value="3">
+
+        <div class="divider"></div>
+
+        <button class="tool-btn" id="undoBtn" title="Undo">
+          <svg viewBox="0 0 24 24"><path d="M3 10h10a5 5 0 0 1 5 5v2"/><path d="M7 6L3 10l4 4"/></svg>
+        </button>
+        <button class="tool-btn" id="clearBtn" title="Clear">
+          <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+        <button class="tool-btn" id="exportBtn" title="Export SVG">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+      </div>
     </div>
   </div>
-
-  <div id="instructions">Draw with pen tip • Erase with pen eraser or right-click</div>
 
   <script>
     // Dark mode detection
@@ -304,265 +436,311 @@
       document.documentElement.classList.add('dark');
     }
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
-      if (event.matches) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+      document.documentElement.classList.toggle('dark', event.matches);
     });
 
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const eraserCursor = document.getElementById('eraser-cursor');
-    const menuToggle = document.getElementById('menu-toggle');
-    const menu = document.getElementById('menu');
-    const sizeDown = document.getElementById('size-down');
-    const sizeUp = document.getElementById('size-up');
-    const penSizeDisplay = document.getElementById('pen-size-display');
-    const minSizeDown = document.getElementById('min-size-down');
-    const minSizeUp = document.getElementById('min-size-up');
-    const minSizeDisplay = document.getElementById('min-size-display');
-    const colorPickerBtn = document.getElementById('color-picker-btn');
-    const colorInput = document.getElementById('color-input');
-    const clearBtn = document.getElementById('clear-btn');
-    const pressureToggle = document.getElementById('pressure-toggle');
-    const trailToggle = document.getElementById('trail-toggle');
-    const trailColorBtn = document.getElementById('trail-color-btn');
-    const trailColorInput = document.getElementById('trail-color-input');
+    // SVG elements
+    const mainLayer = document.getElementById('mainLayer');
+    const mainSvg = document.getElementById('mainSvg');
+    const strokesGroup = document.getElementById('strokesGroup');
+    const currentStrokePath = document.getElementById('currentStroke');
 
-    const presenter = navigator.ink.requestPresenter({ presentationArea: canvas });
+    // Drawing state
     let isDrawing = false;
-    let isErasing = false;
-    let lastX = 0;
-    let lastY = 0;
-    let prevX = 0;
-    let prevY = 0;
-    let smoothedPressure = 0.5;
-    const PRESSURE_SMOOTHING = 0.12; // Lower = smoother (0-1)
-    const inkStyle = { color: 'red', diameter: 2 }; // Delegated ink trail always red
+    let currentTool = 'pen';
+    let currentColor = '#2d2a26';
+    let currentSize = 3;
+    let points = [];
+    let strokeHistory = []; // Array of SVG path elements
 
-    // Stroke settings
-    let penColor = '#000000';
-    let trailColor = '#ff0000';
-    let penMaxSize = 5;
-    let minStrokeWidth = 0.50;
+    // Stats
+    const coalescedEl = document.getElementById('coalescedCount');
+    const pressureEl = document.getElementById('pressureVal');
 
-    // Menu toggle
-    menuToggle.addEventListener('click', () => {
-      menu.classList.toggle('open');
-      menuToggle.classList.toggle('menu-open');
-    });
-
-    // Pen size step controls
-    const MIN_PEN_SIZE = 0.5;
-    const MAX_PEN_SIZE = 20;
-    const SIZE_STEP = 0.5;
-    const MIN_SIZE_STEP = 0.05;
-    const MIN_SIZE_LOWER = 0.05;
-    const MIN_SIZE_UPPER = 2;
-
-    function updateSizeDisplay() {
-      penSizeDisplay.textContent = penMaxSize % 1 === 0 ? penMaxSize : penMaxSize.toFixed(1);
+    function getPoint(e) {
+      const rect = mainLayer.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+        pressure: e.pressure || 0.5
+      };
     }
 
-    function updateMinSizeDisplay() {
-      minSizeDisplay.textContent = minStrokeWidth.toFixed(2);
+    function getStrokeWidth(pressure) {
+      return currentSize * (0.6 + pressure * 0.8);
     }
 
-    sizeDown.addEventListener('click', () => {
-      penMaxSize = Math.max(MIN_PEN_SIZE, penMaxSize - SIZE_STEP);
-      updateSizeDisplay();
+    // Build SVG path data from points using quadratic bezier curves
+    function buildPathData(pts) {
+      if (pts.length === 0) return '';
+      if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+
+      let d = `M ${pts[0].x} ${pts[0].y}`;
+
+      if (pts.length === 2) {
+        d += ` L ${pts[1].x} ${pts[1].y}`;
+        return d;
+      }
+
+      // Use quadratic bezier curves through midpoints for smoothness
+      for (let i = 1; i < pts.length - 1; i++) {
+        const p0 = pts[i];
+        const p1 = pts[i + 1];
+        const midX = (p0.x + p1.x) / 2;
+        const midY = (p0.y + p1.y) / 2;
+
+        if (i === 1) {
+          d += ` Q ${p0.x} ${p0.y} ${midX} ${midY}`;
+        } else {
+          d += ` Q ${p0.x} ${p0.y} ${midX} ${midY}`;
+        }
+      }
+
+      // End at last point
+      const last = pts[pts.length - 1];
+      const secondLast = pts[pts.length - 2];
+      d += ` Q ${secondLast.x} ${secondLast.y} ${last.x} ${last.y}`;
+
+      return d;
+    }
+
+    // Calculate average pressure for variable stroke width (simplified for SVG)
+    function getAveragePressure(pts) {
+      if (pts.length === 0) return 0.5;
+      const sum = pts.reduce((acc, p) => acc + p.pressure, 0);
+      return sum / pts.length;
+    }
+
+    function updateCurrentStroke() {
+      const pathData = buildPathData(points);
+      const avgPressure = getAveragePressure(points);
+      const strokeWidth = getStrokeWidth(avgPressure);
+
+      currentStrokePath.setAttribute('d', pathData);
+      currentStrokePath.setAttribute('stroke', currentColor);
+      currentStrokePath.setAttribute('stroke-width', strokeWidth);
+    }
+
+    function commitStroke() {
+      if (points.length < 2) return;
+
+      const pathData = buildPathData(points);
+      const avgPressure = getAveragePressure(points);
+      const strokeWidth = getStrokeWidth(avgPressure);
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', pathData);
+      path.setAttribute('stroke', currentColor);
+      path.setAttribute('stroke-width', strokeWidth);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+
+      strokesGroup.appendChild(path);
+      strokeHistory.push(path);
+
+      // Clear current stroke
+      currentStrokePath.setAttribute('d', '');
+    }
+
+    function handlePointerDown(e) {
+      if (e.pointerType === 'touch' && e.isPrimary === false) return;
+
+      isDrawing = true;
+      points = [getPoint(e)];
+
+      if (currentTool === 'eraser') {
+        checkEraserHit(points[0]);
+      }
+
+      mainLayer.setPointerCapture(e.pointerId);
+    }
+
+    function handlePointerMove(e) {
+      if (!isDrawing) return;
+
+      // Process coalesced events
+      const coalescedEvents = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      coalescedEl.textContent = coalescedEvents.length;
+
+      for (const event of coalescedEvents) {
+        const point = getPoint(event);
+        points.push(point);
+        pressureEl.textContent = point.pressure.toFixed(2);
+
+        if (currentTool === 'eraser') {
+          checkEraserHit(point);
+        }
+      }
+
+      if (currentTool === 'pen') {
+        updateCurrentStroke();
+      }
+    }
+
+    function handlePointerUp(e) {
+      if (!isDrawing) return;
+      isDrawing = false;
+
+      if (currentTool === 'pen') {
+        commitStroke();
+      }
+
+      points = [];
+    }
+
+    function handlePointerCancel() {
+      isDrawing = false;
+      currentStrokePath.setAttribute('d', '');
+      points = [];
+    }
+
+    // Eraser: check if point hits any stroke (optimized)
+    function checkEraserHit(point) {
+      const eraserRadius = currentSize * 4;
+      const r2 = eraserRadius * eraserRadius;
+
+      for (let i = strokeHistory.length - 1; i >= 0; i--) {
+        const path = strokeHistory[i];
+
+        // Fast bounding box check first
+        const bbox = path.getBBox();
+        if (point.x < bbox.x - eraserRadius ||
+            point.x > bbox.x + bbox.width + eraserRadius ||
+            point.y < bbox.y - eraserRadius ||
+            point.y > bbox.y + bbox.height + eraserRadius) {
+          continue; // Skip - not even close
+        }
+
+        // Sample limited points along the path
+        const pathLength = path.getTotalLength();
+        const step = Math.max(20, pathLength / 15); // Fixed step size
+
+        for (let len = 0; len <= pathLength; len += step) {
+          const samplePoint = path.getPointAtLength(len);
+          const dx = samplePoint.x - point.x;
+          const dy = samplePoint.y - point.y;
+
+          if (dx * dx + dy * dy < r2) {
+            path.remove();
+            strokeHistory.splice(i, 1);
+            break;
+          }
+        }
+      }
+    }
+
+    // Event listeners
+    mainLayer.addEventListener('pointerdown', handlePointerDown);
+    mainLayer.addEventListener('pointermove', handlePointerMove);
+    mainLayer.addEventListener('pointerup', handlePointerUp);
+    mainLayer.addEventListener('pointercancel', handlePointerCancel);
+    mainLayer.addEventListener('pointerleave', handlePointerUp);
+
+    mainLayer.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    mainLayer.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+    // Tool buttons
+    const penBtn = document.getElementById('penTool');
+    const eraserBtn = document.getElementById('eraserTool');
+
+    penBtn.addEventListener('click', () => {
+      currentTool = 'pen';
+      penBtn.classList.add('active');
+      eraserBtn.classList.remove('active');
+      mainLayer.style.cursor = 'crosshair';
     });
 
-    sizeUp.addEventListener('click', () => {
-      penMaxSize = Math.min(MAX_PEN_SIZE, penMaxSize + SIZE_STEP);
-      updateSizeDisplay();
-    });
-
-    minSizeDown.addEventListener('click', () => {
-      minStrokeWidth = Math.max(MIN_SIZE_LOWER, minStrokeWidth - MIN_SIZE_STEP);
-      updateMinSizeDisplay();
-    });
-
-    minSizeUp.addEventListener('click', () => {
-      minStrokeWidth = Math.min(MIN_SIZE_UPPER, minStrokeWidth + MIN_SIZE_STEP);
-      updateMinSizeDisplay();
+    eraserBtn.addEventListener('click', () => {
+      currentTool = 'eraser';
+      eraserBtn.classList.add('active');
+      penBtn.classList.remove('active');
+      mainLayer.style.cursor = 'cell';
     });
 
     // Color picker
-    colorPickerBtn.addEventListener('click', () => {
-      colorInput.click();
+    const colorSwatch = document.getElementById('colorSwatch');
+    const colorOptions = document.getElementById('colorOptions');
+
+    colorSwatch.addEventListener('click', (e) => {
+      e.stopPropagation();
+      colorOptions.classList.toggle('show');
     });
 
-    colorInput.addEventListener('input', (e) => {
-      penColor = e.target.value;
-      colorPickerBtn.style.background = penColor;
+    document.querySelectorAll('.color-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentColor = btn.dataset.color;
+        colorSwatch.style.background = currentColor;
+        colorOptions.classList.remove('show');
+
+        currentTool = 'pen';
+        penBtn.classList.add('active');
+        eraserBtn.classList.remove('active');
+      });
     });
 
-    // Trail color picker
-    trailColorBtn.addEventListener('click', () => {
-      trailColorInput.click();
+    document.addEventListener('click', () => {
+      colorOptions.classList.remove('show');
     });
 
-    trailColorInput.addEventListener('input', (e) => {
-      trailColor = e.target.value;
-      trailColorBtn.style.background = trailColor;
+    // Size slider
+    const sizeSlider = document.getElementById('sizeSlider');
+    sizeSlider.addEventListener('input', () => {
+      currentSize = parseInt(sizeSlider.value);
     });
 
-    // Clear canvas
-    clearBtn.addEventListener('click', () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Undo
+    document.getElementById('undoBtn').addEventListener('click', () => {
+      if (strokeHistory.length === 0) return;
+      const lastStroke = strokeHistory.pop();
+      lastStroke.remove();
     });
 
-    // Eraser size management
-    const ERASER_BASE_SIZE = 20;
-    const ERASER_LARGE_SIZE = 80;
-    let eraserSize = ERASER_BASE_SIZE;
-    let eraserTapCount = 0;
-    let lastEraserTapTime = 0;
-    const TAP_TIMEOUT = 500; // ms between taps to count as consecutive
+    // Clear
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      strokeHistory.forEach(path => path.remove());
+      strokeHistory = [];
+    });
 
-    // Set up stroke style
-    ctx.strokeStyle = penColor;
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    // Export SVG
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const svgClone = mainSvg.cloneNode(true);
 
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      // Restore stroke style after resize (canvas reset clears it)
-      ctx.strokeStyle = penColor;
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-    }
+      // Remove the current stroke path (empty during export)
+      const currentPath = svgClone.querySelector('#currentStroke');
+      if (currentPath) currentPath.remove();
 
-    // Prevent context menu on right-click
-    canvas.addEventListener('contextmenu', (evt) => evt.preventDefault());
+      // Set proper dimensions
+      const rect = mainSvg.getBoundingClientRect();
+      svgClone.setAttribute('width', rect.width);
+      svgClone.setAttribute('height', rect.height);
+      svgClone.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
 
-    function checkEraser(evt) {
-      // Multiple detection methods for stylus eraser:
-      // 1. button 5 = eraser button
-      // 2. buttons bitmask 32 = eraser
-      // 3. pointerType "eraser" (some devices)
-      // 4. right-click (button 2) for mouse fallback
-      return evt.button === 5 ||
-             evt.button === 2 ||
-             (evt.buttons & 32) !== 0 ||
-             evt.pointerType === 'eraser';
-    }
+      const svgData = new XMLSerializer().serializeToString(svgClone);
+      const blob = new Blob([svgData], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
 
-    function updateEraserCursor(x, y) {
-      const offset = eraserSize / 2;
-      eraserCursor.style.width = eraserSize + 'px';
-      eraserCursor.style.height = eraserSize + 'px';
-      eraserCursor.style.transform = `translate(${x - offset}px, ${y - offset}px)`;
-      eraserCursor.style.borderColor = eraserSize === ERASER_LARGE_SIZE ? 'red' : '#000';
-    }
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'annotation.svg';
+      link.click();
 
-    canvas.addEventListener('pointerdown', (evt) => {
-      // Only allow pen/stylus input, not finger touch
-      if (evt.pointerType === 'touch') return;
+      URL.revokeObjectURL(url);
+    });
 
-      isDrawing = true;
-      isErasing = checkEraser(evt);
-      lastX = evt.pageX;
-      lastY = evt.pageY;
-      prevX = evt.pageX;
-      prevY = evt.pageY;
-      smoothedPressure = evt.pressure > 0 ? evt.pressure : 0.5;
-
-      if (isErasing) {
-        // Track eraser taps for size toggle
-        const now = Date.now();
-        if (now - lastEraserTapTime < TAP_TIMEOUT) {
-          eraserTapCount++;
-        } else {
-          eraserTapCount = 1;
-        }
-        lastEraserTapTime = now;
-
-        // Toggle eraser size after 3 taps
-        if (eraserTapCount >= 3) {
-          eraserSize = eraserSize === ERASER_BASE_SIZE ? ERASER_LARGE_SIZE : ERASER_BASE_SIZE;
-          eraserTapCount = 0;
-        }
-
-        eraserCursor.style.display = 'block';
-        updateEraserCursor(evt.pageX, evt.pageY);
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'p' || e.key === 'P') penBtn.click();
+      if (e.key === 'e' || e.key === 'E') eraserBtn.click();
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        e.preventDefault();
+        document.getElementById('undoBtn').click();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        document.getElementById('exportBtn').click();
       }
     });
-
-    canvas.addEventListener('pointerup', () => {
-      // Reset large eraser back to normal when stylus leaves screen
-      if (isErasing && eraserSize === ERASER_LARGE_SIZE) {
-        eraserSize = ERASER_BASE_SIZE;
-      }
-      isDrawing = false;
-      isErasing = false;
-      eraserCursor.style.display = 'none';
-      ctx.globalCompositeOperation = 'source-over';
-    });
-
-    canvas.addEventListener('pointerleave', () => {
-      isDrawing = false;
-      isErasing = false;
-      eraserCursor.style.display = 'none';
-      ctx.globalCompositeOperation = 'source-over';
-    });
-
-    canvas.addEventListener('pointermove', async (evt) => {
-      if (!isDrawing) return;
-
-      // Calculate midpoint for smooth quadratic curve
-      const midX = (lastX + evt.pageX) / 2;
-      const midY = (lastY + evt.pageY) / 2;
-
-      ctx.beginPath();
-      ctx.moveTo(prevX, prevY);
-      ctx.quadraticCurveTo(lastX, lastY, midX, midY);
-
-      // Get pressure (0-1), default to 0.5 for devices without pressure
-      const rawPressure = evt.pressure > 0 ? evt.pressure : 0.5;
-      // Apply pressure curve for more dramatic taper (power of 2)
-      const curvedPressure = Math.pow(rawPressure, 2);
-      // Smooth pressure to prevent stepped changes
-      smoothedPressure = smoothedPressure + (curvedPressure - smoothedPressure) * PRESSURE_SMOOTHING;
-
-      // Calculate stroke width based on pressure toggle
-      const strokeWidth = pressureToggle.checked
-        ? minStrokeWidth + smoothedPressure * (penMaxSize - minStrokeWidth)
-        : penMaxSize;
-
-      if (isErasing) {
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.lineWidth = eraserSize;
-        updateEraserCursor(evt.pageX, evt.pageY);
-      } else {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = penColor;
-        ctx.lineWidth = strokeWidth;
-      }
-
-      ctx.stroke();
-
-      prevX = midX;
-      prevY = midY;
-      lastX = evt.pageX;
-      lastY = evt.pageY;
-
-      // Update ink trail if enabled
-      if (trailToggle.checked) {
-        const pressureDiameter = pressureToggle.checked ? strokeWidth : penMaxSize;
-        const currentInkStyle = { color: trailColor, diameter: pressureDiameter };
-        const currentEraserStyle = { color: 'white', diameter: eraserSize };
-        (await presenter).updateInkTrailStartPoint(evt, isErasing ? currentEraserStyle : currentInkStyle);
-      }
-    });
-
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
   </script>
 </body>
 </html>
