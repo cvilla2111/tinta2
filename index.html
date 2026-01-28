@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Drawing Canvas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delegated Ink Trail</title>
   <style>
     * {
       margin: 0;
@@ -11,621 +11,83 @@
       box-sizing: border-box;
     }
 
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      touch-action: none;
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-
     body {
-      background: #fff;
-    }
-
-    .canvas-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
+      overflow: hidden;
+      background-color: white;
     }
 
     canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      cursor: crosshair;
-    }
-
-    /* Main canvas - permanent strokes */
-    #canvas {
-      background: #fff;
-      z-index: 1;
-    }
-
-    /* Preview canvas - GPU accelerated trail */
-    #preview {
-      z-index: 2;
-      pointer-events: none;
-      /* Force GPU compositing layer */
-      will-change: transform, opacity;
-      transform: translateZ(0);
-      -webkit-transform: translateZ(0);
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-    }
-
-    /* Input canvas - captures events */
-    #input {
-      z-index: 3;
-      background: transparent;
-    }
-
-    /* Minimal floating controls */
-    #controls {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      display: flex;
-      gap: 8px;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      z-index: 100;
-    }
-
-    #controls:hover,
-    #controls.visible {
-      opacity: 1;
-    }
-
-    .ctrl-btn {
-      width: 40px;
-      height: 40px;
-      border: none;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.08);
-      color: #333;
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s, transform 0.2s;
-      backdrop-filter: blur(10px);
-    }
-
-    .ctrl-btn:hover {
-      background: rgba(0, 0, 0, 0.15);
-      transform: scale(1.1);
-    }
-
-    .ctrl-btn:active {
-      transform: scale(0.95);
-    }
-
-    .stepper {
-      display: flex;
-      align-items: center;
-      background: rgba(0, 0, 0, 0.08);
-      border-radius: 20px;
-      padding: 4px;
-      backdrop-filter: blur(10px);
-    }
-
-    .step-btn {
-      width: 32px;
-      height: 32px;
-      border: none;
-      border-radius: 50%;
-      background: transparent;
-      color: #333;
-      font-size: 18px;
-      font-weight: bold;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s;
-    }
-
-    .step-btn:hover {
-      background: rgba(0, 0, 0, 0.1);
-    }
-
-    .step-btn:active {
-      background: rgba(0, 0, 0, 0.15);
-    }
-
-    .step-value {
-      min-width: 36px;
-      text-align: center;
-      font-size: 14px;
-      font-weight: 600;
-      color: #333;
-      font-family: system-ui, sans-serif;
-    }
-
-    .switch {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(0, 0, 0, 0.08);
-      border-radius: 20px;
-      padding: 6px 10px;
-      cursor: pointer;
-      backdrop-filter: blur(10px);
-    }
-
-    .switch input {
-      display: none;
-    }
-
-    .switch-slider {
-      width: 32px;
-      height: 18px;
-      background: rgba(0, 0, 0, 0.15);
-      border-radius: 9px;
-      position: relative;
-      transition: background 0.2s;
-    }
-
-    .switch-slider::after {
-      content: '';
-      position: absolute;
-      width: 14px;
-      height: 14px;
-      background: #fff;
-      border-radius: 50%;
-      top: 2px;
-      left: 2px;
-      transition: transform 0.2s;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    }
-
-    .switch input:checked + .switch-slider {
-      background: #4a90d9;
-    }
-
-    .switch input:checked + .switch-slider::after {
-      transform: translateX(14px);
-    }
-
-    .switch-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: #333;
-      font-family: system-ui, sans-serif;
-    }
-
-    body.eraser-mode #input {
-      cursor: cell;
-    }
-
-    body.eraser-mode #eraser-btn {
-      background: rgba(0, 0, 0, 0.25);
+      display: block;
+      touch-action: none;
     }
   </style>
 </head>
 <body>
-  <div class="canvas-container">
-    <canvas id="canvas"></canvas>
-    <canvas id="preview"></canvas>
-    <canvas id="input"></canvas>
-  </div>
-
-  <div id="controls">
-    <div class="stepper" title="Stroke Size">
-      <button class="step-btn" id="size-down">−</button>
-      <span class="step-value" id="size-value">2</span>
-      <button class="step-btn" id="size-up">+</button>
-    </div>
-    <label class="switch" title="Pressure Sensitivity (P)">
-      <input type="checkbox" id="pressure-toggle">
-      <span class="switch-slider"></span>
-      <span class="switch-label">P</span>
-    </label>
-    <button class="ctrl-btn" id="eraser-btn" title="Toggle Eraser (E)">✏️</button>
-    <button class="ctrl-btn" id="clear-btn" title="Clear Canvas (C)">🗑️</button>
-    <button class="ctrl-btn" id="save-btn" title="Save Image (S)">💾</button>
-  </div>
+  <canvas id="canvas"></canvas>
 
   <script>
-    // Canvas layers
-    const mainCanvas = document.getElementById('canvas');
-    const previewCanvas = document.getElementById('preview');
-    const inputCanvas = document.getElementById('input');
+    const ctx = canvas.getContext("2d");
+    const presenter = navigator.ink.requestPresenter({ presentationArea: canvas });
+    const strokeSize = 10;
+    const style = { color: "red", diameter: strokeSize * 0.3 };
+    const activePointers = new Set();
+    let lastX = null;
+    let lastY = null;
 
-    // Contexts with optimizations
-    const mainCtx = mainCanvas.getContext('2d', {
-      alpha: true, // Enable alpha for real eraser (destination-out)
-      desynchronized: true // Reduces latency by bypassing compositor
-    });
-    const previewCtx = previewCanvas.getContext('2d', {
-      alpha: true,
-      desynchronized: true
-    });
+    // Set up stroke style
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = strokeSize;
+    ctx.strokeStyle = "black";
 
-    const controls = document.getElementById('controls');
-
-    let isDrawing = false;
-    let lastX = 0;
-    let lastY = 0;
-    let lastPressure = 0.5;
-    let isEraser = false;
-    let controlsTimeout;
-    let dpr = 1;
-    let strokeSize = 2;
-    let pressureEnabled = false;
-
-    // Trail points for smooth preview
-    let trailPoints = [];
-    const TRAIL_LENGTH = 8;
-    const TRAIL_FADE_SPEED = 0.15;
-
-    // Animation frame handle
-    let animationId = null;
-
-    function resizeCanvas() {
-      dpr = window.devicePixelRatio || 1;
-      const rect = mainCanvas.parentElement.getBoundingClientRect();
-
-      // Save current drawing
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = mainCanvas.width;
-      tempCanvas.height = mainCanvas.height;
-      tempCanvas.getContext('2d').drawImage(mainCanvas, 0, 0);
-
-      // Resize all canvases
-      [mainCanvas, previewCanvas, inputCanvas].forEach(c => {
-        c.width = rect.width * dpr;
-        c.height = rect.height * dpr;
-        c.style.width = rect.width + 'px';
-        c.style.height = rect.height + 'px';
-      });
-
-      mainCtx.scale(dpr, dpr);
-      previewCtx.scale(dpr, dpr);
-
-      // Fill main with white
-      mainCtx.fillStyle = '#ffffff';
-      mainCtx.fillRect(0, 0, rect.width, rect.height);
-
-      // Restore drawing
-      if (tempCanvas.width > 0 && tempCanvas.height > 0) {
-        mainCtx.drawImage(tempCanvas, 0, 0, rect.width, rect.height);
-      }
-
-      setupContext(mainCtx);
-      setupContext(previewCtx);
-    }
-
-    function setupContext(ctx) {
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = 2;
-    }
-
-    function getPointerPos(e) {
-      const rect = inputCanvas.getBoundingClientRect();
-      return {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-        pressure: e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5
-      };
-    }
-
-    // Get coalesced events for smoother strokes
-    function getCoalescedPoints(e) {
-      const points = [];
-      const rect = inputCanvas.getBoundingClientRect();
-
-      // Use coalesced events if available (contains all intermediate points)
-      if (e.getCoalescedEvents) {
-        const coalesced = e.getCoalescedEvents();
-        for (const ce of coalesced) {
-          points.push({
-            x: ce.clientX - rect.left,
-            y: ce.clientY - rect.top,
-            pressure: ce.pressure > 0 ? ce.pressure : 0.5
-          });
-        }
-      }
-
-      // Always include current point
-      if (points.length === 0) {
-        points.push(getPointerPos(e));
-      }
-
-      return points;
-    }
-
-
-    // Track if eraser is triggered by stylus top
-    let stylusEraser = false;
-
-    // Eraser cursor position
-    let eraserCursorX = 0;
-    let eraserCursorY = 0;
-    let eraserCursorVisible = false;
-
-    // Eraser tap tracking for 4x mode
-    let eraserTapCount = 0;
-    let eraserTapTimer = null;
-    let eraser4xMode = false;
-    const ERASER_TAP_TIMEOUT = 500; // ms between taps
-
-    function startDrawing(e) {
-      e.preventDefault();
-      // Ignore touch/finger input, only allow pen and mouse
-      if (e.pointerType === 'touch') return;
-
-      // Detect stylus eraser (button 5 or buttons 32 indicates eraser end)
-      stylusEraser = (e.pointerType === 'pen' && (e.button === 5 || e.buttons === 32));
-
-      // Track eraser taps for 4x mode
-      if (stylusEraser) {
-        eraserTapCount++;
-        clearTimeout(eraserTapTimer);
-        eraserTapTimer = setTimeout(() => {
-          eraserTapCount = 0;
-        }, ERASER_TAP_TIMEOUT);
-
-        if (eraserTapCount >= 3) {
-          eraser4xMode = true;
-          eraserTapCount = 0;
-        }
-      }
-
-      isDrawing = true;
-      const pos = getPointerPos(e);
-      lastX = pos.x;
-      lastY = pos.y;
-      lastPressure = pos.pressure;
-      trailPoints = [{ ...pos, alpha: 1 }];
-
-      // Draw initial dot on main canvas
-      mainCtx.beginPath();
-      mainCtx.arc(lastX, lastY, getLineWidth(pos.pressure) / 2, 0, Math.PI * 2);
-      if (isEraserActive()) {
-        mainCtx.globalCompositeOperation = 'destination-out';
-        mainCtx.fillStyle = 'rgba(0,0,0,1)';
-      } else {
-        mainCtx.globalCompositeOperation = 'source-over';
-        mainCtx.fillStyle = '#000000';
-      }
-      mainCtx.fill();
-
-      // Start render loop
-      if (!animationId) {
-        animationId = requestAnimationFrame(renderPreviewTrail);
-      }
-    }
-
-    function isEraserActive() {
-      return isEraser || stylusEraser;
-    }
-
-    function getLineWidth(pressure) {
-      const basePressure = pressureEnabled ? Math.max(0.1, pressure) : 0.5;
-      if (isEraserActive()) {
-        const eraserSize = 40 * basePressure;
-        return eraser4xMode ? eraserSize * 4 : eraserSize;
-      }
-      return strokeSize + (basePressure * strokeSize);
-    }
-
-    function updateStrokeSize(delta) {
-      strokeSize = Math.max(0.5, Math.min(20, strokeSize + delta));
-      document.getElementById('size-value').textContent = strokeSize;
-      showControls();
-    }
-
-    function draw(e) {
-      if (!isDrawing) return;
-      e.preventDefault();
-
-      // Get all coalesced points for accurate main stroke
-      const coalescedPoints = getCoalescedPoints(e);
-
-      // Draw all coalesced points to main canvas
-      for (const pos of coalescedPoints) {
-        const lineWidth = getLineWidth(pos.pressure);
-
-        mainCtx.beginPath();
-        mainCtx.moveTo(lastX, lastY);
-        mainCtx.lineTo(pos.x, pos.y);
-        mainCtx.lineWidth = lineWidth;
-        if (isEraserActive()) {
-          mainCtx.globalCompositeOperation = 'destination-out';
-          mainCtx.strokeStyle = 'rgba(0,0,0,1)';
-        } else {
-          mainCtx.globalCompositeOperation = 'source-over';
-          mainCtx.strokeStyle = '#000000';
-        }
-        mainCtx.stroke();
-
-        lastX = pos.x;
-        lastY = pos.y;
-        lastPressure = pos.pressure;
-      }
-
-      // Add current position to trail
-      const currentPos = coalescedPoints[coalescedPoints.length - 1];
-      trailPoints.push({ ...currentPos, alpha: 1 });
-
-      // Limit trail length
-      while (trailPoints.length > TRAIL_LENGTH) {
-        trailPoints.shift();
-      }
-    }
-
-    function renderPreviewTrail() {
-      const rect = previewCanvas.getBoundingClientRect();
-
-      // Clear preview canvas
-      previewCtx.clearRect(0, 0, rect.width, rect.height);
-
-      // Draw eraser circle indicator
-      if (eraserCursorVisible && isEraserActive()) {
-        const eraserRadius = getLineWidth(pressureEnabled ? lastPressure : 0.5) / 2;
-        previewCtx.beginPath();
-        previewCtx.arc(eraserCursorX, eraserCursorY, eraserRadius, 0, Math.PI * 2);
-        previewCtx.strokeStyle = eraser4xMode ? 'rgba(255, 60, 60, 0.8)' : 'rgba(100, 100, 100, 0.6)';
-        previewCtx.lineWidth = eraser4xMode ? 2 : 1.5;
-        previewCtx.stroke();
-      }
-
-      if (isDrawing && trailPoints.length > 1 && !isEraserActive()) {
-        // Draw trail with fading opacity
-        for (let i = 1; i < trailPoints.length; i++) {
-          const prev = trailPoints[i - 1];
-          const curr = trailPoints[i];
-
-          // Calculate alpha based on position in trail
-          const trailAlpha = (i / trailPoints.length) * 0.4 * curr.alpha;
-          const lineWidth = getLineWidth(curr.pressure);
-
-          previewCtx.beginPath();
-          previewCtx.moveTo(prev.x, prev.y);
-          previewCtx.lineTo(curr.x, curr.y);
-          previewCtx.lineWidth = lineWidth;
-          previewCtx.strokeStyle = `rgba(255, 60, 60, ${trailAlpha})`;
-          previewCtx.stroke();
-        }
-
-        // Fade out trail points
-        trailPoints = trailPoints.map(p => ({
-          ...p,
-          alpha: p.alpha - TRAIL_FADE_SPEED
-        })).filter(p => p.alpha > 0);
-      }
-
-      // Continue animation if drawing, trail exists, or eraser cursor visible
-      if (isDrawing || trailPoints.some(p => p.alpha > 0) || (eraserCursorVisible && isEraserActive())) {
-        animationId = requestAnimationFrame(renderPreviewTrail);
-      } else {
-        animationId = null;
-        previewCtx.clearRect(0, 0, rect.width, rect.height);
-      }
-    }
-
-    function stopDrawing(e) {
-      if (e) e.preventDefault();
-      isDrawing = false;
-      stylusEraser = false;
-      // Trail will fade out naturally via animation loop
-    }
-
-    function resetEraserMode() {
-      // Reset 4x mode when stylus leaves canvas
-      eraser4xMode = false;
-      eraserTapCount = 0;
-      clearTimeout(eraserTapTimer);
-    }
-
-    function showControls() {
-      controls.classList.add('visible');
-      clearTimeout(controlsTimeout);
-      controlsTimeout = setTimeout(() => {
-        controls.classList.remove('visible');
-      }, 2000);
-    }
-
-    function toggleEraser() {
-      isEraser = !isEraser;
-      document.body.classList.toggle('eraser-mode', isEraser);
-      document.getElementById('eraser-btn').textContent = isEraser ? '🖊️' : '✏️';
-      showControls();
-    }
-
-    function clearCanvas() {
-      const rect = mainCanvas.getBoundingClientRect();
-      mainCtx.fillStyle = '#ffffff';
-      mainCtx.fillRect(0, 0, rect.width, rect.height);
-      previewCtx.clearRect(0, 0, rect.width, rect.height);
-      trailPoints = [];
-      showControls();
-    }
-
-    function saveCanvas() {
-      const link = document.createElement('a');
-      link.download = 'drawing.png';
-      link.href = mainCanvas.toDataURL('image/png');
-      link.click();
-      showControls();
-    }
-
-    function updateEraserCursor(e) {
-      const pos = getPointerPos(e);
-      eraserCursorX = pos.x;
-      eraserCursorY = pos.y;
-      eraserCursorVisible = true;
-
-      // Start render loop if not running (for eraser cursor)
-      if (!animationId && isEraserActive()) {
-        animationId = requestAnimationFrame(renderPreviewTrail);
-      }
-    }
-
-    function hideEraserCursor() {
-      eraserCursorVisible = false;
-    }
-
-    // Event listeners
-    inputCanvas.addEventListener('pointerdown', startDrawing);
-    inputCanvas.addEventListener('pointermove', (e) => {
-      draw(e);
-      updateEraserCursor(e);
-    });
-    inputCanvas.addEventListener('pointerup', stopDrawing);
-    inputCanvas.addEventListener('pointerleave', (e) => {
-      stopDrawing(e);
-      hideEraserCursor();
-      resetEraserMode();
-    });
-    inputCanvas.addEventListener('pointercancel', stopDrawing);
-
-    // Prevent default touch behaviors
-    inputCanvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
-    inputCanvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
-
-    // Control buttons
-    document.getElementById('eraser-btn').addEventListener('click', toggleEraser);
-    document.getElementById('clear-btn').addEventListener('click', clearCanvas);
-    document.getElementById('save-btn').addEventListener('click', saveCanvas);
-    document.getElementById('size-up').addEventListener('click', () => updateStrokeSize(0.5));
-    document.getElementById('size-down').addEventListener('click', () => updateStrokeSize(-0.5));
-    document.getElementById('pressure-toggle').addEventListener('change', (e) => {
-      pressureEnabled = e.target.checked;
-      showControls();
+    canvas.addEventListener("pointerdown", (evt) => {
+      evt.preventDefault();
+      activePointers.add(evt.pointerId);
+      canvas.setPointerCapture(evt.pointerId);
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      lastX = evt.pageX;
+      lastY = evt.pageY;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
     });
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (e.key.toLowerCase() === 'e') toggleEraser();
-      if (e.key.toLowerCase() === 'c') clearCanvas();
-      if (e.key.toLowerCase() === 's') { e.preventDefault(); saveCanvas(); }
-      if (e.key.toLowerCase() === 'p') {
-        const toggle = document.getElementById('pressure-toggle');
-        toggle.checked = !toggle.checked;
-        pressureEnabled = toggle.checked;
-        showControls();
-      }
+    canvas.addEventListener("pointerup", (evt) => {
+      activePointers.delete(evt.pointerId);
+      canvas.releasePointerCapture(evt.pointerId);
+      lastX = null;
+      lastY = null;
     });
 
-    // Show controls on mouse near bottom-right
-    document.addEventListener('pointermove', (e) => {
-      if (e.clientX > window.innerWidth - 150 && e.clientY > window.innerHeight - 100) {
-        showControls();
-      }
+    canvas.addEventListener("pointercancel", (evt) => {
+      activePointers.delete(evt.pointerId);
+      lastX = null;
+      lastY = null;
     });
 
-    // Initialize
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+    canvas.addEventListener("lostpointercapture", (evt) => {
+      activePointers.delete(evt.pointerId);
+      lastX = null;
+      lastY = null;
+    });
+
+    canvas.addEventListener("pointermove", async (evt) => {
+      evt.preventDefault();
+      // Only draw when pointer is actively down (touching screen)
+      if (!activePointers.has(evt.pointerId)) return;
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(evt.pageX, evt.pageY);
+      ctx.stroke();
+
+      lastX = evt.pageX;
+      lastY = evt.pageY;
+
+      (await presenter).updateInkTrailStartPoint(evt, style);
+    });
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
   </script>
 </body>
 </html>
