@@ -29,7 +29,7 @@
       background: rgba(0, 0, 0, 0.05);
       backdrop-filter: blur(10px);
       border-radius: 6px;
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 12px;
       color: rgba(0, 0, 0, 0.7);
       z-index: 10;
@@ -72,7 +72,7 @@
     }
 
     #toolbar label {
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 14px;
       color: rgba(0, 0, 0, 0.7);
     }
@@ -110,7 +110,7 @@
     .stepper-value {
       min-width: 50px;
       text-align: center;
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 16px;
       font-weight: bold;
       color: #000000;
@@ -152,7 +152,7 @@
     }
 
     .color-row label {
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 12px;
       color: rgba(0, 0, 0, 0.7);
       min-width: 55px;
@@ -179,7 +179,7 @@
     }
 
     .switch-group label {
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 12px;
       color: rgba(0, 0, 0, 0.7);
     }
@@ -237,7 +237,6 @@
       display: none;
       z-index: 1000;
     }
-
   </style>
 </head>
 <body>
@@ -260,12 +259,6 @@
         </div>
       </div>
       <button id="size-increase">+</button>
-    </div>
-    <label>Smooth:</label>
-    <div class="stepper">
-      <button id="smooth-decrease">−</button>
-      <span id="smooth-value" class="stepper-value">5</span>
-      <button id="smooth-increase">+</button>
     </div>
     <div class="switch-group">
       <label>Ink API:</label>
@@ -333,33 +326,16 @@
     let strokeColor = '#000000';
     let strokeWidth = 2.5;
     let inkApiEnabled = true;
-    let smoothingIntensity = 5; // 0-10 scale, 0 = no smoothing, 10 = max smoothing
     const previewStyle = { color: '#000000', diameter: strokeWidth };
     const sizeValueEl = document.getElementById('size-value');
     const colorPopup = document.getElementById('color-popup');
     const penColorPicker = document.getElementById('pen-color-picker');
     const previewColorPicker = document.getElementById('preview-color-picker');
     const inkApiToggle = document.getElementById('ink-api-toggle');
-    const smoothValueEl = document.getElementById('smooth-value');
 
     // Toggle Ink API
     inkApiToggle.addEventListener('change', (evt) => {
       inkApiEnabled = evt.target.checked;
-    });
-
-    // Smoothing intensity stepper controls
-    document.getElementById('smooth-decrease').addEventListener('click', () => {
-      if (smoothingIntensity > 0) {
-        smoothingIntensity--;
-        smoothValueEl.textContent = smoothingIntensity;
-      }
-    });
-
-    document.getElementById('smooth-increase').addEventListener('click', () => {
-      if (smoothingIntensity < 10) {
-        smoothingIntensity++;
-        smoothValueEl.textContent = smoothingIntensity;
-      }
     });
 
     // Toggle color popup when clicking size value
@@ -405,17 +381,10 @@
       sizeValueEl.textContent = strokeWidth;
       previewStyle.diameter = strokeWidth;
     });
-
     let isPenDown = false;
     let isErasing = false;
     let lastX = 0;
     let lastY = 0;
-
-    // Smoothing state
-    let points = [];
-    let smoothX = 0;
-    let smoothY = 0;
-
     const defaultEraserSize = 20;
     const bigEraserSize = defaultEraserSize * 6;
     let currentEraserSize = defaultEraserSize;
@@ -439,12 +408,6 @@
         isErasing = (evt.buttons & 32) !== 0;
         lastX = evt.pageX;
         lastY = evt.pageY;
-
-        // Reset smoothing state for new stroke
-        points = [{ x: lastX, y: lastY }];
-        smoothX = lastX;
-        smoothY = lastY;
-
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
 
@@ -484,26 +447,6 @@
     canvas.addEventListener('pointerup', (evt) => {
       if (evt.pointerType === 'pen') {
         isPenDown = false;
-
-        // Draw final segment to complete the stroke
-        if (smoothingIntensity > 0 && points.length >= 2 && !isErasing) {
-          ctx.strokeStyle = strokeColor;
-          ctx.lineWidth = strokeWidth;
-
-          const lastPoint = points[points.length - 1];
-          const prevPoint = points[points.length - 2];
-          const midX = (prevPoint.x + lastPoint.x) / 2;
-          const midY = (prevPoint.y + lastPoint.y) / 2;
-
-          // Draw line from last midpoint to final point
-          ctx.beginPath();
-          ctx.moveTo(midX, midY);
-          ctx.lineTo(lastPoint.x, lastPoint.y);
-          ctx.stroke();
-        }
-
-        points = [];
-
         if (isErasing) {
           resetEraser();
         }
@@ -514,7 +457,6 @@
     canvas.addEventListener('pointerleave', (evt) => {
       if (evt.pointerType === 'pen') {
         isPenDown = false;
-        points = [];
         if (isErasing) {
           resetEraser();
         }
@@ -560,56 +502,8 @@
         // Update eraser indicator position
         eraserIndicator.style.left = x + 'px';
         eraserIndicator.style.top = y + 'px';
-      } else if (smoothingIntensity > 0) {
-        // Quadratic Bezier with midpoints - smooth curves through midpoints
-        points.push({ x, y });
-
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = strokeWidth;
-
-        // Intensity factor: 0 = straight lines, 1 = full bezier curves
-        const intensity = smoothingIntensity / 10;
-
-        // End weight: how close the endpoint is to current position (0.5 = midpoint, 1.0 = current point)
-        // Higher values reduce the gap with Ink API preview
-        const endWeight = 0.75;
-
-        if (points.length >= 3) {
-          // Get the last three points
-          const p0 = points[points.length - 3];
-          const p1 = points[points.length - 2];
-          const p2 = points[points.length - 1];
-
-          // Calculate weighted endpoints (closer to current point than pure midpoint)
-          const midX1 = p0.x + (p1.x - p0.x) * endWeight;
-          const midY1 = p0.y + (p1.y - p0.y) * endWeight;
-          const midX2 = p1.x + (p2.x - p1.x) * endWeight;
-          const midY2 = p1.y + (p2.y - p1.y) * endWeight;
-
-          // Interpolate control point between midpoint (no curve) and actual point (full curve)
-          const linearCtrlX = (midX1 + midX2) / 2;
-          const linearCtrlY = (midY1 + midY2) / 2;
-          const ctrlX = linearCtrlX + (p1.x - linearCtrlX) * intensity;
-          const ctrlY = linearCtrlY + (p1.y - linearCtrlY) * intensity;
-
-          // Draw quadratic curve from previous midpoint to new midpoint
-          ctx.beginPath();
-          ctx.moveTo(midX1, midY1);
-          ctx.quadraticCurveTo(ctrlX, ctrlY, midX2, midY2);
-          ctx.stroke();
-        } else if (points.length === 2) {
-          // For the first two points, just draw a line
-          ctx.beginPath();
-          ctx.moveTo(points[0].x, points[0].y);
-          ctx.lineTo(points[1].x, points[1].y);
-          ctx.stroke();
-        }
-
-        if (presenter && inkApiEnabled) {
-          presenter.updateInkTrailStartPoint(evt, previewStyle);
-        }
       } else {
-        // No smoothing - draw straight line segments
+        // Draw stroke from last position to current
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = strokeWidth;
         ctx.beginPath();
