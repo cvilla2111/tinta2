@@ -243,18 +243,6 @@
       pointer-events: auto;
     }
 
-    #stabilizer-cursor {
-      position: fixed;
-      pointer-events: none;
-      border: 2px solid rgba(0, 150, 68, 0.6);
-      background: rgba(0, 150, 68, 0.15);
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-      display: none;
-      z-index: 999;
-      transition: width 0.1s, height 0.1s;
-    }
-
     #eraser-indicator {
       position: fixed;
       pointer-events: none;
@@ -312,7 +300,6 @@
     </div>
   </div>
   <canvas id="canvas"></canvas>
-  <div id="stabilizer-cursor"></div>
   <div id="eraser-indicator"></div>
   <div id="dpr-info">Device Pixel Ratio: <span id="dpr-value">1</span></div>
 
@@ -379,7 +366,6 @@
 
     // Stabilizer settings
     const stabilizerValueEl = document.getElementById('stabilizer-value');
-    const stabilizerCursor = document.getElementById('stabilizer-cursor');
     let stabilizerStrength = 0; // 0 = off, 0.1-10 = strength
     let brushX = 0;
     let brushY = 0;
@@ -389,10 +375,6 @@
 
     function updateStabilizerDisplay() {
       stabilizerValueEl.textContent = stabilizerStrength.toFixed(1);
-      // Update cursor size based on strength (visual feedback)
-      const cursorSize = 8 + stabilizerStrength * 1.5;
-      stabilizerCursor.style.width = cursorSize + 'px';
-      stabilizerCursor.style.height = cursorSize + 'px';
     }
 
     // Stabilizer stepper controls
@@ -591,10 +573,6 @@
         lastY = brushY;
         brushX = newBrushX;
         brushY = newBrushY;
-
-        // Update stabilizer cursor position
-        stabilizerCursor.style.left = brushX + 'px';
-        stabilizerCursor.style.top = brushY + 'px';
       }
 
       stabilizerAnimationId = requestAnimationFrame(stabilizerLoop);
@@ -621,13 +599,8 @@
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
 
-        // Show and position stabilizer cursor if stabilizer is active
+        // Start stabilizer loop if stabilizer is active
         if (stabilizerStrength > 0 && !isErasing) {
-          stabilizerCursor.style.display = 'block';
-          stabilizerCursor.style.left = brushX + 'px';
-          stabilizerCursor.style.top = brushY + 'px';
-
-          // Start stabilizer loop
           if (!stabilizerAnimationId) {
             stabilizerAnimationId = requestAnimationFrame(stabilizerLoop);
           }
@@ -690,9 +663,6 @@
         drawSmoothCurve(pointBuffer, lineWidth);
         pointBuffer = [];
       }
-
-      // Hide stabilizer cursor
-      stabilizerCursor.style.display = 'none';
 
       // Cancel animation loop
       if (stabilizerAnimationId) {
