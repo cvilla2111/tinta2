@@ -29,7 +29,7 @@
       background: rgba(0, 0, 0, 0.05);
       backdrop-filter: blur(10px);
       border-radius: 6px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       font-size: 12px;
       color: rgba(0, 0, 0, 0.7);
       z-index: 10;
@@ -72,7 +72,7 @@
     }
 
     #toolbar label {
-      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       font-size: 14px;
       color: rgba(0, 0, 0, 0.7);
     }
@@ -110,7 +110,7 @@
     .stepper-value {
       min-width: 50px;
       text-align: center;
-      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       font-size: 16px;
       font-weight: bold;
       color: #000000;
@@ -152,7 +152,7 @@
     }
 
     .color-row label {
-      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       font-size: 12px;
       color: rgba(0, 0, 0, 0.7);
       min-width: 55px;
@@ -171,76 +171,61 @@
       position: relative;
     }
 
-    .toggle-container {
+    .switch-group {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 8px;
       margin-left: 1rem;
-      padding-left: 1rem;
-      border-left: 1px solid rgba(0, 0, 0, 0.15);
     }
 
-    .toggle-switch {
+    .switch-group label {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.7);
+    }
+
+    .switch {
       position: relative;
-      width: 44px;
-      height: 24px;
-      background: rgba(0, 0, 0, 0.15);
-      border-radius: 12px;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-
-    .toggle-switch::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 20px;
+      width: 36px;
       height: 20px;
-      background: #fff;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .switch-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.2);
+      transition: 0.3s;
+      border-radius: 20px;
+    }
+
+    .switch-slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
       border-radius: 50%;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-      transition: transform 0.3s ease;
     }
 
-    .toggle-switch.active {
-      background: #009944;
+    .switch input:checked + .switch-slider {
+      background-color: #009944;
     }
 
-    .toggle-switch.active::after {
-      transform: translateX(20px);
-    }
-
-    .stabilizer-container {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-left: 1rem;
-      padding-left: 1rem;
-      border-left: 1px solid rgba(0, 0, 0, 0.15);
-    }
-
-    .bezier-container {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-left: 1rem;
-      padding-left: 1rem;
-      border-left: 1px solid rgba(0, 0, 0, 0.15);
-    }
-
-    .bezier-controls {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      opacity: 0.4;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-    }
-
-    .bezier-controls.active {
-      opacity: 1;
-      pointer-events: auto;
+    .switch input:checked + .switch-slider:before {
+      transform: translateX(16px);
     }
 
     #eraser-indicator {
@@ -252,6 +237,7 @@
       display: none;
       z-index: 1000;
     }
+
   </style>
 </head>
 <body>
@@ -275,28 +261,18 @@
       </div>
       <button id="size-increase">+</button>
     </div>
-    <div class="toggle-container">
-      <label>Pressure:</label>
-      <div id="pressure-toggle" class="toggle-switch"></div>
+    <label>Smooth:</label>
+    <div class="stepper">
+      <button id="smooth-decrease">−</button>
+      <span id="smooth-value" class="stepper-value">5</span>
+      <button id="smooth-increase">+</button>
     </div>
-    <div class="stabilizer-container">
-      <label>Stabilizer:</label>
-      <div class="stepper">
-        <button id="stabilizer-decrease">−</button>
-        <span id="stabilizer-value" class="stepper-value">0.0</span>
-        <button id="stabilizer-increase">+</button>
-      </div>
-    </div>
-    <div class="bezier-container">
-      <label>Bezier:</label>
-      <div id="bezier-toggle" class="toggle-switch"></div>
-      <div id="bezier-controls" class="bezier-controls">
-        <div class="stepper">
-          <button id="bezier-decrease">−</button>
-          <span id="bezier-value" class="stepper-value">3</span>
-          <button id="bezier-increase">+</button>
-        </div>
-      </div>
+    <div class="switch-group">
+      <label>Ink API:</label>
+      <label class="switch">
+        <input type="checkbox" id="ink-api-toggle" checked>
+        <span class="switch-slider"></span>
+      </label>
     </div>
   </div>
   <canvas id="canvas"></canvas>
@@ -356,119 +332,34 @@
 
     let strokeColor = '#000000';
     let strokeWidth = 2.5;
+    let inkApiEnabled = true;
+    let smoothingIntensity = 5; // 0-10 scale, 0 = no smoothing, 10 = max smoothing
     const previewStyle = { color: '#000000', diameter: strokeWidth };
     const sizeValueEl = document.getElementById('size-value');
     const colorPopup = document.getElementById('color-popup');
     const penColorPicker = document.getElementById('pen-color-picker');
     const previewColorPicker = document.getElementById('preview-color-picker');
-    const pressureToggle = document.getElementById('pressure-toggle');
-    let pressureEnabled = false;
+    const inkApiToggle = document.getElementById('ink-api-toggle');
+    const smoothValueEl = document.getElementById('smooth-value');
 
-    // Stabilizer settings
-    const stabilizerValueEl = document.getElementById('stabilizer-value');
-    let stabilizerStrength = 0; // 0 = off, 0.1-10 = strength
-    let brushX = 0;
-    let brushY = 0;
-    let targetX = 0;
-    let targetY = 0;
-    let stabilizerAnimationId = null;
+    // Toggle Ink API
+    inkApiToggle.addEventListener('change', (evt) => {
+      inkApiEnabled = evt.target.checked;
+    });
 
-    function updateStabilizerDisplay() {
-      stabilizerValueEl.textContent = stabilizerStrength.toFixed(1);
-    }
-
-    // Stabilizer stepper controls
-    document.getElementById('stabilizer-decrease').addEventListener('click', () => {
-      if (stabilizerStrength > 0) {
-        stabilizerStrength = Math.round((stabilizerStrength - 0.1) * 10) / 10;
-        if (stabilizerStrength < 0) stabilizerStrength = 0;
-        updateStabilizerDisplay();
+    // Smoothing intensity stepper controls
+    document.getElementById('smooth-decrease').addEventListener('click', () => {
+      if (smoothingIntensity > 0) {
+        smoothingIntensity--;
+        smoothValueEl.textContent = smoothingIntensity;
       }
     });
 
-    document.getElementById('stabilizer-increase').addEventListener('click', () => {
-      if (stabilizerStrength < 10) {
-        stabilizerStrength = Math.round((stabilizerStrength + 0.1) * 10) / 10;
-        updateStabilizerDisplay();
+    document.getElementById('smooth-increase').addEventListener('click', () => {
+      if (smoothingIntensity < 10) {
+        smoothingIntensity++;
+        smoothValueEl.textContent = smoothingIntensity;
       }
-    });
-
-    // Bezier smoothing settings
-    const bezierToggle = document.getElementById('bezier-toggle');
-    const bezierControls = document.getElementById('bezier-controls');
-    const bezierValueEl = document.getElementById('bezier-value');
-    let bezierEnabled = false;
-    let bezierSmoothness = 3; // Number of points to collect before drawing (2-10)
-    let pointBuffer = []; // Buffer to collect points for bezier curve
-
-    // Toggle bezier smoothing
-    bezierToggle.addEventListener('click', () => {
-      bezierEnabled = !bezierEnabled;
-      bezierToggle.classList.toggle('active', bezierEnabled);
-      bezierControls.classList.toggle('active', bezierEnabled);
-    });
-
-    // Bezier smoothness stepper controls
-    document.getElementById('bezier-decrease').addEventListener('click', () => {
-      if (bezierSmoothness > 2) {
-        bezierSmoothness--;
-        bezierValueEl.textContent = bezierSmoothness;
-      }
-    });
-
-    document.getElementById('bezier-increase').addEventListener('click', () => {
-      if (bezierSmoothness < 10) {
-        bezierSmoothness++;
-        bezierValueEl.textContent = bezierSmoothness;
-      }
-    });
-
-    // Draw smooth curve using quadratic midpoint interpolation
-    function drawSmoothCurve(points, lineWidth) {
-      if (points.length < 2) return;
-
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = lineWidth;
-      ctx.beginPath();
-
-      // Start from the first point
-      ctx.moveTo(points[0].x, points[0].y);
-
-      if (points.length === 2) {
-        // Just two points - draw a line
-        ctx.lineTo(points[1].x, points[1].y);
-      } else {
-        // Quadratic midpoint interpolation:
-        // Draw lines to midpoints, using actual points as control points
-        for (let i = 0; i < points.length - 1; i++) {
-          const p0 = points[i];
-          const p1 = points[i + 1];
-
-          // Calculate midpoint between current and next point
-          const midX = (p0.x + p1.x) / 2;
-          const midY = (p0.y + p1.y) / 2;
-
-          if (i === 0) {
-            // First segment: line to first midpoint
-            ctx.lineTo(midX, midY);
-          } else {
-            // Subsequent segments: quadratic curve using previous point as control
-            ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
-          }
-        }
-
-        // Final segment: curve to the last point
-        const lastPoint = points[points.length - 1];
-        ctx.lineTo(lastPoint.x, lastPoint.y);
-      }
-
-      ctx.stroke();
-    }
-
-    // Toggle pressure sensitivity
-    pressureToggle.addEventListener('click', () => {
-      pressureEnabled = !pressureEnabled;
-      pressureToggle.classList.toggle('active', pressureEnabled);
     });
 
     // Toggle color popup when clicking size value
@@ -514,10 +405,17 @@
       sizeValueEl.textContent = strokeWidth;
       previewStyle.diameter = strokeWidth;
     });
+
     let isPenDown = false;
     let isErasing = false;
     let lastX = 0;
     let lastY = 0;
+
+    // Smoothing state
+    let points = [];
+    let smoothX = 0;
+    let smoothY = 0;
+
     const defaultEraserSize = 20;
     const bigEraserSize = defaultEraserSize * 6;
     let currentEraserSize = defaultEraserSize;
@@ -534,50 +432,6 @@
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Stabilizer animation loop - runs while drawing
-    let currentPressure = 0.5;
-
-    function stabilizerLoop() {
-      if (!isPenDown || isErasing || stabilizerStrength === 0) {
-        stabilizerAnimationId = null;
-        return;
-      }
-
-      // Calculate distance to target
-      const dx = targetX - brushX;
-      const dy = targetY - brushY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      // Only draw if brush has moved enough
-      if (dist > 0.5) {
-        // Move brush toward target - lower values = more smoothing
-        const catchUp = 1 / (stabilizerStrength + 1);
-        const newBrushX = brushX + dx * catchUp;
-        const newBrushY = brushY + dy * catchUp;
-
-        // Calculate pressure-based width
-        const currentWidth = pressureEnabled
-          ? strokeWidth * (0.2 + currentPressure * 1.6)
-          : strokeWidth;
-
-        // Draw from old brush position to new
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = currentWidth;
-        ctx.beginPath();
-        ctx.moveTo(brushX, brushY);
-        ctx.lineTo(newBrushX, newBrushY);
-        ctx.stroke();
-
-        // Update brush position
-        lastX = brushX;
-        lastY = brushY;
-        brushX = newBrushX;
-        brushY = newBrushY;
-      }
-
-      stabilizerAnimationId = requestAnimationFrame(stabilizerLoop);
-    }
-
     canvas.addEventListener('pointerdown', (evt) => {
       if (evt.pointerType === 'pen') {
         isPenDown = true;
@@ -586,25 +440,13 @@
         lastX = evt.pageX;
         lastY = evt.pageY;
 
-        // Initialize stabilizer brush position
-        brushX = lastX;
-        brushY = lastY;
-        targetX = lastX;
-        targetY = lastY;
-        currentPressure = evt.pressure || 0.5;
-
-        // Reset bezier point buffer
-        pointBuffer = [{ x: lastX, y: lastY, pressure: currentPressure }];
+        // Reset smoothing state for new stroke
+        points = [{ x: lastX, y: lastY }];
+        smoothX = lastX;
+        smoothY = lastY;
 
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
-
-        // Start stabilizer loop if stabilizer is active
-        if (stabilizerStrength > 0 && !isErasing) {
-          if (!stabilizerAnimationId) {
-            stabilizerAnimationId = requestAnimationFrame(stabilizerLoop);
-          }
-        }
 
         if (isErasing) {
           const now = Date.now();
@@ -639,42 +481,29 @@
       eraserIndicator.style.display = 'none';
     }
 
-    function finishStabilizerStroke() {
-      // Draw remaining stroke from brush to target
-      if (stabilizerStrength > 0) {
-        const currentWidth = pressureEnabled
-          ? strokeWidth * (0.2 + currentPressure * 1.6)
-          : strokeWidth;
-
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = currentWidth;
-        ctx.beginPath();
-        ctx.moveTo(brushX, brushY);
-        ctx.lineTo(targetX, targetY);
-        ctx.stroke();
-      }
-
-      // Flush remaining bezier buffer
-      if (bezierEnabled && pointBuffer.length >= 2) {
-        const avgPressure = pointBuffer.reduce((sum, p) => sum + p.pressure, 0) / pointBuffer.length;
-        const lineWidth = pressureEnabled
-          ? strokeWidth * (0.2 + avgPressure * 1.6)
-          : strokeWidth;
-        drawSmoothCurve(pointBuffer, lineWidth);
-        pointBuffer = [];
-      }
-
-      // Cancel animation loop
-      if (stabilizerAnimationId) {
-        cancelAnimationFrame(stabilizerAnimationId);
-        stabilizerAnimationId = null;
-      }
-    }
-
     canvas.addEventListener('pointerup', (evt) => {
       if (evt.pointerType === 'pen') {
-        finishStabilizerStroke();
         isPenDown = false;
+
+        // Draw final segment to complete the stroke
+        if (smoothingIntensity > 0 && points.length >= 2 && !isErasing) {
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = strokeWidth;
+
+          const lastPoint = points[points.length - 1];
+          const prevPoint = points[points.length - 2];
+          const midX = (prevPoint.x + lastPoint.x) / 2;
+          const midY = (prevPoint.y + lastPoint.y) / 2;
+
+          // Draw line from last midpoint to final point
+          ctx.beginPath();
+          ctx.moveTo(midX, midY);
+          ctx.lineTo(lastPoint.x, lastPoint.y);
+          ctx.stroke();
+        }
+
+        points = [];
+
         if (isErasing) {
           resetEraser();
         }
@@ -684,8 +513,8 @@
 
     canvas.addEventListener('pointerleave', (evt) => {
       if (evt.pointerType === 'pen') {
-        finishStabilizerStroke();
         isPenDown = false;
+        points = [];
         if (isErasing) {
           resetEraser();
         }
@@ -731,82 +560,70 @@
         // Update eraser indicator position
         eraserIndicator.style.left = x + 'px';
         eraserIndicator.style.top = y + 'px';
-        lastX = x;
-        lastY = y;
-      } else if (stabilizerStrength > 0) {
-        // Stabilizer mode - update target position, drawing happens in animation loop
-        targetX = x;
-        targetY = y;
-        currentPressure = evt.pressure || 0.5;
-
-        // Update ink presenter for low-latency preview (shows cursor position)
-        if (presenter) {
-          const previewDiameter = pressureEnabled
-            ? strokeWidth * (0.2 + currentPressure * 1.6)
-            : strokeWidth;
-          presenter.updateInkTrailStartPoint(evt, {
-            color: previewStyle.color,
-            diameter: previewDiameter
-          });
-        }
-      } else if (bezierEnabled) {
-        // Bezier mode - collect points and draw smooth curves
-        const pressure = evt.pressure || 0.5;
-        pointBuffer.push({ x, y, pressure });
-
-        // When buffer reaches threshold, draw bezier curve
-        if (pointBuffer.length >= bezierSmoothness) {
-          const avgPressure = pointBuffer.reduce((sum, p) => sum + p.pressure, 0) / pointBuffer.length;
-          const lineWidth = pressureEnabled
-            ? strokeWidth * (0.2 + avgPressure * 1.6)
-            : strokeWidth;
-
-          drawSmoothCurve(pointBuffer, lineWidth);
-
-          // Keep last point as start of next segment for continuity
-          const lastPoint = pointBuffer[pointBuffer.length - 1];
-          pointBuffer = [lastPoint];
-        }
-
-        if (presenter) {
-          const previewDiameter = pressureEnabled
-            ? strokeWidth * (0.2 + pressure * 1.6)
-            : strokeWidth;
-          presenter.updateInkTrailStartPoint(evt, {
-            color: previewStyle.color,
-            diameter: previewDiameter
-          });
-        }
-
-        lastX = x;
-        lastY = y;
-      } else {
-        // No stabilizer, no bezier - draw directly
-        const pressure = evt.pressure || 0.5;
-        const lineWidth = pressureEnabled
-          ? strokeWidth * (0.2 + pressure * 1.6)
-          : strokeWidth;
+      } else if (smoothingIntensity > 0) {
+        // Quadratic Bezier with midpoints - smooth curves through midpoints
+        points.push({ x, y });
 
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = lineWidth;
+        ctx.lineWidth = strokeWidth;
+
+        // Intensity factor: 0 = straight lines, 1 = full bezier curves
+        const intensity = smoothingIntensity / 10;
+
+        // End weight: how close the endpoint is to current position (0.5 = midpoint, 1.0 = current point)
+        // Higher values reduce the gap with Ink API preview
+        const endWeight = 0.75;
+
+        if (points.length >= 3) {
+          // Get the last three points
+          const p0 = points[points.length - 3];
+          const p1 = points[points.length - 2];
+          const p2 = points[points.length - 1];
+
+          // Calculate weighted endpoints (closer to current point than pure midpoint)
+          const midX1 = p0.x + (p1.x - p0.x) * endWeight;
+          const midY1 = p0.y + (p1.y - p0.y) * endWeight;
+          const midX2 = p1.x + (p2.x - p1.x) * endWeight;
+          const midY2 = p1.y + (p2.y - p1.y) * endWeight;
+
+          // Interpolate control point between midpoint (no curve) and actual point (full curve)
+          const linearCtrlX = (midX1 + midX2) / 2;
+          const linearCtrlY = (midY1 + midY2) / 2;
+          const ctrlX = linearCtrlX + (p1.x - linearCtrlX) * intensity;
+          const ctrlY = linearCtrlY + (p1.y - linearCtrlY) * intensity;
+
+          // Draw quadratic curve from previous midpoint to new midpoint
+          ctx.beginPath();
+          ctx.moveTo(midX1, midY1);
+          ctx.quadraticCurveTo(ctrlX, ctrlY, midX2, midY2);
+          ctx.stroke();
+        } else if (points.length === 2) {
+          // For the first two points, just draw a line
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          ctx.lineTo(points[1].x, points[1].y);
+          ctx.stroke();
+        }
+
+        if (presenter && inkApiEnabled) {
+          presenter.updateInkTrailStartPoint(evt, previewStyle);
+        }
+      } else {
+        // No smoothing - draw straight line segments
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = strokeWidth;
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
         ctx.lineTo(x, y);
         ctx.stroke();
 
-        if (presenter) {
-          const previewDiameter = pressureEnabled
-            ? strokeWidth * (0.2 + pressure * 1.6)
-            : strokeWidth;
-          presenter.updateInkTrailStartPoint(evt, {
-            color: previewStyle.color,
-            diameter: previewDiameter
-          });
+        if (presenter && inkApiEnabled) {
+          presenter.updateInkTrailStartPoint(evt, previewStyle);
         }
-
-        lastX = x;
-        lastY = y;
       }
+
+      lastX = x;
+      lastY = y;
     });
   </script>
 </body>
