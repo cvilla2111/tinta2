@@ -171,6 +171,90 @@
       position: relative;
     }
 
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-left: 1rem;
+      padding-left: 1rem;
+      border-left: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      transition: transform 0.3s ease;
+    }
+
+    .toggle-switch.active {
+      background: #009944;
+    }
+
+    .toggle-switch.active::after {
+      transform: translateX(20px);
+    }
+
+    .stabilizer-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-left: 1rem;
+      padding-left: 1rem;
+      border-left: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .bezier-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-left: 1rem;
+      padding-left: 1rem;
+      border-left: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .bezier-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      opacity: 0.4;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .bezier-controls.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #stabilizer-cursor {
+      position: fixed;
+      pointer-events: none;
+      border: 2px solid rgba(0, 150, 68, 0.6);
+      background: rgba(0, 150, 68, 0.15);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      z-index: 999;
+      transition: width 0.1s, height 0.1s;
+    }
+
     #eraser-indicator {
       position: fixed;
       pointer-events: none;
@@ -203,8 +287,32 @@
       </div>
       <button id="size-increase">+</button>
     </div>
+    <div class="toggle-container">
+      <label>Pressure:</label>
+      <div id="pressure-toggle" class="toggle-switch"></div>
+    </div>
+    <div class="stabilizer-container">
+      <label>Stabilizer:</label>
+      <div class="stepper">
+        <button id="stabilizer-decrease">−</button>
+        <span id="stabilizer-value" class="stepper-value">0.0</span>
+        <button id="stabilizer-increase">+</button>
+      </div>
+    </div>
+    <div class="bezier-container">
+      <label>Bezier:</label>
+      <div id="bezier-toggle" class="toggle-switch"></div>
+      <div id="bezier-controls" class="bezier-controls">
+        <div class="stepper">
+          <button id="bezier-decrease">−</button>
+          <span id="bezier-value" class="stepper-value">3</span>
+          <button id="bezier-increase">+</button>
+        </div>
+      </div>
+    </div>
   </div>
   <canvas id="canvas"></canvas>
+  <div id="stabilizer-cursor"></div>
   <div id="eraser-indicator"></div>
   <div id="dpr-info">Device Pixel Ratio: <span id="dpr-value">1</span></div>
 
@@ -266,6 +374,106 @@
     const colorPopup = document.getElementById('color-popup');
     const penColorPicker = document.getElementById('pen-color-picker');
     const previewColorPicker = document.getElementById('preview-color-picker');
+    const pressureToggle = document.getElementById('pressure-toggle');
+    let pressureEnabled = false;
+
+    // Stabilizer settings
+    const stabilizerValueEl = document.getElementById('stabilizer-value');
+    const stabilizerCursor = document.getElementById('stabilizer-cursor');
+    let stabilizerStrength = 0; // 0 = off, 0.1-10 = strength
+    let brushX = 0;
+    let brushY = 0;
+    let targetX = 0;
+    let targetY = 0;
+    let stabilizerAnimationId = null;
+
+    function updateStabilizerDisplay() {
+      stabilizerValueEl.textContent = stabilizerStrength.toFixed(1);
+      // Update cursor size based on strength (visual feedback)
+      const cursorSize = 8 + stabilizerStrength * 1.5;
+      stabilizerCursor.style.width = cursorSize + 'px';
+      stabilizerCursor.style.height = cursorSize + 'px';
+    }
+
+    // Stabilizer stepper controls
+    document.getElementById('stabilizer-decrease').addEventListener('click', () => {
+      if (stabilizerStrength > 0) {
+        stabilizerStrength = Math.round((stabilizerStrength - 0.1) * 10) / 10;
+        if (stabilizerStrength < 0) stabilizerStrength = 0;
+        updateStabilizerDisplay();
+      }
+    });
+
+    document.getElementById('stabilizer-increase').addEventListener('click', () => {
+      if (stabilizerStrength < 10) {
+        stabilizerStrength = Math.round((stabilizerStrength + 0.1) * 10) / 10;
+        updateStabilizerDisplay();
+      }
+    });
+
+    // Bezier smoothing settings
+    const bezierToggle = document.getElementById('bezier-toggle');
+    const bezierControls = document.getElementById('bezier-controls');
+    const bezierValueEl = document.getElementById('bezier-value');
+    let bezierEnabled = false;
+    let bezierSmoothness = 3; // Number of points to collect before drawing (2-10)
+    let pointBuffer = []; // Buffer to collect points for bezier curve
+
+    // Toggle bezier smoothing
+    bezierToggle.addEventListener('click', () => {
+      bezierEnabled = !bezierEnabled;
+      bezierToggle.classList.toggle('active', bezierEnabled);
+      bezierControls.classList.toggle('active', bezierEnabled);
+    });
+
+    // Bezier smoothness stepper controls
+    document.getElementById('bezier-decrease').addEventListener('click', () => {
+      if (bezierSmoothness > 2) {
+        bezierSmoothness--;
+        bezierValueEl.textContent = bezierSmoothness;
+      }
+    });
+
+    document.getElementById('bezier-increase').addEventListener('click', () => {
+      if (bezierSmoothness < 10) {
+        bezierSmoothness++;
+        bezierValueEl.textContent = bezierSmoothness;
+      }
+    });
+
+    // Draw smooth bezier curve through collected points
+    function drawBezierCurve(points, lineWidth) {
+      if (points.length < 2) return;
+
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+
+      if (points.length === 2) {
+        // Just two points - draw a line
+        ctx.lineTo(points[1].x, points[1].y);
+      } else {
+        // Use quadratic bezier curves through midpoints
+        for (let i = 1; i < points.length - 1; i++) {
+          const midX = (points[i].x + points[i + 1].x) / 2;
+          const midY = (points[i].y + points[i + 1].y) / 2;
+          ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+        }
+        // Draw to the last point
+        const last = points[points.length - 1];
+        const secondLast = points[points.length - 2];
+        ctx.quadraticCurveTo(secondLast.x, secondLast.y, last.x, last.y);
+      }
+
+      ctx.stroke();
+    }
+
+    // Toggle pressure sensitivity
+    pressureToggle.addEventListener('click', () => {
+      pressureEnabled = !pressureEnabled;
+      pressureToggle.classList.toggle('active', pressureEnabled);
+    });
 
     // Toggle color popup when clicking size value
     sizeValueEl.addEventListener('click', (evt) => {
@@ -330,6 +538,54 @@
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
+    // Stabilizer animation loop - runs while drawing
+    let currentPressure = 0.5;
+
+    function stabilizerLoop() {
+      if (!isPenDown || isErasing || stabilizerStrength === 0) {
+        stabilizerAnimationId = null;
+        return;
+      }
+
+      // Calculate distance to target
+      const dx = targetX - brushX;
+      const dy = targetY - brushY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Only draw if brush has moved enough
+      if (dist > 0.5) {
+        // Move brush toward target - lower values = more smoothing
+        const catchUp = 1 / (stabilizerStrength + 1);
+        const newBrushX = brushX + dx * catchUp;
+        const newBrushY = brushY + dy * catchUp;
+
+        // Calculate pressure-based width
+        const currentWidth = pressureEnabled
+          ? strokeWidth * (0.2 + currentPressure * 1.6)
+          : strokeWidth;
+
+        // Draw from old brush position to new
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = currentWidth;
+        ctx.beginPath();
+        ctx.moveTo(brushX, brushY);
+        ctx.lineTo(newBrushX, newBrushY);
+        ctx.stroke();
+
+        // Update brush position
+        lastX = brushX;
+        lastY = brushY;
+        brushX = newBrushX;
+        brushY = newBrushY;
+
+        // Update stabilizer cursor position
+        stabilizerCursor.style.left = brushX + 'px';
+        stabilizerCursor.style.top = brushY + 'px';
+      }
+
+      stabilizerAnimationId = requestAnimationFrame(stabilizerLoop);
+    }
+
     canvas.addEventListener('pointerdown', (evt) => {
       if (evt.pointerType === 'pen') {
         isPenDown = true;
@@ -337,8 +593,31 @@
         isErasing = (evt.buttons & 32) !== 0;
         lastX = evt.pageX;
         lastY = evt.pageY;
+
+        // Initialize stabilizer brush position
+        brushX = lastX;
+        brushY = lastY;
+        targetX = lastX;
+        targetY = lastY;
+        currentPressure = evt.pressure || 0.5;
+
+        // Reset bezier point buffer
+        pointBuffer = [{ x: lastX, y: lastY, pressure: currentPressure }];
+
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
+
+        // Show and position stabilizer cursor if stabilizer is active
+        if (stabilizerStrength > 0 && !isErasing) {
+          stabilizerCursor.style.display = 'block';
+          stabilizerCursor.style.left = brushX + 'px';
+          stabilizerCursor.style.top = brushY + 'px';
+
+          // Start stabilizer loop
+          if (!stabilizerAnimationId) {
+            stabilizerAnimationId = requestAnimationFrame(stabilizerLoop);
+          }
+        }
 
         if (isErasing) {
           const now = Date.now();
@@ -373,8 +652,44 @@
       eraserIndicator.style.display = 'none';
     }
 
+    function finishStabilizerStroke() {
+      // Draw remaining stroke from brush to target
+      if (stabilizerStrength > 0) {
+        const currentWidth = pressureEnabled
+          ? strokeWidth * (0.2 + currentPressure * 1.6)
+          : strokeWidth;
+
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = currentWidth;
+        ctx.beginPath();
+        ctx.moveTo(brushX, brushY);
+        ctx.lineTo(targetX, targetY);
+        ctx.stroke();
+      }
+
+      // Flush remaining bezier buffer
+      if (bezierEnabled && pointBuffer.length >= 2) {
+        const avgPressure = pointBuffer.reduce((sum, p) => sum + p.pressure, 0) / pointBuffer.length;
+        const lineWidth = pressureEnabled
+          ? strokeWidth * (0.2 + avgPressure * 1.6)
+          : strokeWidth;
+        drawBezierCurve(pointBuffer, lineWidth);
+        pointBuffer = [];
+      }
+
+      // Hide stabilizer cursor
+      stabilizerCursor.style.display = 'none';
+
+      // Cancel animation loop
+      if (stabilizerAnimationId) {
+        cancelAnimationFrame(stabilizerAnimationId);
+        stabilizerAnimationId = null;
+      }
+    }
+
     canvas.addEventListener('pointerup', (evt) => {
       if (evt.pointerType === 'pen') {
+        finishStabilizerStroke();
         isPenDown = false;
         if (isErasing) {
           resetEraser();
@@ -385,6 +700,7 @@
 
     canvas.addEventListener('pointerleave', (evt) => {
       if (evt.pointerType === 'pen') {
+        finishStabilizerStroke();
         isPenDown = false;
         if (isErasing) {
           resetEraser();
@@ -431,22 +747,82 @@
         // Update eraser indicator position
         eraserIndicator.style.left = x + 'px';
         eraserIndicator.style.top = y + 'px';
+        lastX = x;
+        lastY = y;
+      } else if (stabilizerStrength > 0) {
+        // Stabilizer mode - update target position, drawing happens in animation loop
+        targetX = x;
+        targetY = y;
+        currentPressure = evt.pressure || 0.5;
+
+        // Update ink presenter for low-latency preview (shows cursor position)
+        if (presenter) {
+          const previewDiameter = pressureEnabled
+            ? strokeWidth * (0.2 + currentPressure * 1.6)
+            : strokeWidth;
+          presenter.updateInkTrailStartPoint(evt, {
+            color: previewStyle.color,
+            diameter: previewDiameter
+          });
+        }
+      } else if (bezierEnabled) {
+        // Bezier mode - collect points and draw smooth curves
+        const pressure = evt.pressure || 0.5;
+        pointBuffer.push({ x, y, pressure });
+
+        // When buffer reaches threshold, draw bezier curve
+        if (pointBuffer.length >= bezierSmoothness) {
+          const avgPressure = pointBuffer.reduce((sum, p) => sum + p.pressure, 0) / pointBuffer.length;
+          const lineWidth = pressureEnabled
+            ? strokeWidth * (0.2 + avgPressure * 1.6)
+            : strokeWidth;
+
+          drawBezierCurve(pointBuffer, lineWidth);
+
+          // Keep last point as start of next segment for continuity
+          const lastPoint = pointBuffer[pointBuffer.length - 1];
+          pointBuffer = [lastPoint];
+        }
+
+        if (presenter) {
+          const previewDiameter = pressureEnabled
+            ? strokeWidth * (0.2 + pressure * 1.6)
+            : strokeWidth;
+          presenter.updateInkTrailStartPoint(evt, {
+            color: previewStyle.color,
+            diameter: previewDiameter
+          });
+        }
+
+        lastX = x;
+        lastY = y;
       } else {
-        // Draw stroke from last position to current
+        // No stabilizer, no bezier - draw directly
+        const pressure = evt.pressure || 0.5;
+        const lineWidth = pressureEnabled
+          ? strokeWidth * (0.2 + pressure * 1.6)
+          : strokeWidth;
+
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = strokeWidth;
+        ctx.lineWidth = lineWidth;
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
         ctx.lineTo(x, y);
         ctx.stroke();
 
         if (presenter) {
-          presenter.updateInkTrailStartPoint(evt, previewStyle);
+          const previewDiameter = pressureEnabled
+            ? strokeWidth * (0.2 + pressure * 1.6)
+            : strokeWidth;
+          presenter.updateInkTrailStartPoint(evt, {
+            color: previewStyle.color,
+            diameter: previewDiameter
+          });
         }
-      }
 
-      lastX = x;
-      lastY = y;
+        lastX = x;
+        lastY = y;
+      }
     });
   </script>
 </body>
