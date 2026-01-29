@@ -231,6 +231,7 @@
         function hideToolbar() {
             toolbarTimeout = setTimeout(() => {
                 toolbar.classList.remove('visible');
+                colorPicker.blur();
             }, 1500);
         }
 
