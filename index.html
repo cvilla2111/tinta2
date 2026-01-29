@@ -393,6 +393,11 @@
       }
     });
 
+    // Disable context menu on touch hold
+    canvas.addEventListener('contextmenu', (evt) => {
+      evt.preventDefault();
+    });
+
     canvas.addEventListener('pointermove', async (evt) => {
       // Only respond to pen input when touching the screen
       if (evt.pointerType !== 'pen' || !isPenDown) return;
