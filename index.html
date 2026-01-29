@@ -441,29 +441,43 @@
       }
     });
 
-    // Draw smooth bezier curve through collected points
-    function drawBezierCurve(points, lineWidth) {
+    // Draw smooth curve using quadratic midpoint interpolation
+    function drawSmoothCurve(points, lineWidth) {
       if (points.length < 2) return;
 
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = lineWidth;
       ctx.beginPath();
+
+      // Start from the first point
       ctx.moveTo(points[0].x, points[0].y);
 
       if (points.length === 2) {
         // Just two points - draw a line
         ctx.lineTo(points[1].x, points[1].y);
       } else {
-        // Use quadratic bezier curves through midpoints
-        for (let i = 1; i < points.length - 1; i++) {
-          const midX = (points[i].x + points[i + 1].x) / 2;
-          const midY = (points[i].y + points[i + 1].y) / 2;
-          ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+        // Quadratic midpoint interpolation:
+        // Draw lines to midpoints, using actual points as control points
+        for (let i = 0; i < points.length - 1; i++) {
+          const p0 = points[i];
+          const p1 = points[i + 1];
+
+          // Calculate midpoint between current and next point
+          const midX = (p0.x + p1.x) / 2;
+          const midY = (p0.y + p1.y) / 2;
+
+          if (i === 0) {
+            // First segment: line to first midpoint
+            ctx.lineTo(midX, midY);
+          } else {
+            // Subsequent segments: quadratic curve using previous point as control
+            ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
+          }
         }
-        // Draw to the last point
-        const last = points[points.length - 1];
-        const secondLast = points[points.length - 2];
-        ctx.quadraticCurveTo(secondLast.x, secondLast.y, last.x, last.y);
+
+        // Final segment: curve to the last point
+        const lastPoint = points[points.length - 1];
+        ctx.lineTo(lastPoint.x, lastPoint.y);
       }
 
       ctx.stroke();
@@ -673,7 +687,7 @@
         const lineWidth = pressureEnabled
           ? strokeWidth * (0.2 + avgPressure * 1.6)
           : strokeWidth;
-        drawBezierCurve(pointBuffer, lineWidth);
+        drawSmoothCurve(pointBuffer, lineWidth);
         pointBuffer = [];
       }
 
@@ -777,7 +791,7 @@
             ? strokeWidth * (0.2 + avgPressure * 1.6)
             : strokeWidth;
 
-          drawBezierCurve(pointBuffer, lineWidth);
+          drawSmoothCurve(pointBuffer, lineWidth);
 
           // Keep last point as start of next segment for continuity
           const lastPoint = pointBuffer[pointBuffer.length - 1];
