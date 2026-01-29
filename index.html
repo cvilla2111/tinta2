@@ -146,6 +146,16 @@
             background: #ddd;
         }
 
+        .toggle-btn {
+            min-width: 44px;
+        }
+
+        .toggle-btn.active {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+
         .eraser-indicator {
             position: fixed;
             pointer-events: none;
@@ -173,6 +183,10 @@
                 <button id="sizeUp">+</button>
             </div>
         </div>
+        <div class="toolbar-group">
+            <span class="toolbar-label">Pressure</span>
+            <button class="btn toggle-btn active" id="pressureToggle">On</button>
+        </div>
         <button class="btn" id="clearBtn">Clear</button>
     </div>
     <canvas id="canvas"></canvas>
@@ -188,6 +202,9 @@
         const sizeDown = document.getElementById('sizeDown');
         const clearBtn = document.getElementById('clearBtn');
         const eraserIndicator = document.getElementById('eraserIndicator');
+        const pressureToggle = document.getElementById('pressureToggle');
+
+        let pressureEnabled = true;
 
         let isDrawing = false;
         let lastX = 0;
@@ -200,7 +217,8 @@
         const minSize = 0.5;
         const maxSize = 20;
         const step = 0.5;
-        const pressureSmoothing = 0.85;
+        const pressureSmoothing = 0.5;
+        const minPressure = 0.31;
 
         // High DPI support
         function setupCanvas() {
@@ -336,7 +354,8 @@
             lastPressure = e.pressure > 0 ? e.pressure : 0.5;
 
             const currentEraserSize = bigEraserMode ? bigEraserSize : eraserSize;
-            const initialWidth = eraserMode ? currentEraserSize : penSize * lastPressure * 2;
+            const adjustedPressure = pressureEnabled ? minPressure + lastPressure * (1 - minPressure) : 1;
+            const initialWidth = eraserMode ? currentEraserSize : penSize * adjustedPressure * 2;
             ctx.beginPath();
             ctx.arc(lastX, lastY, initialWidth / 2, 0, Math.PI * 2);
 
@@ -356,7 +375,7 @@
 
             const coords = getCoordinates(e);
 
-            // Smooth pressure to avoid abrupt size changes
+            // Simple pressure smoothing
             const currentPressure = e.pressure > 0 ? e.pressure : 0.5;
             const smoothedPressure = lastPressure * pressureSmoothing + currentPressure * (1 - pressureSmoothing);
             lastPressure = smoothedPressure;
@@ -368,7 +387,8 @@
                 updateEraserIndicator(e.clientX, e.clientY, true);
             } else {
                 ctx.globalCompositeOperation = 'source-over';
-                ctx.lineWidth = penSize * smoothedPressure * 2;
+                const adjustedPressure = pressureEnabled ? minPressure + smoothedPressure * (1 - minPressure) : 1;
+                ctx.lineWidth = penSize * adjustedPressure * 2;
             }
 
             // Quadratic curve smoothing using midpoints
@@ -426,6 +446,12 @@
 
         clearBtn.addEventListener('click', () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
+        pressureToggle.addEventListener('click', () => {
+            pressureEnabled = !pressureEnabled;
+            pressureToggle.textContent = pressureEnabled ? 'On' : 'Off';
+            pressureToggle.classList.toggle('active', pressureEnabled);
         });
 
         // Prevent touch-and-hold context menu
