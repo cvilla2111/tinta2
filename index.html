@@ -263,6 +263,13 @@
       </div>
     </div>
     <div class="divider"></div>
+    <button class="tool-btn active" id="pressureBtn" title="Pressure Sensitivity">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+    </button>
+    <div class="divider"></div>
     <button class="tool-btn" id="undoBtn" title="Undo (Ctrl+Z)">
       <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 2.5-6.5L3 7"/>
@@ -311,6 +318,7 @@
     let undoStack = [];
     let usingEraserEnd = false;
     let previousTool = 'pen';
+    let pressureEnabled = true;
 
     const $ = id => document.getElementById(id);
     const svg = $('drawing-svg');
@@ -349,8 +357,8 @@
     // Tools
     function setTool(tool) {
       currentTool = tool;
-      document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-      $(tool + 'Tool').classList.add('active');
+      $('penTool').classList.toggle('active', tool === 'pen');
+      $('eraserTool').classList.toggle('active', tool === 'eraser');
       canvasContainer.classList.toggle('eraser-mode', tool === 'eraser');
       updateEraserCursor();
     }
@@ -398,7 +406,8 @@
       const left = [], right = [];
       for (let i = 0; i < points.length; i++) {
         const p = points[i];
-        const w = (baseWidth * Math.max(0.25, p.pressure) * 1.5) / 2;
+        const pressure = pressureEnabled ? Math.max(0.25, p.pressure) : 0.7;
+        const w = (baseWidth * pressure * 1.5) / 2;
         let dx, dy;
         if (i === 0) { dx = points[1].x - p.x; dy = points[1].y - p.y; }
         else if (i === points.length - 1) { dx = p.x - points[i - 1].x; dy = p.y - points[i - 1].y; }
@@ -543,6 +552,10 @@
     $('eraserTool').onclick = () => setTool('eraser');
     $('sizeDown').onclick = () => { if (sizeIndex > 0) { strokeWidth = sizes[--sizeIndex]; sizeValue.textContent = strokeWidth; updateEraserCursor(); } };
     $('sizeUp').onclick = () => { if (sizeIndex < sizes.length - 1) { strokeWidth = sizes[++sizeIndex]; sizeValue.textContent = strokeWidth; updateEraserCursor(); } };
+    $('pressureBtn').onclick = () => {
+      pressureEnabled = !pressureEnabled;
+      $('pressureBtn').classList.toggle('active', pressureEnabled);
+    };
     $('undoBtn').onclick = undo;
     $('redoBtn').onclick = redo;
     $('clearBtn').onclick = () => { if (strokes.length) { undoStack.push(...strokes.reverse()); strokes = []; strokesGroup.innerHTML = ''; } };
