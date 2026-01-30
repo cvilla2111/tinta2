@@ -432,6 +432,23 @@
       return path;
     }
 
+    const SEGMENT_MAX_LENGTH = 2000;
+    let segmentLength = 0;
+
+    function createNewPath() {
+      currentPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      currentPath.classList.add('stroke-path');
+      currentPath.setAttribute('fill', strokeColor);
+      currentPath.setAttribute('d', buildVariableWidthPath(currentPoints, strokeWidth));
+      strokesGroup.appendChild(currentPath);
+    }
+
+    function finalizeCurrentSegment() {
+      if (currentPath && currentPoints.length > 1) {
+        strokes.push({ element: currentPath, points: [...currentPoints], color: strokeColor, width: strokeWidth });
+      }
+    }
+
     function startDrawing(e) {
       if (!isPenInput(e)) return;
       if (isEraserEnd(e)) {
@@ -445,15 +462,10 @@
       e.preventDefault();
       isDrawing = true;
       currentPoints = [];
+      segmentLength = 0;
       undoStack = [];
       currentPoints.push(getPointerData(e));
-      if (currentTool === 'pen') {
-        currentPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        currentPath.classList.add('stroke-path');
-        currentPath.setAttribute('fill', strokeColor);
-        currentPath.setAttribute('d', buildVariableWidthPath(currentPoints, strokeWidth));
-        strokesGroup.appendChild(currentPath);
-      }
+      if (currentTool === 'pen') createNewPath();
     }
 
     function draw(e) {
@@ -467,9 +479,22 @@
         return;
       }
       const last = currentPoints[currentPoints.length - 1];
-      if (Math.hypot(data.x - last.x, data.y - last.y) < 2) return;
+      const dist = Math.hypot(data.x - last.x, data.y - last.y);
+      if (dist < 2) return;
+
+      segmentLength += dist;
       currentPoints.push(data);
       currentPath.setAttribute('d', buildVariableWidthPath(currentPoints, strokeWidth));
+
+      // Auto-segment when stroke exceeds max length
+      if (segmentLength >= SEGMENT_MAX_LENGTH) {
+        finalizeCurrentSegment();
+        // Start new segment with last 2 points for seamless connection
+        const overlap = currentPoints.slice(-2);
+        currentPoints = overlap;
+        segmentLength = 0;
+        createNewPath();
+      }
     }
 
     function stopDrawing(e) {
