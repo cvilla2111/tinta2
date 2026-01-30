@@ -414,21 +414,18 @@
         const prev = left[i - 1], curr = left[i];
         path += `Q${prev.x},${prev.y},${(prev.x + curr.x) / 2},${(prev.y + curr.y) / 2}`;
       }
-      path += `L${left[left.length - 1].x},${left[left.length - 1].y}`;
-
+      // End: sharp point at center between last left and right
       const ll = left[left.length - 1], lr = right[right.length - 1];
-      const er = Math.hypot(ll.x - lr.x, ll.y - lr.y) / 2;
-      path += `A${er},${er} 0 0,1 ${lr.x},${lr.y}`;
+      const endCenter = { x: (ll.x + lr.x) / 2, y: (ll.y + lr.y) / 2 };
+      path += `L${endCenter.x},${endCenter.y}`;
 
       for (let i = right.length - 2; i >= 0; i--) {
         const prev = right[i + 1], curr = right[i];
         path += `Q${prev.x},${prev.y},${(prev.x + curr.x) / 2},${(prev.y + curr.y) / 2}`;
       }
-      path += `L${right[0].x},${right[0].y}`;
-
-      const fl = left[0], fr = right[0];
-      const sr = Math.hypot(fl.x - fr.x, fl.y - fr.y) / 2;
-      path += `A${sr},${sr} 0 0,1 ${fl.x},${fl.y}Z`;
+      // Close: curve back to start
+      const fr = right[0], fl = left[0];
+      path += `Q${fr.x},${fr.y},${fl.x},${fl.y}Z`;
       return path;
     }
 
