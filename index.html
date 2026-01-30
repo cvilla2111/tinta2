@@ -452,6 +452,9 @@
         usingEraserEnd = true;
         previousTool = currentTool;
         if (currentTool !== 'eraser') setTool('eraser');
+        // Update eraser cursor position immediately
+        eraserCursor.style.left = e.clientX + 'px';
+        eraserCursor.style.top = e.clientY + 'px';
       } else {
         if (e.button && e.button !== 0) return;
         usingEraserEnd = false;
@@ -463,6 +466,11 @@
       undoStack = [];
       currentPoints.push(getPointerData(e));
       if (currentTool === 'pen') createNewPath();
+      // Also update eraser cursor if eraser tool is active
+      if (currentTool === 'eraser') {
+        eraserCursor.style.left = e.clientX + 'px';
+        eraserCursor.style.top = e.clientY + 'px';
+      }
     }
 
     function draw(e) {
