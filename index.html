@@ -286,11 +286,12 @@
     // Event listeners
     window.addEventListener('resize', () => {
       const imageData = canvas.toDataURL();
+      const oldWidth = canvas.width / dpr;
+      const oldHeight = canvas.height / dpr;
       setupCanvas();
       const img = new Image();
       img.onload = () => {
-        const rect = canvas.getBoundingClientRect();
-        ctx.drawImage(img, 0, 0, rect.width, rect.height);
+        ctx.drawImage(img, 0, 0, oldWidth, oldHeight);
       };
       img.src = imageData;
     });
