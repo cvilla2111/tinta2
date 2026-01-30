@@ -142,11 +142,6 @@
       ctx.scale(dpr, dpr);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      if (history.length > 0 && historyIndex >= 0) {
-        const img = new Image();
-        img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
-        img.src = history[historyIndex];
-      }
     }
 
     function saveState() {
@@ -286,12 +281,16 @@
     // Event listeners
     window.addEventListener('resize', () => {
       const imageData = canvas.toDataURL();
-      const oldWidth = canvas.width / dpr;
-      const oldHeight = canvas.height / dpr;
+      const oldDpr = dpr;
+      const oldWidth = canvas.width;
+      const oldHeight = canvas.height;
       setupCanvas();
       const img = new Image();
       img.onload = () => {
-        ctx.drawImage(img, 0, 0, oldWidth, oldHeight);
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(img, 0, 0, oldWidth, oldHeight, 0, 0, oldWidth / oldDpr * dpr, oldHeight / oldDpr * dpr);
+        ctx.restore();
       };
       img.src = imageData;
     });
