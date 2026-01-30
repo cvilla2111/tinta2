@@ -30,11 +30,10 @@
       height: 100%;
       overflow: hidden;
       font-family: 'IBM Plex Sans', -apple-system, sans-serif;
-      background: #ffffff;
+      background: #fff;
       touch-action: none;
     }
 
-    /* Toolbar */
     .toolbar {
       position: fixed;
       top: 12px;
@@ -76,15 +75,8 @@
       transition: background 0.2s;
     }
 
-    .toolbar-toggle:hover {
-      background: var(--btn-hover);
-    }
-
-    .toolbar-toggle svg {
-      width: 20px;
-      height: 20px;
-      stroke: var(--text-primary);
-    }
+    .toolbar-toggle:hover { background: var(--btn-hover); }
+    .toolbar-toggle svg { width: 20px; height: 20px; stroke: var(--text-primary); }
 
     .divider {
       width: 1px;
@@ -106,27 +98,11 @@
       transition: all 0.15s;
     }
 
-    .tool-btn:hover {
-      background: var(--btn-hover);
-    }
+    .tool-btn:hover { background: var(--btn-hover); }
+    .tool-btn.active { background: var(--btn-active); }
+    .tool-btn.active svg { stroke: #fff; }
+    .tool-btn svg { width: 18px; height: 18px; stroke: var(--text-primary); stroke-width: 2; fill: none; }
 
-    .tool-btn.active {
-      background: var(--btn-active);
-    }
-
-    .tool-btn.active svg {
-      stroke: #ffffff;
-    }
-
-    .tool-btn svg {
-      width: 18px;
-      height: 18px;
-      stroke: var(--text-primary);
-      stroke-width: 2;
-      fill: none;
-    }
-
-    /* Stepper */
     .stepper-group {
       display: flex;
       flex-direction: column;
@@ -165,13 +141,8 @@
       transition: background 0.15s;
     }
 
-    .stepper-btn:hover {
-      background: var(--btn-hover);
-    }
-
-    .stepper-btn:active {
-      background: #d1d5db;
-    }
+    .stepper-btn:hover { background: var(--btn-hover); }
+    .stepper-btn:active { background: #d1d5db; }
 
     .stepper-value {
       min-width: 32px;
@@ -184,11 +155,8 @@
       transition: background 0.15s;
     }
 
-    .stepper-value:hover {
-      background: var(--btn-hover);
-    }
+    .stepper-value:hover { background: var(--btn-hover); }
 
-    /* Color Modal */
     .color-modal-overlay {
       position: fixed;
       inset: 0;
@@ -202,13 +170,10 @@
       transition: opacity 0.2s, visibility 0.2s;
     }
 
-    .color-modal-overlay.visible {
-      opacity: 1;
-      visibility: visible;
-    }
+    .color-modal-overlay.visible { opacity: 1; visibility: visible; }
 
     .color-modal {
-      background: #ffffff;
+      background: #fff;
       border-radius: 16px;
       padding: 20px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
@@ -216,9 +181,7 @@
       transition: transform 0.2s;
     }
 
-    .color-modal-overlay.visible .color-modal {
-      transform: scale(1);
-    }
+    .color-modal-overlay.visible .color-modal { transform: scale(1); }
 
     .color-modal-title {
       font-size: 14px;
@@ -243,16 +206,9 @@
       transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
     }
 
-    .color-modal-btn:hover {
-      transform: scale(1.15);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
+    .color-modal-btn:hover { transform: scale(1.15); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+    .color-modal-btn.selected { border-color: var(--btn-active); }
 
-    .color-modal-btn.selected {
-      border-color: var(--btn-active);
-    }
-
-    /* Canvas */
     .canvas-container {
       width: 100%;
       height: 100%;
@@ -260,17 +216,9 @@
       cursor: crosshair;
     }
 
-    #drawing-svg {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
+    #drawing-svg { width: 100%; height: 100%; display: block; }
+    .stroke-path { stroke: none; }
 
-    .stroke-path {
-      stroke: none;
-    }
-
-    /* Eraser cursor */
     .eraser-cursor {
       position: fixed;
       pointer-events: none;
@@ -281,48 +229,31 @@
       display: none;
     }
 
-    .canvas-container.eraser-mode {
-      cursor: none;
-    }
-
-    .canvas-container.eraser-mode .eraser-cursor {
-      display: block;
-    }
+    .canvas-container.eraser-mode { cursor: none; }
+    .canvas-container.eraser-mode .eraser-cursor { display: block; }
   </style>
 </head>
 <body>
-  <!-- Toolbar Toggle -->
   <button class="toolbar-toggle" id="toolbarToggle" title="Toggle Toolbar">
     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
-      <line x1="4" y1="6" x2="20" y2="6"/>
-      <line x1="4" y1="12" x2="20" y2="12"/>
-      <line x1="4" y1="18" x2="20" y2="18"/>
+      <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
     </svg>
   </button>
 
-  <!-- Toolbar -->
   <div class="toolbar" id="toolbar">
-    <!-- Pen Tool -->
-    <button class="tool-btn active" id="penTool" title="Pen">
+    <button class="tool-btn active" id="penTool" title="Pen (P)">
       <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
-        <path d="M2 2l7.586 7.586"/>
-        <circle cx="11" cy="11" r="2"/>
+        <path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+        <path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>
       </svg>
     </button>
-
-    <!-- Eraser Tool -->
-    <button class="tool-btn" id="eraserTool" title="Eraser">
+    <button class="tool-btn" id="eraserTool" title="Eraser (E)">
       <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
         <path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.5 3a2 2 0 012.8 0L21 7.5a2 2 0 010 2.8L11 20"/>
         <path d="M6.5 13.5L11 9"/>
       </svg>
     </button>
-
     <div class="divider"></div>
-
-    <!-- Stroke Width Stepper -->
     <div class="stepper-group">
       <span class="stepper-label">Size</span>
       <div class="stepper">
@@ -331,39 +262,27 @@
         <button class="stepper-btn" id="sizeUp">+</button>
       </div>
     </div>
-
     <div class="divider"></div>
-
-    <!-- Undo/Redo -->
-    <button class="tool-btn" id="undoBtn" title="Undo">
+    <button class="tool-btn" id="undoBtn" title="Undo (Ctrl+Z)">
       <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 7v6h6"/>
-        <path d="M3 13a9 9 0 1 0 2.5-6.5L3 7"/>
+        <path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 2.5-6.5L3 7"/>
       </svg>
     </button>
-
-    <button class="tool-btn" id="redoBtn" title="Redo">
+    <button class="tool-btn" id="redoBtn" title="Redo (Ctrl+Shift+Z)">
       <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 7v6h-6"/>
-        <path d="M21 13a9 9 0 1 1-2.5-6.5L21 7"/>
+        <path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-2.5-6.5L21 7"/>
       </svg>
     </button>
-
     <div class="divider"></div>
-
-    <!-- Clear -->
     <button class="tool-btn" id="clearBtn" title="Clear Canvas">
       <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 6h18"/>
-        <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+        <path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
         <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-        <line x1="10" y1="11" x2="10" y2="17"/>
-        <line x1="14" y1="11" x2="14" y2="17"/>
+        <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
       </svg>
     </button>
   </div>
 
-  <!-- Color Modal -->
   <div class="color-modal-overlay" id="colorModalOverlay">
     <div class="color-modal">
       <div class="color-modal-title">Choose Color</div>
@@ -371,158 +290,78 @@
     </div>
   </div>
 
-  <!-- Canvas -->
   <div class="canvas-container" id="canvasContainer">
-    <svg id="drawing-svg" xmlns="http://www.w3.org/2000/svg">
-      <g id="strokes-group"></g>
-    </svg>
+    <svg id="drawing-svg" xmlns="http://www.w3.org/2000/svg"><g id="strokes-group"></g></svg>
     <div class="eraser-cursor" id="eraserCursor"></div>
   </div>
 
   <script>
-    // High DPI support
     const dpr = window.devicePixelRatio || 1;
+    const sizes = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32];
+    const colorPalette = ['#1f2937', '#6b7280', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-    // State
     let currentTool = 'pen';
     let strokeWidth = 8;
     let strokeColor = '#1f2937';
+    let sizeIndex = 5;
     let isDrawing = false;
     let currentPath = null;
     let currentPoints = [];
     let strokes = [];
     let undoStack = [];
-    let toolbarVisible = true;
+    let usingEraserEnd = false;
+    let previousTool = 'pen';
 
-    // DOM Elements
-    const svg = document.getElementById('drawing-svg');
-    const strokesGroup = document.getElementById('strokes-group');
-    const canvasContainer = document.getElementById('canvasContainer');
-    const eraserCursor = document.getElementById('eraserCursor');
-    const toolbar = document.getElementById('toolbar');
-    const toolbarToggle = document.getElementById('toolbarToggle');
-    const sizeValue = document.getElementById('sizeValue');
-    const colorModalOverlay = document.getElementById('colorModalOverlay');
-    const colorModalGrid = document.getElementById('colorModalGrid');
+    const $ = id => document.getElementById(id);
+    const svg = $('drawing-svg');
+    const strokesGroup = $('strokes-group');
+    const canvasContainer = $('canvasContainer');
+    const eraserCursor = $('eraserCursor');
+    const toolbar = $('toolbar');
+    const sizeValue = $('sizeValue');
+    const colorModalOverlay = $('colorModalOverlay');
+    const colorModalGrid = $('colorModalGrid');
 
-    // Stroke sizes
-    const sizes = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32];
-    let sizeIndex = 5;
-
-    // Color palette (10 colors)
-    const colorPalette = [
-      '#1f2937', // Black
-      '#6b7280', // Gray
-      '#ef4444', // Red
-      '#f97316', // Orange
-      '#eab308', // Yellow
-      '#22c55e', // Green
-      '#14b8a6', // Teal
-      '#3b82f6', // Blue
-      '#8b5cf6', // Purple
-      '#ec4899'  // Pink
-    ];
-
-    // Update size value color
-    function updateSizeValueColor() {
-      sizeValue.style.color = strokeColor;
-    }
-
-    // Initialize color modal
+    // Color modal
     function initColorModal() {
       colorPalette.forEach(color => {
         const btn = document.createElement('button');
-        btn.className = 'color-modal-btn';
+        btn.className = 'color-modal-btn' + (color === strokeColor ? ' selected' : '');
         btn.style.background = color;
         btn.dataset.color = color;
-        if (color === strokeColor) btn.classList.add('selected');
-        btn.addEventListener('click', () => selectColor(color));
+        btn.onclick = () => selectColor(color);
         colorModalGrid.appendChild(btn);
       });
     }
 
     function selectColor(color) {
       strokeColor = color;
-      updateSizeValueColor();
-      // Update selected state
+      sizeValue.style.color = color;
       colorModalGrid.querySelectorAll('.color-modal-btn').forEach(btn => {
         btn.classList.toggle('selected', btn.dataset.color === color);
       });
-      closeColorModal();
-    }
-
-    function openColorModal() {
-      colorModalOverlay.classList.add('visible');
-    }
-
-    function closeColorModal() {
       colorModalOverlay.classList.remove('visible');
     }
 
-    // Click on size value opens color modal
-    sizeValue.addEventListener('click', openColorModal);
+    sizeValue.onclick = () => colorModalOverlay.classList.add('visible');
+    colorModalOverlay.onclick = e => { if (e.target === colorModalOverlay) colorModalOverlay.classList.remove('visible'); };
 
-    // Click outside modal closes it
-    colorModalOverlay.addEventListener('click', (e) => {
-      if (e.target === colorModalOverlay) {
-        closeColorModal();
-      }
-    });
-
-    // Initialize color modal
-    initColorModal();
-    updateSizeValueColor();
-
-    // Update eraser cursor size
-    function updateEraserCursor() {
-      const size = strokeWidth * 3;
-      eraserCursor.style.width = size + 'px';
-      eraserCursor.style.height = size + 'px';
-    }
-
-    // Toolbar toggle
-    toolbarToggle.addEventListener('click', () => {
-      toolbarVisible = !toolbarVisible;
-      toolbar.classList.toggle('hidden', !toolbarVisible);
-    });
-
-    // Tool selection
-    document.getElementById('penTool').addEventListener('click', () => setTool('pen'));
-    document.getElementById('eraserTool').addEventListener('click', () => setTool('eraser'));
-
+    // Tools
     function setTool(tool) {
       currentTool = tool;
       document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-      document.getElementById(tool + 'Tool').classList.add('active');
+      $(tool + 'Tool').classList.add('active');
       canvasContainer.classList.toggle('eraser-mode', tool === 'eraser');
       updateEraserCursor();
     }
 
-    // Size stepper
-    document.getElementById('sizeDown').addEventListener('click', () => {
-      if (sizeIndex > 0) {
-        sizeIndex--;
-        strokeWidth = sizes[sizeIndex];
-        sizeValue.textContent = strokeWidth;
-        updateEraserCursor();
-      }
-    });
-
-    document.getElementById('sizeUp').addEventListener('click', () => {
-      if (sizeIndex < sizes.length - 1) {
-        sizeIndex++;
-        strokeWidth = sizes[sizeIndex];
-        sizeValue.textContent = strokeWidth;
-        updateEraserCursor();
-      }
-    });
-
-    // Undo/Redo
-    document.getElementById('undoBtn').addEventListener('click', undo);
-    document.getElementById('redoBtn').addEventListener('click', redo);
+    function updateEraserCursor() {
+      const size = strokeWidth * 3;
+      eraserCursor.style.width = eraserCursor.style.height = size + 'px';
+    }
 
     function undo() {
-      if (strokes.length > 0) {
+      if (strokes.length) {
         const stroke = strokes.pop();
         undoStack.push(stroke);
         stroke.element.remove();
@@ -530,149 +369,84 @@
     }
 
     function redo() {
-      if (undoStack.length > 0) {
+      if (undoStack.length) {
         const stroke = undoStack.pop();
         strokesGroup.appendChild(stroke.element);
         strokes.push(stroke);
       }
     }
 
-    // Clear
-    document.getElementById('clearBtn').addEventListener('click', () => {
-      if (strokes.length === 0) return;
-      undoStack.push(...strokes.reverse());
-      strokes = [];
-      strokesGroup.innerHTML = '';
-    });
+    // Drawing
+    function isPenInput(e) { return e.pointerType === 'pen'; }
+    function isEraserEnd(e) { return e.button === 5 || (e.buttons & 32) !== 0; }
 
-    // Get pointer position with pressure
     function getPointerData(e) {
       const rect = svg.getBoundingClientRect();
       return {
         x: (e.clientX - rect.left) * dpr,
         y: (e.clientY - rect.top) * dpr,
-        pressure: e.pressure !== undefined ? e.pressure : 0.5
+        pressure: e.pressure ?? 0.5
       };
     }
 
-    // Build variable-width stroke as filled polygon
     function buildVariableWidthPath(points, baseWidth) {
       if (points.length < 2) {
-        // Single point - draw a circle
-        const p = points[0];
-        const r = (baseWidth * p.pressure * 1.5) / 2;
+        const p = points[0], r = (baseWidth * p.pressure * 1.5) / 2;
         return `M${p.x - r},${p.y}a${r},${r} 0 1,0 ${r * 2},0a${r},${r} 0 1,0 ${-r * 2},0`;
       }
 
-      const leftPoints = [];
-      const rightPoints = [];
-
+      const left = [], right = [];
       for (let i = 0; i < points.length; i++) {
         const p = points[i];
-        const width = (baseWidth * Math.max(0.1, p.pressure) * 1.5) / 2;
-
-        // Calculate perpendicular direction
+        const w = (baseWidth * Math.max(0.1, p.pressure) * 1.5) / 2;
         let dx, dy;
-        if (i === 0) {
-          dx = points[1].x - p.x;
-          dy = points[1].y - p.y;
-        } else if (i === points.length - 1) {
-          dx = p.x - points[i - 1].x;
-          dy = p.y - points[i - 1].y;
-        } else {
-          dx = points[i + 1].x - points[i - 1].x;
-          dy = points[i + 1].y - points[i - 1].y;
-        }
-
+        if (i === 0) { dx = points[1].x - p.x; dy = points[1].y - p.y; }
+        else if (i === points.length - 1) { dx = p.x - points[i - 1].x; dy = p.y - points[i - 1].y; }
+        else { dx = points[i + 1].x - points[i - 1].x; dy = points[i + 1].y - points[i - 1].y; }
         const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        const nx = -dy / len;
-        const ny = dx / len;
-
-        leftPoints.push({ x: p.x + nx * width, y: p.y + ny * width });
-        rightPoints.push({ x: p.x - nx * width, y: p.y - ny * width });
+        const nx = -dy / len, ny = dx / len;
+        left.push({ x: p.x + nx * w, y: p.y + ny * w });
+        right.push({ x: p.x - nx * w, y: p.y - ny * w });
       }
 
-      // Build smooth path using quadratic curves
-      let path = `M${leftPoints[0].x},${leftPoints[0].y}`;
-
-      // Left side (forward)
-      for (let i = 1; i < leftPoints.length; i++) {
-        const prev = leftPoints[i - 1];
-        const curr = leftPoints[i];
-        const midX = (prev.x + curr.x) / 2;
-        const midY = (prev.y + curr.y) / 2;
-        path += `Q${prev.x},${prev.y},${midX},${midY}`;
+      let path = `M${left[0].x},${left[0].y}`;
+      for (let i = 1; i < left.length; i++) {
+        const prev = left[i - 1], curr = left[i];
+        path += `Q${prev.x},${prev.y},${(prev.x + curr.x) / 2},${(prev.y + curr.y) / 2}`;
       }
-      path += `L${leftPoints[leftPoints.length - 1].x},${leftPoints[leftPoints.length - 1].y}`;
+      path += `L${left[left.length - 1].x},${left[left.length - 1].y}`;
 
-      // Round end cap
-      const lastLeft = leftPoints[leftPoints.length - 1];
-      const lastRight = rightPoints[rightPoints.length - 1];
-      const endRadius = Math.sqrt(
-        Math.pow(lastLeft.x - lastRight.x, 2) + Math.pow(lastLeft.y - lastRight.y, 2)
-      ) / 2;
-      path += `A${endRadius},${endRadius} 0 0,1 ${lastRight.x},${lastRight.y}`;
+      const ll = left[left.length - 1], lr = right[right.length - 1];
+      const er = Math.hypot(ll.x - lr.x, ll.y - lr.y) / 2;
+      path += `A${er},${er} 0 0,1 ${lr.x},${lr.y}`;
 
-      // Right side (backward)
-      for (let i = rightPoints.length - 2; i >= 0; i--) {
-        const prev = rightPoints[i + 1];
-        const curr = rightPoints[i];
-        const midX = (prev.x + curr.x) / 2;
-        const midY = (prev.y + curr.y) / 2;
-        path += `Q${prev.x},${prev.y},${midX},${midY}`;
+      for (let i = right.length - 2; i >= 0; i--) {
+        const prev = right[i + 1], curr = right[i];
+        path += `Q${prev.x},${prev.y},${(prev.x + curr.x) / 2},${(prev.y + curr.y) / 2}`;
       }
-      path += `L${rightPoints[0].x},${rightPoints[0].y}`;
+      path += `L${right[0].x},${right[0].y}`;
 
-      // Round start cap
-      const firstLeft = leftPoints[0];
-      const firstRight = rightPoints[0];
-      const startRadius = Math.sqrt(
-        Math.pow(firstLeft.x - firstRight.x, 2) + Math.pow(firstLeft.y - firstRight.y, 2)
-      ) / 2;
-      path += `A${startRadius},${startRadius} 0 0,1 ${firstLeft.x},${firstLeft.y}`;
-
-      path += 'Z';
+      const fl = left[0], fr = right[0];
+      const sr = Math.hypot(fl.x - fr.x, fl.y - fr.y) / 2;
+      path += `A${sr},${sr} 0 0,1 ${fl.x},${fl.y}Z`;
       return path;
     }
 
-    // Check if input is from pen/stylus only
-    function isPenInput(e) {
-      return e.pointerType === 'pen';
-    }
-
-    // Check if using eraser end of stylus (button 5 = eraser)
-    function isEraserEnd(e) {
-      return e.button === 5 || (e.buttons & 32) !== 0;
-    }
-
-    // Track if currently using eraser end
-    let usingEraserEnd = false;
-    let previousTool = 'pen';
-
-    // Drawing handlers
     function startDrawing(e) {
       if (!isPenInput(e)) return;
-
-      // Check for eraser end of stylus
       if (isEraserEnd(e)) {
         usingEraserEnd = true;
         previousTool = currentTool;
-        if (currentTool !== 'eraser') {
-          setTool('eraser');
-        }
+        if (currentTool !== 'eraser') setTool('eraser');
       } else {
         if (e.button && e.button !== 0) return;
         usingEraserEnd = false;
       }
-
       e.preventDefault();
       isDrawing = true;
       currentPoints = [];
       undoStack = [];
-
-      const data = getPointerData(e);
-      currentPoints.push(data);
-
+      currentPoints.push(getPointerData(e));
       if (currentTool === 'pen') {
         currentPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         currentPath.classList.add('stroke-path');
@@ -683,27 +457,18 @@
     }
 
     function draw(e) {
-      if (!isPenInput(e)) return;
-      if (!isDrawing) return;
+      if (!isPenInput(e) || !isDrawing) return;
       e.preventDefault();
-
       const data = getPointerData(e);
-
       if (currentTool === 'eraser') {
         eraserCursor.style.left = e.clientX + 'px';
         eraserCursor.style.top = e.clientY + 'px';
         eraseAt(data.x, data.y);
         return;
       }
-
-      // Only add point if moved enough (reduces jitter)
-      const lastPoint = currentPoints[currentPoints.length - 1];
-      const dist = Math.hypot(data.x - lastPoint.x, data.y - lastPoint.y);
-      if (dist < 2) return;
-
+      const last = currentPoints[currentPoints.length - 1];
+      if (Math.hypot(data.x - last.x, data.y - last.y) < 2) return;
       currentPoints.push(data);
-
-      // Update path with variable width based on pressure at each point
       currentPath.setAttribute('d', buildVariableWidthPath(currentPoints, strokeWidth));
     }
 
@@ -711,46 +476,25 @@
       if (e && !isPenInput(e)) return;
       if (!isDrawing) return;
       isDrawing = false;
-
       if (currentTool === 'pen' && currentPath) {
-        strokes.push({
-          element: currentPath,
-          points: [...currentPoints],
-          color: strokeColor,
-          width: strokeWidth
-        });
+        strokes.push({ element: currentPath, points: [...currentPoints], color: strokeColor, width: strokeWidth });
         currentPath = null;
       }
       currentPoints = [];
-
-      // Restore previous tool if was using eraser end
       if (usingEraserEnd) {
         usingEraserEnd = false;
-        if (previousTool !== 'eraser') {
-          setTool(previousTool);
-        }
+        if (previousTool !== 'eraser') setTool(previousTool);
       }
     }
 
-    // Eraser function
     function eraseAt(x, y) {
-      const eraserRadius = strokeWidth * 3 / 2;
-
+      const r = strokeWidth * 1.5;
       for (let i = strokes.length - 1; i >= 0; i--) {
-        const stroke = strokes[i];
-        const bbox = stroke.element.getBBox();
-
-        // Quick bounding box check
-        if (x < bbox.x - eraserRadius || x > bbox.x + bbox.width + eraserRadius ||
-            y < bbox.y - eraserRadius || y > bbox.y + bbox.height + eraserRadius) {
-          continue;
-        }
-
-        // Point-by-point check
-        for (const point of stroke.points) {
-          const dist = Math.hypot(x - point.x, y - point.y);
-          if (dist < eraserRadius + stroke.width) {
-            stroke.element.remove();
+        const s = strokes[i], bb = s.element.getBBox();
+        if (x < bb.x - r || x > bb.x + bb.width + r || y < bb.y - r || y > bb.y + bb.height + r) continue;
+        for (const p of s.points) {
+          if (Math.hypot(x - p.x, y - p.y) < r + s.width) {
+            s.element.remove();
             undoStack.push(strokes.splice(i, 1)[0]);
             break;
           }
@@ -758,56 +502,44 @@
       }
     }
 
-    // Update eraser cursor position when moving (pen only)
-    canvasContainer.addEventListener('pointermove', (e) => {
-      if (!isPenInput(e)) return;
-      if (currentTool === 'eraser') {
-        eraserCursor.style.left = e.clientX + 'px';
-        eraserCursor.style.top = e.clientY + 'px';
-      }
-    });
-
-    // Event listeners with pointer events for stylus support
-    canvasContainer.addEventListener('pointerdown', startDrawing);
-    canvasContainer.addEventListener('pointermove', draw);
-    canvasContainer.addEventListener('pointerup', stopDrawing);
-    canvasContainer.addEventListener('pointerleave', stopDrawing);
-    canvasContainer.addEventListener('pointercancel', stopDrawing);
-
-    // Prevent context menu on long press
-    canvasContainer.addEventListener('contextmenu', e => e.preventDefault());
-
-    // Disable touch and hold (long press) behavior
-    canvasContainer.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
-    canvasContainer.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
-    canvasContainer.addEventListener('touchend', e => e.preventDefault(), { passive: false });
-
-    // Handle window resize
     function resizeSVG() {
       const rect = canvasContainer.getBoundingClientRect();
       svg.setAttribute('viewBox', `0 0 ${rect.width * dpr} ${rect.height * dpr}`);
     }
 
-    window.addEventListener('resize', resizeSVG);
-    resizeSVG();
+    // Event listeners
+    $('toolbarToggle').onclick = () => toolbar.classList.toggle('hidden');
+    $('penTool').onclick = () => setTool('pen');
+    $('eraserTool').onclick = () => setTool('eraser');
+    $('sizeDown').onclick = () => { if (sizeIndex > 0) { strokeWidth = sizes[--sizeIndex]; sizeValue.textContent = strokeWidth; updateEraserCursor(); } };
+    $('sizeUp').onclick = () => { if (sizeIndex < sizes.length - 1) { strokeWidth = sizes[++sizeIndex]; sizeValue.textContent = strokeWidth; updateEraserCursor(); } };
+    $('undoBtn').onclick = undo;
+    $('redoBtn').onclick = redo;
+    $('clearBtn').onclick = () => { if (strokes.length) { undoStack.push(...strokes.reverse()); strokes = []; strokesGroup.innerHTML = ''; } };
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'z') {
-          e.preventDefault();
-          if (e.shiftKey) redo();
-          else undo();
-        }
-      }
+    canvasContainer.addEventListener('pointerdown', startDrawing);
+    canvasContainer.addEventListener('pointermove', draw);
+    canvasContainer.addEventListener('pointermove', e => { if (isPenInput(e) && currentTool === 'eraser') { eraserCursor.style.left = e.clientX + 'px'; eraserCursor.style.top = e.clientY + 'px'; } });
+    canvasContainer.addEventListener('pointerup', stopDrawing);
+    canvasContainer.addEventListener('pointerleave', stopDrawing);
+    canvasContainer.addEventListener('pointercancel', stopDrawing);
+    canvasContainer.addEventListener('contextmenu', e => e.preventDefault());
+    ['touchstart', 'touchmove', 'touchend'].forEach(ev => canvasContainer.addEventListener(ev, e => e.preventDefault(), { passive: false }));
+    window.addEventListener('resize', resizeSVG);
+
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
       if (e.key === 'p' || e.key === 'P') setTool('pen');
       if (e.key === 'e' || e.key === 'E') setTool('eraser');
-      if (e.key === '[') document.getElementById('sizeDown').click();
-      if (e.key === ']') document.getElementById('sizeUp').click();
+      if (e.key === '[') $('sizeDown').click();
+      if (e.key === ']') $('sizeUp').click();
     });
 
-    // Initial setup
+    // Init
+    initColorModal();
+    sizeValue.style.color = strokeColor;
     updateEraserCursor();
+    resizeSVG();
   </script>
 </body>
 </html>
