@@ -51,8 +51,9 @@
     .canvas-container.eraser-mode .eraser-cursor { display: block; }
 
     /* PDF Controls */
-    .pdf-toolbar { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+    .pdf-toolbar { position: fixed; top: 12px; right: 60px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s, transform 0.3s; }
     .pdf-toolbar.visible { opacity: 1; visibility: visible; }
+    .pdf-toolbar.hidden { opacity: 0; transform: translateY(-100%); pointer-events: none; }
     .pdf-nav-btn { width: 36px; height: 36px; border: none; background: var(--btn); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
     .pdf-nav-btn:hover:not(:disabled) { background: var(--btn-hover); }
     .pdf-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -545,7 +546,10 @@
     };
 
     // Event listeners
-    $('toolbarToggle').onclick = () => $('toolbar').classList.toggle('hidden');
+    $('toolbarToggle').onclick = () => {
+      $('toolbar').classList.toggle('hidden');
+      if (pdfDoc) $('pdfToolbar').classList.toggle('hidden');
+    };
     $('penTool').onclick = () => setTool('pen');
     $('eraserTool').onclick = () => setTool('eraser');
     $('sizeDown').onclick = () => { if (sizeIdx > 0) { width = sizes[--sizeIdx]; sizeVal.textContent = width; updateCursor(); } };
