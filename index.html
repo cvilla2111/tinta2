@@ -258,7 +258,7 @@
       <span class="stepper-label">Size</span>
       <div class="stepper">
         <button class="stepper-btn" id="sizeDown">−</button>
-        <span class="stepper-value" id="sizeValue">8</span>
+        <span class="stepper-value" id="sizeValue">5</span>
         <button class="stepper-btn" id="sizeUp">+</button>
       </div>
     </div>
@@ -304,13 +304,14 @@
 
   <script>
     const dpr = window.devicePixelRatio || 1;
-    const sizes = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32];
+    const sizes = [];
+    for (let i = 0.5; i <= 32; i += 0.5) sizes.push(i);
     const colorPalette = ['#1f2937', '#6b7280', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899'];
 
     let currentTool = 'pen';
-    let strokeWidth = 8;
+    let strokeWidth = 5;
     let strokeColor = '#1f2937';
-    let sizeIndex = 5;
+    let sizeIndex = 9;
     let isDrawing = false;
     let currentPath = null;
     let currentPoints = [];
