@@ -40,7 +40,7 @@
     .color-modal-btn.selected { border-color: var(--active); }
     .canvas-container { width: 100%; height: 100%; overflow: hidden; cursor: crosshair; position: relative; }
     #pdf-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-    #drawing-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; }
+    #drawing-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; overflow: visible; }
     .stroke-path { stroke: none; }
     .eraser-cursor { position: fixed; pointer-events: none; border: 1px solid #666; border-radius: 50%; transform: translate(-50%, -50%); z-index: 999; display: none; }
     .eraser-cursor.big-eraser { border-color: #ef4444; border-width: 1.5px; }
@@ -171,6 +171,10 @@
     let pdfDoc = null, currentPage = 1, totalPages = 0;
     let pageAnnotations = {}; // Store annotations per page: { pageNum: { strokes: [], undoStack: [] } }
 
+    // PDF coordinate system - used for fixed coordinate mapping
+    let pdfPageWidth = 0, pdfPageHeight = 0;  // Native PDF page dimensions
+    let pdfScale = 1, pdfOffsetX = 0, pdfOffsetY = 0;  // Current transform for screen-to-PDF conversion
+
     const $ = id => document.getElementById(id);
     const svg = $('drawing-svg'), group = $('strokes-group'), container = $('canvasContainer');
     const cursor = $('eraserCursor'), sizeVal = $('sizeValue');
@@ -277,9 +281,21 @@
 
     const isPen = e => e.pointerType === 'pen';
     const isEraser = e => e.button === 5 || (e.buttons & 32) !== 0;
+
+    // Convert screen coordinates to SVG/PDF-space coordinates
     const getData = e => {
       const r = svg.getBoundingClientRect();
-      return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr, pressure: e.pressure ?? 0.5 };
+
+      if (pdfDoc && pdfPageWidth > 0) {
+        // When PDF is loaded, SVG is sized to match PDF page
+        // Convert screen coords to PDF page coords using the viewBox
+        const x = ((e.clientX - r.left) / r.width) * pdfPageWidth;
+        const y = ((e.clientY - r.top) / r.height) * pdfPageHeight;
+        return { x, y, pressure: e.pressure ?? 0.5 };
+      } else {
+        // No PDF loaded, use screen coordinates with dpr
+        return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr, pressure: e.pressure ?? 0.5 };
+      }
     };
 
     function buildPath(pts, w) {
@@ -385,7 +401,9 @@
     }
 
     function erase(x, y) {
-      const r = width * 1.5 * (bigEraser ? BIG_ERASER_MULT : 1) * dpr;
+      // Eraser radius - no dpr scaling needed when in PDF coordinate space
+      const scaleFactor = (pdfDoc && pdfPageWidth > 0) ? 1 : dpr;
+      const r = width * 1.5 * (bigEraser ? BIG_ERASER_MULT : 1) * scaleFactor;
       let erased = false;
       for (let i = strokes.length - 1; i >= 0; i--) {
         const s = strokes[i], b = s.element.getBBox();
@@ -409,13 +427,17 @@
       const page = await pdfDoc.getPage(pageNum);
       const containerRect = container.getBoundingClientRect();
 
-      // Calculate scale to fit page in container
+      // Get native PDF page dimensions
       const viewport = page.getViewport({ scale: 1 });
+      pdfPageWidth = viewport.width;
+      pdfPageHeight = viewport.height;
+
+      // Calculate scale to fit page in container
       const scaleX = (containerRect.width * dpr) / viewport.width;
       const scaleY = (containerRect.height * dpr) / viewport.height;
-      const scale = Math.min(scaleX, scaleY) * 0.95; // 95% to add some padding
+      pdfScale = Math.min(scaleX, scaleY) * 0.95; // 95% to add some padding
 
-      const scaledViewport = page.getViewport({ scale });
+      const scaledViewport = page.getViewport({ scale: pdfScale });
 
       // Set canvas size
       pdfCanvas.width = containerRect.width * dpr;
@@ -423,16 +445,16 @@
       pdfCanvas.style.width = containerRect.width + 'px';
       pdfCanvas.style.height = containerRect.height + 'px';
 
-      // Center the page
-      const offsetX = (pdfCanvas.width - scaledViewport.width) / 2;
-      const offsetY = (pdfCanvas.height - scaledViewport.height) / 2;
+      // Center the page - store offsets for coordinate conversion
+      pdfOffsetX = (pdfCanvas.width - scaledViewport.width) / 2;
+      pdfOffsetY = (pdfCanvas.height - scaledViewport.height) / 2;
 
       // Clear and render
       pdfCtx.fillStyle = '#e5e7eb';
       pdfCtx.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
 
       pdfCtx.save();
-      pdfCtx.translate(offsetX, offsetY);
+      pdfCtx.translate(pdfOffsetX, pdfOffsetY);
 
       await page.render({
         canvasContext: pdfCtx,
@@ -440,6 +462,20 @@
       }).promise;
 
       pdfCtx.restore();
+
+      // Set SVG viewBox to PDF page dimensions so strokes align with PDF content
+      svg.setAttribute('viewBox', `0 0 ${pdfPageWidth} ${pdfPageHeight}`);
+
+      // Position and size the SVG to exactly overlay the PDF page
+      const svgLeft = pdfOffsetX / dpr;
+      const svgTop = pdfOffsetY / dpr;
+      const svgWidth = scaledViewport.width / dpr;
+      const svgHeight = scaledViewport.height / dpr;
+
+      svg.style.left = svgLeft + 'px';
+      svg.style.top = svgTop + 'px';
+      svg.style.width = svgWidth + 'px';
+      svg.style.height = svgHeight + 'px';
 
       // Update page info
       pageInfo.textContent = `${pageNum} / ${totalPages}`;
@@ -479,11 +515,21 @@
       currentPage = 1;
       totalPages = 0;
       pageAnnotations = {};
+      pdfPageWidth = 0;
+      pdfPageHeight = 0;
 
       pdfCtx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
       group.innerHTML = '';
       strokes = [];
       undoStack = [];
+
+      // Reset SVG to full container size
+      svg.style.left = '0';
+      svg.style.top = '0';
+      svg.style.width = '100%';
+      svg.style.height = '100%';
+      const r = container.getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${r.width * dpr} ${r.height * dpr}`);
 
       container.classList.add('no-pdf');
       pdfToolbar.classList.remove('visible');
@@ -500,8 +546,13 @@
 
     const resize = () => {
       const r = container.getBoundingClientRect();
-      svg.setAttribute('viewBox', `0 0 ${r.width*dpr} ${r.height*dpr}`);
-      if (pdfDoc) renderPage(currentPage);
+      if (pdfDoc) {
+        // Re-render PDF page - this will also update SVG positioning
+        renderPage(currentPage);
+      } else {
+        // No PDF - SVG fills container
+        svg.setAttribute('viewBox', `0 0 ${r.width * dpr} ${r.height * dpr}`);
+      }
     };
 
     // Event listeners
