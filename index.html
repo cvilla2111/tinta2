@@ -39,8 +39,11 @@
     .color-modal-btn:hover { transform: scale(1.15); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     .color-modal-btn.selected { border-color: var(--active); }
     .canvas-container { width: 100%; height: 100%; overflow: hidden; cursor: crosshair; position: relative; }
-    #pdf-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-    #drawing-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+    .canvas-container.pdf-mode { overflow-y: auto; overflow-x: hidden; }
+    #pdf-canvas { display: block; pointer-events: none; }
+    #drawing-svg { position: absolute; top: 0; left: 0; display: block; overflow: visible; }
+    .canvas-container:not(.pdf-mode) #pdf-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    .canvas-container:not(.pdf-mode) #drawing-svg { width: 100%; height: 100%; }
     .stroke-path { stroke: none; }
     .eraser-cursor { position: fixed; pointer-events: none; border: 1px solid #666; border-radius: 50%; transform: translate(-50%, -50%); z-index: 999; display: none; }
     .eraser-cursor.big-eraser { border-color: #ef4444; border-width: 1.5px; }
@@ -173,7 +176,6 @@
 
     // PDF coordinate system - used for fixed coordinate mapping
     let pdfPageWidth = 0, pdfPageHeight = 0;  // Native PDF page dimensions
-    let pdfScale = 1, pdfOffsetX = 0, pdfOffsetY = 0;  // Current transform for screen-to-PDF conversion
 
     const $ = id => document.getElementById(id);
     const svg = $('drawing-svg'), group = $('strokes-group'), container = $('canvasContainer');
@@ -432,50 +434,34 @@
       pdfPageWidth = viewport.width;
       pdfPageHeight = viewport.height;
 
-      // Calculate scale to fit page in container
-      const scaleX = (containerRect.width * dpr) / viewport.width;
-      const scaleY = (containerRect.height * dpr) / viewport.height;
-      pdfScale = Math.min(scaleX, scaleY) * 0.95; // 95% to add some padding
+      // Calculate scale to fit WIDTH (fill horizontal space, scroll vertically if needed)
+      const pdfScale = (containerRect.width * dpr) / viewport.width;
 
       const scaledViewport = page.getViewport({ scale: pdfScale });
 
-      // Set canvas size
-      pdfCanvas.width = containerRect.width * dpr;
-      pdfCanvas.height = containerRect.height * dpr;
+      // Set canvas size to fit the scaled page exactly
+      pdfCanvas.width = scaledViewport.width;
+      pdfCanvas.height = scaledViewport.height;
       pdfCanvas.style.width = containerRect.width + 'px';
-      pdfCanvas.style.height = containerRect.height + 'px';
+      pdfCanvas.style.height = (scaledViewport.height / dpr) + 'px';
 
-      // Center the page - store offsets for coordinate conversion
-      pdfOffsetX = (pdfCanvas.width - scaledViewport.width) / 2;
-      pdfOffsetY = (pdfCanvas.height - scaledViewport.height) / 2;
-
-      // Clear and render
-      pdfCtx.fillStyle = '#e5e7eb';
+      // Clear and render (no offset needed - page fills width)
+      pdfCtx.fillStyle = '#fff';
       pdfCtx.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
-
-      pdfCtx.save();
-      pdfCtx.translate(pdfOffsetX, pdfOffsetY);
 
       await page.render({
         canvasContext: pdfCtx,
         viewport: scaledViewport
       }).promise;
 
-      pdfCtx.restore();
-
       // Set SVG viewBox to PDF page dimensions so strokes align with PDF content
       svg.setAttribute('viewBox', `0 0 ${pdfPageWidth} ${pdfPageHeight}`);
 
       // Position and size the SVG to exactly overlay the PDF page
-      const svgLeft = pdfOffsetX / dpr;
-      const svgTop = pdfOffsetY / dpr;
-      const svgWidth = scaledViewport.width / dpr;
-      const svgHeight = scaledViewport.height / dpr;
-
-      svg.style.left = svgLeft + 'px';
-      svg.style.top = svgTop + 'px';
-      svg.style.width = svgWidth + 'px';
-      svg.style.height = svgHeight + 'px';
+      svg.style.left = '0';
+      svg.style.top = '0';
+      svg.style.width = containerRect.width + 'px';
+      svg.style.height = (scaledViewport.height / dpr) + 'px';
 
       // Update page info
       pageInfo.textContent = `${pageNum} / ${totalPages}`;
@@ -499,6 +485,7 @@
         undoStack = [];
 
         container.classList.remove('no-pdf');
+        container.classList.add('pdf-mode');
         pdfToolbar.classList.add('visible');
 
         await renderPage(1);
@@ -531,6 +518,7 @@
       const r = container.getBoundingClientRect();
       svg.setAttribute('viewBox', `0 0 ${r.width * dpr} ${r.height * dpr}`);
 
+      container.classList.remove('pdf-mode');
       container.classList.add('no-pdf');
       pdfToolbar.classList.remove('visible');
     }
@@ -542,6 +530,7 @@
       currentPage = pageNum;
       await renderPage(pageNum);
       loadPageAnnotations();
+      container.scrollTop = 0; // Scroll to top of new page
     }
 
     const resize = () => {
