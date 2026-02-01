@@ -646,7 +646,43 @@
     container.addEventListener('pointerleave', stop);
     container.addEventListener('pointercancel', stop);
     container.addEventListener('contextmenu', e => e.preventDefault());
-    ['touchstart','touchmove','touchend'].forEach(ev => container.addEventListener(ev, e => e.preventDefault(), { passive: false }));
+
+    // Two-finger swipe for PDF page navigation
+    let touchStartX = 0;
+    let isTwoFingerTouch = false;
+
+    container.addEventListener('touchstart', e => {
+      if (e.touches.length === 2 && pdfDoc) {
+        isTwoFingerTouch = true;
+        touchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        e.preventDefault();
+      } else {
+        isTwoFingerTouch = false;
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', e => {
+      e.preventDefault();
+    }, { passive: false });
+
+    container.addEventListener('touchend', e => {
+      if (isTwoFingerTouch && pdfDoc) {
+        const touchEndX = e.changedTouches[0].clientX;
+        const deltaX = touchEndX - touchStartX;
+        const swipeThreshold = 50;
+
+        if (Math.abs(deltaX) > swipeThreshold) {
+          if (deltaX > 0) {
+            goToPage(currentPage - 1); // Swipe right = previous page
+          } else {
+            goToPage(currentPage + 1); // Swipe left = next page
+          }
+        }
+        isTwoFingerTouch = false;
+      }
+    }, { passive: false });
+
     window.addEventListener('resize', resize);
 
     document.addEventListener('keydown', e => {
