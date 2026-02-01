@@ -40,7 +40,11 @@
     .color-modal-btn:hover { transform: scale(1.15); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     .color-modal-btn.selected { border-color: var(--active); }
     .canvas-container { width: 100%; height: 100%; overflow: hidden; cursor: crosshair; position: relative; }
-    .canvas-container.pdf-mode { overflow-y: auto; overflow-x: hidden; background: #d1d5db; display: flex; flex-direction: column; align-items: center; }
+    .canvas-container.pdf-mode { overflow-y: auto; overflow-x: hidden; background: #d1d5db; display: flex; flex-direction: column; align-items: center; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.2) transparent; }
+    .canvas-container.pdf-mode::-webkit-scrollbar { width: 6px; }
+    .canvas-container.pdf-mode::-webkit-scrollbar-track { background: transparent; }
+    .canvas-container.pdf-mode::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
+    .canvas-container.pdf-mode::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
     .canvas-container.pdf-mode::before { content: ''; flex: 1; min-height: 0; }
     .canvas-container.pdf-mode::after { content: ''; flex: 1; min-height: 0; }
     .pdf-page-container { position: relative; flex-shrink: 0; }
@@ -66,20 +70,6 @@
     .pdf-close-btn { background: #ef4444; }
     .pdf-close-btn:hover { background: #dc2626; }
     .pdf-close-btn svg { stroke: #fff; }
-
-    /* Upload overlay */
-    .upload-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 3000; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
-    .upload-overlay.visible { opacity: 1; visibility: visible; }
-    .upload-modal { background: var(--bg); border-radius: 20px; padding: 32px; box-shadow: 0 12px 48px rgba(0,0,0,0.2); text-align: center; max-width: 360px; width: 90%; transform: scale(0.9); transition: transform 0.3s; }
-    .upload-overlay.visible .upload-modal { transform: scale(1); }
-    .upload-icon { width: 64px; height: 64px; margin: 0 auto 16px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); border-radius: 16px; display: flex; align-items: center; justify-content: center; }
-    .upload-icon svg { width: 32px; height: 32px; stroke: #fff; stroke-width: 2; fill: none; }
-    .upload-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
-    .upload-desc { font-size: 14px; color: var(--text2); margin-bottom: 24px; }
-    .upload-btn { width: 100%; padding: 14px 24px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); border: none; border-radius: 12px; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
-    .upload-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(59,130,246,0.4); }
-    .upload-cancel { margin-top: 12px; padding: 10px; background: none; border: none; color: var(--text2); font-size: 14px; cursor: pointer; transition: color 0.15s; }
-    .upload-cancel:hover { color: var(--text); }
 
     /* Loading state */
     .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 4000; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
@@ -145,18 +135,6 @@
     </div>
   </div>
 
-  <div class="upload-overlay" id="uploadOverlay">
-    <div class="upload-modal">
-      <div class="upload-icon">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
-      </div>
-      <div class="upload-title">Open PDF Document</div>
-      <div class="upload-desc">Select a PDF file to annotate with your drawings</div>
-      <button class="upload-btn" id="selectPdfBtn">Choose PDF File</button>
-      <button class="upload-cancel" id="uploadCancel">Cancel</button>
-    </div>
-  </div>
-
   <div class="loading-overlay" id="loadingOverlay">
     <div class="loading-spinner"></div>
   </div>
@@ -209,7 +187,7 @@
     const cursor = $('eraserCursor'), sizeVal = $('sizeValue');
     const modal = $('colorModalOverlay'), grid = $('colorModalGrid');
     const pdfCanvas = $('pdf-canvas'), pdfCtx = pdfCanvas.getContext('2d');
-    const uploadOverlay = $('uploadOverlay'), loadingOverlay = $('loadingOverlay');
+    const loadingOverlay = $('loadingOverlay');
     const toolbar = $('toolbar'), pageInfo = $('pageInfo');
     const pdfInput = $('pdfInput');
     const pdfControls = $('pdfControls'), pdfDivider = $('pdfDivider');
@@ -647,15 +625,11 @@
     };
 
     // PDF controls
-    $('pdfBtn').onclick = () => uploadOverlay.classList.add('visible');
-    $('selectPdfBtn').onclick = () => pdfInput.click();
-    $('uploadCancel').onclick = () => uploadOverlay.classList.remove('visible');
-    uploadOverlay.onclick = e => { if (e.target === uploadOverlay) uploadOverlay.classList.remove('visible'); };
+    $('pdfBtn').onclick = () => pdfInput.click();
 
     pdfInput.onchange = async e => {
       const file = e.target.files[0];
       if (file) {
-        uploadOverlay.classList.remove('visible');
         await loadPDF(file);
       }
       pdfInput.value = '';
