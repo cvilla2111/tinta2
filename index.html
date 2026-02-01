@@ -453,19 +453,21 @@
 
       const page = await pdfDoc.getPage(pageNum);
       const containerRect = container.getBoundingClientRect();
+      const horizontalMargin = 20; // 10px left + 10px right
 
       // Get native PDF page dimensions
       const viewport = page.getViewport({ scale: 1 });
       pdfPageWidth = viewport.width;
       pdfPageHeight = viewport.height;
 
-      // Calculate scale to fit WIDTH (fill horizontal space, scroll vertically if needed)
-      const pdfScale = (containerRect.width * dpr) / viewport.width;
+      // Calculate scale to fit WIDTH with margins
+      const availableWidth = containerRect.width - horizontalMargin;
+      const pdfScale = (availableWidth * dpr) / viewport.width;
 
       const scaledViewport = page.getViewport({ scale: pdfScale });
 
       // Set canvas size to fit the scaled page exactly
-      const displayWidth = containerRect.width;
+      const displayWidth = availableWidth;
       const displayHeight = scaledViewport.height / dpr;
 
       pdfCanvas.width = scaledViewport.width;
