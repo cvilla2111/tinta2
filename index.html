@@ -649,12 +649,14 @@
 
     // Two-finger swipe for PDF page navigation
     let touchStartX = 0;
+    let touchStartY = 0;
     let isTwoFingerTouch = false;
 
     container.addEventListener('touchstart', e => {
       if (e.touches.length === 2 && pdfDoc) {
         isTwoFingerTouch = true;
         touchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        touchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         e.preventDefault();
       } else {
         isTwoFingerTouch = false;
@@ -669,10 +671,16 @@
     container.addEventListener('touchend', e => {
       if (isTwoFingerTouch && pdfDoc) {
         const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
         const deltaX = touchEndX - touchStartX;
-        const swipeThreshold = 50;
+        const deltaY = touchEndY - touchStartY;
+        const swipeThreshold = 80; // Minimum horizontal distance
+        const verticalTolerance = 0.5; // Allow up to 50% vertical vs horizontal
 
-        if (Math.abs(deltaX) > swipeThreshold) {
+        // Check if swipe is primarily horizontal
+        const isHorizontal = Math.abs(deltaY) < Math.abs(deltaX) * verticalTolerance;
+
+        if (Math.abs(deltaX) > swipeThreshold && isHorizontal) {
           if (deltaX > 0) {
             goToPage(currentPage - 1); // Swipe right = previous page
           } else {
