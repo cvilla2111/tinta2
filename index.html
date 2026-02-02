@@ -54,6 +54,12 @@
     .canvas-container:not(.pdf-mode) #pdf-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
     .canvas-container:not(.pdf-mode) #drawing-svg { width: 100%; height: 100%; }
     .stroke-path { stroke: none; }
+    .lasso-path { fill: none; stroke: var(--active); stroke-width: 2.5; stroke-dasharray: 6 4; }
+    .selection-box { fill: none; stroke: var(--active); stroke-width: 2; stroke-dasharray: 5 3; }
+    .selection-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: nwse-resize; }
+    .rotation-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: grab; }
+    .rotation-line { stroke: var(--active); stroke-width: 1.5; }
+    .canvas-container.lasso-mode { cursor: crosshair; }
     .eraser-cursor { position: fixed; pointer-events: none; border: 1px solid #666; border-radius: 50%; transform: translate(-50%, -50%); z-index: 999; display: none; }
     .eraser-cursor.big-eraser { border-color: #ef4444; border-width: 1.5px; }
     .canvas-container.eraser-mode { cursor: none; }
@@ -102,6 +108,7 @@
     <div class="divider"></div>
     <button class="tool-btn active" id="penTool" title="Pen (P)"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></button>
     <button class="tool-btn" id="eraserTool" title="Eraser (E)"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.5 3a2 2 0 012.8 0L21 7.5a2 2 0 010 2.8L11 20"/><path d="M6.5 13.5L11 9"/></svg></button>
+    <button class="tool-btn" id="lassoTool" title="Lasso Select (L)"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.5 2 2 6.5 2 12c0 3.5 1.8 6.5 4.5 8.3"/><path d="M12 2c5.5 0 10 4.5 10 10 0 2.5-.9 4.8-2.4 6.5"/><path d="M8.5 21.5c1.1.3 2.3.5 3.5.5"/><circle cx="12" cy="19" r="2"/><path d="M12 21v2"/></svg></button>
     <div class="divider"></div>
     <div class="stepper"><button class="stepper-btn" id="sizeDown">−</button><span class="stepper-value" id="sizeValue">5.5</span><button class="stepper-btn" id="sizeUp">+</button></div>
     <div class="divider"></div>
@@ -159,7 +166,7 @@
 
     let tool = 'pen', width = 5.5, color = '#1f2937', sizeIdx = 10, drawing = false, path = null, points = [];
     let strokes = [], undoStack = [];
-    let eraserEnd = false, prevTool = 'pen', pressure = true, bigEraser = false, tapTimes = [], segLen = 0;
+    let eraserEnd = false, lassoEnd = false, prevTool = 'pen', pressure = true, bigEraser = false, tapTimes = [], segLen = 0;
 
     // PDF state
     let pdfDoc = null, currentPage = 1, totalPages = 0;
@@ -181,6 +188,28 @@
     // Toolbar visibility state
     let toolbarVisible = false;
     let hideToolbarTimeout = null;
+
+    // Lasso state
+    let lassoPath = null;
+    let lassoPoints = [];
+    let selectedStrokes = [];
+    let selectionBoxes = [];
+    let selectionHandles = [];
+    let rotationHandle = null;
+    let rotationLine = null;
+    let isDraggingSelection = false;
+    let isScalingSelection = false;
+    let isRotatingSelection = false;
+    let activeHandle = null; // 'tl', 'tr', 'bl', 'br' for corners
+    let dragStartX = 0, dragStartY = 0;
+    let selectionBounds = null;
+    let originalBounds = null;
+    let originalStrokePoints = [];
+    let rotationCenterX = 0, rotationCenterY = 0;
+    let startAngle = 0;
+    let currentRotation = 0;
+    let previousRotation = 0; // Accumulated rotation from previous operations
+    let scaleAnchorWorldX = 0, scaleAnchorWorldY = 0; // World-space anchor for scaling
 
     const $ = id => document.getElementById(id);
     const svg = $('drawing-svg'), group = $('strokes-group'), container = $('canvasContainer');
@@ -229,11 +258,14 @@
     sizeVal.onclick = () => modal.classList.add('visible');
     modal.onclick = e => { if (e.target === modal) modal.classList.remove('visible'); };
 
-    const setTool = t => {
+    const setTool = (t, preserveSelection = false) => {
       tool = t;
       $('penTool').classList.toggle('active', t === 'pen');
       $('eraserTool').classList.toggle('active', t === 'eraser');
+      $('lassoTool').classList.toggle('active', t === 'lasso');
       container.classList.toggle('eraser-mode', t === 'eraser');
+      container.classList.toggle('lasso-mode', t === 'lasso');
+      if (t !== 'lasso' && !preserveSelection) clearSelection();
       updateCursor();
     };
 
@@ -252,6 +284,365 @@
     };
 
     const resetBig = () => { if (bigEraser) { bigEraser = false; tapTimes = []; updateCursor(); } };
+
+    // Lasso functions
+    const clearSelection = () => {
+      selectedStrokes = [];
+      selectionBoxes.forEach(box => box.remove());
+      selectionBoxes = [];
+      selectionHandles.forEach(h => h.remove());
+      selectionHandles = [];
+      if (rotationHandle) { rotationHandle.remove(); rotationHandle = null; }
+      if (rotationLine) { rotationLine.remove(); rotationLine = null; }
+      if (lassoPath) { lassoPath.remove(); lassoPath = null; }
+      lassoPoints = [];
+      selectionBounds = null;
+      originalBounds = null;
+      originalStrokePoints = [];
+      currentRotation = 0;
+      previousRotation = 0;
+    };
+
+    const pointInPolygon = (x, y, polygon) => {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].x, yi = polygon[i].y;
+        const xj = polygon[j].x, yj = polygon[j].y;
+        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    };
+
+    const createSelectionHandles = () => {
+      selectionHandles.forEach(h => h.remove());
+      selectionHandles = [];
+      if (rotationHandle) { rotationHandle.remove(); rotationHandle = null; }
+      if (rotationLine) { rotationLine.remove(); rotationLine = null; }
+      if (!selectionBounds) return;
+
+      const handleSize = 40;
+      const rotationOffset = 50;
+      const corners = [
+        { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
+        { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
+        { id: 'bl', x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
+        { id: 'br', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
+      ];
+
+      corners.forEach(corner => {
+        const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        handle.classList.add('selection-handle');
+        handle.setAttribute('x', corner.x - handleSize / 2);
+        handle.setAttribute('y', corner.y - handleSize / 2);
+        handle.setAttribute('width', handleSize);
+        handle.setAttribute('height', handleSize);
+        handle.setAttribute('data-handle', corner.id);
+        group.appendChild(handle);
+        selectionHandles.push(handle);
+      });
+
+      // Create rotation line
+      const centerX = selectionBounds.x + selectionBounds.width / 2;
+      const topY = selectionBounds.y;
+      rotationLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      rotationLine.classList.add('rotation-line');
+      rotationLine.setAttribute('x1', centerX);
+      rotationLine.setAttribute('y1', topY);
+      rotationLine.setAttribute('x2', centerX);
+      rotationLine.setAttribute('y2', topY - rotationOffset);
+      group.appendChild(rotationLine);
+
+      // Create rotation handle (circle at top center)
+      rotationHandle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      rotationHandle.classList.add('rotation-handle');
+      rotationHandle.setAttribute('cx', centerX);
+      rotationHandle.setAttribute('cy', topY - rotationOffset);
+      rotationHandle.setAttribute('r', 20);
+      group.appendChild(rotationHandle);
+    };
+
+    const updateSelectionUI = (preserveRotation = false) => {
+      if (!selectionBounds || selectionBoxes.length === 0) return;
+
+      // Update selection box
+      selectionBoxes[0].setAttribute('x', selectionBounds.x);
+      selectionBoxes[0].setAttribute('y', selectionBounds.y);
+      selectionBoxes[0].setAttribute('width', selectionBounds.width);
+      selectionBoxes[0].setAttribute('height', selectionBounds.height);
+
+      // Update handles
+      const handleSize = 40;
+      const rotationOffset = 50;
+      const corners = [
+        { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
+        { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
+        { id: 'bl', x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
+        { id: 'br', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
+      ];
+
+      selectionHandles.forEach((handle, i) => {
+        handle.setAttribute('x', corners[i].x - handleSize / 2);
+        handle.setAttribute('y', corners[i].y - handleSize / 2);
+      });
+
+      // Update rotation handle and line
+      if (rotationHandle && rotationLine) {
+        const centerX = selectionBounds.x + selectionBounds.width / 2;
+        const topY = selectionBounds.y;
+        rotationLine.setAttribute('x1', centerX);
+        rotationLine.setAttribute('y1', topY);
+        rotationLine.setAttribute('x2', centerX);
+        rotationLine.setAttribute('y2', topY - rotationOffset);
+        rotationHandle.setAttribute('cx', centerX);
+        rotationHandle.setAttribute('cy', topY - rotationOffset);
+      }
+
+      // Preserve rotation transform if needed
+      if (preserveRotation && currentRotation !== 0) {
+        const cx = selectionBounds.x + selectionBounds.width / 2;
+        const cy = selectionBounds.y + selectionBounds.height / 2;
+        const degrees = currentRotation * (180 / Math.PI);
+        const rotateTransform = `rotate(${degrees}, ${cx}, ${cy})`;
+
+        if (selectionBoxes[0]) {
+          selectionBoxes[0].setAttribute('transform', rotateTransform);
+        }
+        selectionHandles.forEach(handle => {
+          handle.setAttribute('transform', rotateTransform);
+        });
+        if (rotationHandle) {
+          rotationHandle.setAttribute('transform', rotateTransform);
+        }
+        if (rotationLine) {
+          rotationLine.setAttribute('transform', rotateTransform);
+        }
+      }
+    };
+
+    const selectStrokesInLasso = () => {
+      // Clear previous selection boxes (but not the lasso path)
+      selectionBoxes.forEach(box => box.remove());
+      selectionBoxes = [];
+      selectionHandles.forEach(h => h.remove());
+      selectionHandles = [];
+      selectedStrokes = [];
+      if (lassoPoints.length < 3) return;
+
+      // Find all strokes inside the lasso
+      strokes.forEach(s => {
+        const isInside = s.points.some(p => pointInPolygon(p.x, p.y, lassoPoints));
+        if (isInside) {
+          selectedStrokes.push(s);
+        }
+      });
+
+      // Create a bounding box based on the lasso selection area
+      if (selectedStrokes.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        lassoPoints.forEach(p => {
+          minX = Math.min(minX, p.x);
+          minY = Math.min(minY, p.y);
+          maxX = Math.max(maxX, p.x);
+          maxY = Math.max(maxY, p.y);
+        });
+        selectionBounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.classList.add('selection-box');
+        rect.setAttribute('x', minX);
+        rect.setAttribute('y', minY);
+        rect.setAttribute('width', maxX - minX);
+        rect.setAttribute('height', maxY - minY);
+        rect.setAttribute('rx', 3);
+        group.appendChild(rect);
+        selectionBoxes.push(rect);
+
+        // Add corner handles
+        createSelectionHandles();
+      } else {
+        selectionBounds = null;
+      }
+    };
+
+    const deleteSelectedStrokes = () => {
+      if (selectedStrokes.length === 0) return;
+      selectedStrokes.forEach(s => {
+        s.element.remove();
+        const idx = strokes.indexOf(s);
+        if (idx > -1) {
+          undoStack.push(strokes.splice(idx, 1)[0]);
+        }
+      });
+      selectedStrokes = [];
+      selectionBoxes.forEach(box => box.remove());
+      selectionBoxes = [];
+      selectionHandles.forEach(h => h.remove());
+      selectionHandles = [];
+      if (rotationHandle) { rotationHandle.remove(); rotationHandle = null; }
+      if (rotationLine) { rotationLine.remove(); rotationLine = null; }
+      selectionBounds = null;
+      currentRotation = 0;
+      previousRotation = 0;
+      savePageAnnotations();
+    };
+
+    // Transform point by inverse rotation to check against unrotated bounds
+    const transformPointForHitTest = (x, y) => {
+      if (currentRotation === 0) return { x, y };
+      const cx = selectionBounds.x + selectionBounds.width / 2;
+      const cy = selectionBounds.y + selectionBounds.height / 2;
+      const cos = Math.cos(-currentRotation);
+      const sin = Math.sin(-currentRotation);
+      const dx = x - cx;
+      const dy = y - cy;
+      return {
+        x: cx + dx * cos - dy * sin,
+        y: cy + dx * sin + dy * cos
+      };
+    };
+
+    const isInsideSelectionBox = (x, y) => {
+      if (!selectionBounds || selectedStrokes.length === 0) return false;
+      const p = transformPointForHitTest(x, y);
+      return p.x >= selectionBounds.x && p.x <= selectionBounds.x + selectionBounds.width &&
+             p.y >= selectionBounds.y && p.y <= selectionBounds.y + selectionBounds.height;
+    };
+
+    const getHandleAtPoint = (x, y) => {
+      if (!selectionBounds || selectedStrokes.length === 0) return null;
+      const p = transformPointForHitTest(x, y);
+      const handleSize = 25; // Slightly larger hit area for 40px handles
+      const corners = [
+        { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
+        { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
+        { id: 'bl', x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
+        { id: 'br', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
+      ];
+      for (const corner of corners) {
+        if (Math.abs(p.x - corner.x) <= handleSize && Math.abs(p.y - corner.y) <= handleSize) {
+          return corner.id;
+        }
+      }
+      return null;
+    };
+
+    const moveSelection = (dx, dy) => {
+      // Move all selected strokes
+      selectedStrokes.forEach(s => {
+        s.points = s.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy }));
+        s.element.setAttribute('d', buildPath(s.points, s.width));
+      });
+      // Update selection bounds and box
+      if (selectionBounds) {
+        selectionBounds.x += dx;
+        selectionBounds.y += dy;
+        updateSelectionUI(true); // preserve rotation
+      }
+    };
+
+    const scaleSelection = (newX, newY) => {
+      if (!originalBounds || !activeHandle) return;
+
+      const anchorX = scaleAnchorWorldX;
+      const anchorY = scaleAnchorWorldY;
+      const origCx = originalBounds.x + originalBounds.width / 2;
+      const origCy = originalBounds.y + originalBounds.height / 2;
+      const cos = Math.cos(currentRotation);
+      const sin = Math.sin(currentRotation);
+
+      // Get the original handle position in world space
+      let handleLocalX, handleLocalY;
+      if (activeHandle === 'tl') {
+        handleLocalX = originalBounds.x;
+        handleLocalY = originalBounds.y;
+      } else if (activeHandle === 'tr') {
+        handleLocalX = originalBounds.x + originalBounds.width;
+        handleLocalY = originalBounds.y;
+      } else if (activeHandle === 'bl') {
+        handleLocalX = originalBounds.x;
+        handleLocalY = originalBounds.y + originalBounds.height;
+      } else {
+        handleLocalX = originalBounds.x + originalBounds.width;
+        handleLocalY = originalBounds.y + originalBounds.height;
+      }
+
+      const dxH = handleLocalX - origCx;
+      const dyH = handleLocalY - origCy;
+      const handleWorldX = origCx + dxH * cos - dyH * sin;
+      const handleWorldY = origCy + dxH * sin + dyH * cos;
+
+      const origDist = Math.hypot(handleWorldX - anchorX, handleWorldY - anchorY);
+      const newDist = Math.hypot(newX - anchorX, newY - anchorY);
+
+      // Calculate uniform scale with minimum
+      const minScale = 20 / Math.max(originalBounds.width, originalBounds.height);
+      const scale = Math.max(minScale, origDist > 0 ? newDist / origDist : 1);
+
+      // Scale all strokes from the world-space anchor
+      selectedStrokes.forEach((s, i) => {
+        const origPoints = originalStrokePoints[i];
+        s.points = origPoints.map(pt => ({
+          ...pt,
+          x: anchorX + (pt.x - anchorX) * scale,
+          y: anchorY + (pt.y - anchorY) * scale
+        }));
+        s.element.setAttribute('d', buildPath(s.points, s.width));
+      });
+
+      // Calculate new bounds
+      const scaledWidth = originalBounds.width * scale;
+      const scaledHeight = originalBounds.height * scale;
+      const newCx = anchorX + (origCx - anchorX) * scale;
+      const newCy = anchorY + (origCy - anchorY) * scale;
+
+      selectionBounds.x = newCx - scaledWidth / 2;
+      selectionBounds.y = newCy - scaledHeight / 2;
+      selectionBounds.width = scaledWidth;
+      selectionBounds.height = scaledHeight;
+
+      updateSelectionUI(true);
+    };
+
+    const isOnRotationHandle = (x, y) => {
+      if (!selectionBounds || selectedStrokes.length === 0 || !rotationHandle) return false;
+      const p = transformPointForHitTest(x, y);
+      const rotationOffset = 50;
+      const centerX = selectionBounds.x + selectionBounds.width / 2;
+      const handleY = selectionBounds.y - rotationOffset;
+      const hitRadius = 25;
+      return Math.hypot(p.x - centerX, p.y - handleY) <= hitRadius;
+    };
+
+    const rotateSelection = (x, y) => {
+      if (!originalBounds) return;
+
+      const angle = Math.atan2(y - rotationCenterY, x - rotationCenterX);
+      const deltaAngle = angle - startAngle;
+      const totalRotation = previousRotation + deltaAngle;
+      const cos = Math.cos(deltaAngle);
+      const sin = Math.sin(deltaAngle);
+
+      // Rotate all strokes around the center
+      selectedStrokes.forEach((s, i) => {
+        const origPoints = originalStrokePoints[i];
+        s.points = origPoints.map(p => {
+          const dx = p.x - rotationCenterX;
+          const dy = p.y - rotationCenterY;
+          return { ...p, x: rotationCenterX + dx * cos - dy * sin, y: rotationCenterY + dx * sin + dy * cos };
+        });
+        s.element.setAttribute('d', buildPath(s.points, s.width));
+      });
+
+      // Apply rotation transform to selection UI
+      const rotateTransform = `rotate(${totalRotation * (180 / Math.PI)}, ${rotationCenterX}, ${rotationCenterY})`;
+      if (selectionBoxes[0]) selectionBoxes[0].setAttribute('transform', rotateTransform);
+      selectionHandles.forEach(h => h.setAttribute('transform', rotateTransform));
+      if (rotationHandle) rotationHandle.setAttribute('transform', rotateTransform);
+      if (rotationLine) rotationLine.setAttribute('transform', rotateTransform);
+
+      currentRotation = totalRotation;
+    };
 
     // Save current page annotations
     const savePageAnnotations = () => {
@@ -309,6 +700,7 @@
 
     const isPen = e => e.pointerType === 'pen';
     const isEraser = e => e.button === 5 || (e.buttons & 32) !== 0;
+    const isLassoButton = e => e.button === 2 || (e.buttons & 2) !== 0;
 
     // Convert screen coordinates to SVG/PDF-space coordinates
     const getData = e => {
@@ -375,29 +767,156 @@
       if (!isPen(e)) return;
       if (isEraser(e)) {
         eraserEnd = true;
+        lassoEnd = false;
         prevTool = tool;
         if (tool !== 'eraser') setTool('eraser');
         checkTap();
         setCursor(e);
+      } else if (isLassoButton(e)) {
+        lassoEnd = true;
+        eraserEnd = false;
+        prevTool = tool;
+        if (tool !== 'lasso') setTool('lasso');
       } else {
         if (e.button && e.button !== 0) return;
         eraserEnd = false;
+        lassoEnd = false;
       }
       e.preventDefault();
+      const d = getData(e);
+
+      // Check if clicking on rotation handle
+      if (tool === 'lasso' && isOnRotationHandle(d.x, d.y)) {
+        isRotatingSelection = true;
+        originalBounds = { ...selectionBounds };
+        originalStrokePoints = selectedStrokes.map(s => s.points.map(p => ({ ...p })));
+        rotationCenterX = selectionBounds.x + selectionBounds.width / 2;
+        rotationCenterY = selectionBounds.y + selectionBounds.height / 2;
+        startAngle = Math.atan2(d.y - rotationCenterY, d.x - rotationCenterX);
+        previousRotation = currentRotation; // Store accumulated rotation
+        drawing = false;
+        return;
+      }
+
+      // Check if clicking on a handle to scale
+      if (tool === 'lasso') {
+        const handle = getHandleAtPoint(d.x, d.y);
+        if (handle) {
+          isScalingSelection = true;
+          activeHandle = handle;
+          originalBounds = { ...selectionBounds };
+          originalStrokePoints = selectedStrokes.map(s => s.points.map(p => ({ ...p })));
+
+          // Calculate world-space anchor (opposite corner) at the start of scaling
+          const cx = selectionBounds.x + selectionBounds.width / 2;
+          const cy = selectionBounds.y + selectionBounds.height / 2;
+          let anchorLocalX, anchorLocalY;
+          if (handle === 'tl') {
+            anchorLocalX = selectionBounds.x + selectionBounds.width;
+            anchorLocalY = selectionBounds.y + selectionBounds.height;
+          } else if (handle === 'tr') {
+            anchorLocalX = selectionBounds.x;
+            anchorLocalY = selectionBounds.y + selectionBounds.height;
+          } else if (handle === 'bl') {
+            anchorLocalX = selectionBounds.x + selectionBounds.width;
+            anchorLocalY = selectionBounds.y;
+          } else { // br
+            anchorLocalX = selectionBounds.x;
+            anchorLocalY = selectionBounds.y;
+          }
+          // Transform anchor to world space
+          const cos = Math.cos(currentRotation);
+          const sin = Math.sin(currentRotation);
+          const dxA = anchorLocalX - cx;
+          const dyA = anchorLocalY - cy;
+          scaleAnchorWorldX = cx + dxA * cos - dyA * sin;
+          scaleAnchorWorldY = cy + dxA * sin + dyA * cos;
+
+          drawing = false;
+          return;
+        }
+      }
+
+      // Check if clicking inside selection box to drag
+      if (tool === 'lasso' && isInsideSelectionBox(d.x, d.y)) {
+        isDraggingSelection = true;
+        dragStartX = d.x;
+        dragStartY = d.y;
+        drawing = false;
+        return;
+      }
+
       drawing = true;
       points = [];
       segLen = 0;
       undoStack = [];
-      points.push(getData(e));
+      points.push(d);
       if (tool === 'pen') newPath();
       if (tool === 'eraser') setCursor(e);
+      if (tool === 'lasso') {
+        // If there was a selection and user clicked outside, switch to pen tool
+        if (selectedStrokes.length > 0) {
+          clearSelection();
+          setTool('pen');
+          drawing = false;
+          return;
+        }
+        clearSelection();
+        lassoPoints = [{ x: d.x, y: d.y }];
+        lassoPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        lassoPath.classList.add('lasso-path');
+        lassoPath.setAttribute('d', `M${d.x},${d.y}`);
+        group.appendChild(lassoPath);
+      }
     }
 
     function move(e) {
-      if (!isPen(e) || !drawing) return;
+      if (!isPen(e)) return;
+
+      // Handle rotation
+      if (isRotatingSelection) {
+        e.preventDefault();
+        const d = getData(e);
+        rotateSelection(d.x, d.y);
+        return;
+      }
+
+      // Handle scaling selection
+      if (isScalingSelection) {
+        e.preventDefault();
+        const d = getData(e);
+        scaleSelection(d.x, d.y);
+        return;
+      }
+
+      // Handle dragging selection
+      if (isDraggingSelection) {
+        e.preventDefault();
+        const d = getData(e);
+        const dx = d.x - dragStartX;
+        const dy = d.y - dragStartY;
+        moveSelection(dx, dy);
+        dragStartX = d.x;
+        dragStartY = d.y;
+        return;
+      }
+
+      if (!drawing) return;
       e.preventDefault();
       const d = getData(e);
       if (tool === 'eraser') { setCursor(e); erase(d.x, d.y); return; }
+      if (tool === 'lasso') {
+        const last = lassoPoints[lassoPoints.length - 1];
+        const dist = Math.hypot(d.x - last.x, d.y - last.y);
+        if (dist < 3) return;
+        lassoPoints.push({ x: d.x, y: d.y });
+        let pathD = `M${lassoPoints[0].x},${lassoPoints[0].y}`;
+        for (let i = 1; i < lassoPoints.length; i++) {
+          pathD += `L${lassoPoints[i].x},${lassoPoints[i].y}`;
+        }
+        lassoPath.setAttribute('d', pathD);
+        return;
+      }
       const last = points[points.length - 1], dist = Math.hypot(d.x - last.x, d.y - last.y);
       if (dist < 2) return;
       segLen += dist;
@@ -413,6 +932,35 @@
 
     function stop(e) {
       if (e && !isPen(e)) return;
+
+      // Handle end of rotation
+      if (isRotatingSelection) {
+        isRotatingSelection = false;
+        // Keep the transform on UI elements - don't recalculate bounds
+        // The selection box stays rotated with the strokes
+        originalBounds = null;
+        originalStrokePoints = [];
+        savePageAnnotations();
+        return;
+      }
+
+      // Handle end of scaling selection
+      if (isScalingSelection) {
+        isScalingSelection = false;
+        activeHandle = null;
+        originalBounds = null;
+        originalStrokePoints = [];
+        savePageAnnotations();
+        return;
+      }
+
+      // Handle end of dragging selection
+      if (isDraggingSelection) {
+        isDraggingSelection = false;
+        savePageAnnotations();
+        return;
+      }
+
       if (!drawing) return;
       drawing = false;
       if (tool === 'pen' && path) {
@@ -420,11 +968,28 @@
         savePageAnnotations();
         path = null;
       }
+      if (tool === 'lasso' && lassoPath && lassoPoints.length >= 3) {
+        // Remove lasso path first, then show selection box
+        lassoPath.remove();
+        lassoPath = null;
+        selectStrokesInLasso();
+      } else if (tool === 'lasso') {
+        clearSelection();
+      }
       points = [];
       if (eraserEnd) {
         eraserEnd = false;
         resetBig();
         if (prevTool !== 'eraser') setTool(prevTool);
+      }
+      if (lassoEnd) {
+        lassoEnd = false;
+        // If strokes were selected, keep lasso tool active for manipulation
+        // Otherwise switch back to previous tool
+        if (selectedStrokes.length === 0 && prevTool !== 'lasso') {
+          setTool(prevTool);
+        }
+        // If strokes are selected, stay in lasso mode to allow rotate/move/scale
       }
     }
 
@@ -612,6 +1177,7 @@
 
     $('penTool').onclick = () => setTool('pen');
     $('eraserTool').onclick = () => setTool('eraser');
+    $('lassoTool').onclick = () => setTool('lasso');
     $('sizeDown').onclick = () => { if (sizeIdx > 0) { width = sizes[--sizeIdx]; sizeVal.textContent = width; updateCursor(); } };
     $('sizeUp').onclick = () => { if (sizeIdx < sizes.length-1) { width = sizes[++sizeIdx]; sizeVal.textContent = width; updateCursor(); } };
     $('pressureBtn').onclick = () => { pressure = !pressure; $('pressureBtn').classList.toggle('active', pressure); };
@@ -643,7 +1209,6 @@
 
     container.addEventListener('pointerdown', start);
     container.addEventListener('pointermove', move);
-    container.addEventListener('pointermove', e => { if (isPen(e) && tool === 'eraser') setCursor(e); });
     container.addEventListener('pointerup', stop);
     container.addEventListener('pointerleave', stop);
     container.addEventListener('pointercancel', stop);
@@ -699,10 +1264,15 @@
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
       if (e.key === 'p' || e.key === 'P') setTool('pen');
       if (e.key === 'e' || e.key === 'E') setTool('eraser');
+      if (e.key === 'l' || e.key === 'L') setTool('lasso');
       if (e.key === '[') $('sizeDown').click();
       if (e.key === ']') $('sizeUp').click();
       if (e.key === 'ArrowLeft' && pdfDoc) goToPage(currentPage - 1);
       if (e.key === 'ArrowRight' && pdfDoc) goToPage(currentPage + 1);
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedStrokes.length > 0) {
+        e.preventDefault();
+        deleteSelectedStrokes();
+      }
     });
 
     sizeVal.style.color = color;
