@@ -95,25 +95,27 @@
 
     #pdfInput { display: none; }
 
-    /* PDF page transition animations */
+    /* PDF page transition animations - carousel style */
     .pdf-page-container {
-      transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .pdf-page-container.slide-out-left {
+      transform: translateX(-100%);
       opacity: 0;
-      transform: translateX(-30px);
     }
     .pdf-page-container.slide-out-right {
+      transform: translateX(100%);
       opacity: 0;
-      transform: translateX(30px);
     }
     .pdf-page-container.slide-in-left {
+      transform: translateX(100%);
       opacity: 0;
-      transform: translateX(30px);
+      transition: none;
     }
     .pdf-page-container.slide-in-right {
+      transform: translateX(-100%);
       opacity: 0;
-      transform: translateX(-30px);
+      transition: none;
     }
   </style>
 </head>
@@ -1156,10 +1158,11 @@
       const pageContainer = $('pdfPageContainer');
       const direction = pageNum > currentPage ? 'left' : 'right';
 
-      // Slide out animation
+      // Slide out current page
       pageContainer.classList.add(`slide-out-${direction}`);
 
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait briefly before loading new page (100ms) for more overlap
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       savePageAnnotations();
       currentPage = pageNum;
@@ -1167,14 +1170,14 @@
       loadPageAnnotations();
       container.scrollTop = 0;
 
-      // Prepare slide in from opposite direction
+      // Position new page off-screen (opposite side), no transition
       pageContainer.classList.remove(`slide-out-${direction}`);
       pageContainer.classList.add(`slide-in-${direction}`);
 
-      // Force reflow to ensure the slide-in class is applied before removing it
+      // Force reflow
       void pageContainer.offsetWidth;
 
-      // Slide in animation
+      // Slide in new page with transition (overlaps with remaining slide-out)
       pageContainer.classList.remove(`slide-in-${direction}`);
     }
 
