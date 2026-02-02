@@ -7,15 +7,19 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
   <style>
-    :root { --bg: #fff; --border: #e5e7eb; --btn: #f3f4f6; --btn-hover: #e5e7eb; --active: #3b82f6; --text: #1f2937; --text2: #6b7280; }
+    :root { --bg: #fff; --border: #e5e7eb; --btn: #f3f4f6; --btn-hover: #e5e7eb; --active: #3b82f6; --text: #1f2937; --text2: #6b7280; --titlebar-height: 32px; }
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'IBM Plex Sans', -apple-system, sans-serif; background: var(--bg); touch-action: none; }
 
+    /* Title bar */
+    .title-bar { position: fixed; top: 0; left: 0; right: 0; height: var(--titlebar-height); background: #fff; border-bottom: 1px solid #e5e7eb; z-index: 1001; display: flex; align-items: center; justify-content: center; }
+    .title-bar-text { font-size: 13px; font-weight: 500; color: var(--text); }
+
     /* Hover zone at top of screen */
-    .toolbar-hover-zone { position: fixed; top: 0; left: 0; right: 0; height: 40px; z-index: 999; }
+    .toolbar-hover-zone { position: fixed; top: var(--titlebar-height); left: 0; right: 0; height: 40px; z-index: 999; }
 
     /* Unified toolbar */
-    .toolbar { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); z-index: 1000; transition: opacity 0.3s, transform 0.3s; }
+    .toolbar { position: fixed; top: calc(var(--titlebar-height) + 8px); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); z-index: 1000; transition: opacity 0.3s, transform 0.3s; }
     .toolbar.hidden { opacity: 0; transform: translateX(-50%) translateY(-100%); pointer-events: none; }
 
     .divider { width: 1px; height: 22px; background: var(--border); margin: 0 3px; }
@@ -39,7 +43,7 @@
     .color-modal-btn { width: 40px; height: 40px; border: 3px solid transparent; border-radius: 50%; cursor: pointer; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
     .color-modal-btn:hover { transform: scale(1.15); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     .color-modal-btn.selected { border-color: var(--active); }
-    .canvas-container { width: 100%; height: 100%; overflow: hidden; cursor: crosshair; position: relative; }
+    .canvas-container { width: 100%; height: calc(100% - var(--titlebar-height)); margin-top: var(--titlebar-height); overflow: hidden; cursor: crosshair; position: relative; }
     .canvas-container.pdf-mode { overflow-y: auto; overflow-x: hidden; background: #fff; display: flex; flex-direction: column; align-items: center; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.2) transparent; }
     .canvas-container.pdf-mode::-webkit-scrollbar { width: 6px; }
     .canvas-container.pdf-mode::-webkit-scrollbar-track { background: transparent; }
@@ -118,6 +122,11 @@
 </head>
 <body>
   <input type="file" id="pdfInput" accept="application/pdf">
+
+  <!-- Title bar -->
+  <div class="title-bar">
+    <span class="title-bar-text">Vector Canvas</span>
+  </div>
 
   <!-- Invisible hover zone at top to trigger toolbar -->
   <div class="toolbar-hover-zone" id="toolbarHoverZone"></div>
@@ -343,7 +352,7 @@
       if (rotationLine) { rotationLine.remove(); rotationLine = null; }
       if (!selectionBounds) return;
 
-      const handleSize = 40;
+      const handleSize = 20;
       const rotationOffset = 50;
       const corners = [
         { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
@@ -394,7 +403,7 @@
       selectionBoxes[0].setAttribute('height', selectionBounds.height);
 
       // Update handles
-      const handleSize = 40;
+      const handleSize = 20;
       const rotationOffset = 50;
       const corners = [
         { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
@@ -533,7 +542,7 @@
     const getHandleAtPoint = (x, y) => {
       if (!selectionBounds || selectedStrokes.length === 0) return null;
       const p = transformPointForHitTest(x, y);
-      const handleSize = 25; // Slightly larger hit area for 40px handles
+      const handleSize = 15; // Slightly larger hit area for 20px handles
       const corners = [
         { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
         { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
