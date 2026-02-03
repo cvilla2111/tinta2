@@ -1485,7 +1485,7 @@
         const deltaY = e.clientY - swipeStartY;
         const isHorizontal = Math.abs(deltaY) < Math.abs(deltaX) * 0.5;
 
-        if (Math.abs(deltaX) > 160 && isHorizontal) {
+        if (Math.abs(deltaX) > 225 && isHorizontal) {
           goToPage(deltaX > 0 ? currentPage - 1 : currentPage + 1);
         }
       }
