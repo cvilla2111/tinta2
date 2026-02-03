@@ -199,15 +199,20 @@
     // PDF coordinate system - used for fixed coordinate mapping
     let pdfPageWidth = 0, pdfPageHeight = 0;  // Native PDF page dimensions
 
-    // Get effective stroke width (scaled for PDF mode)
-    const getEffectiveWidth = () => {
+    // Get scale factor for PDF mode
+    const getPdfScale = () => {
       if (pdfDoc && pdfPageWidth > 0) {
         const containerWidth = container.getBoundingClientRect().width;
-        const scale = pdfPageWidth / (containerWidth * dpr);
-        return width * scale;
+        return pdfPageWidth / (containerWidth * dpr);
       }
-      return width;
+      return 1;
     };
+
+    // Get effective stroke width (scaled for PDF mode)
+    const getEffectiveWidth = () => width * getPdfScale();
+
+    // Get effective handle size (scaled for PDF mode)
+    const getEffectiveHandleSize = (size) => size * getPdfScale();
 
     // Toolbar visibility state
     let toolbarVisible = true;
@@ -346,8 +351,9 @@
       if (rotationLine) { rotationLine.remove(); rotationLine = null; }
       if (!selectionBounds) return;
 
-      const handleSize = 30;
-      const rotationOffset = 50;
+      const handleSize = getEffectiveHandleSize(30);
+      const rotationOffset = getEffectiveHandleSize(50);
+      const rotationRadius = getEffectiveHandleSize(20);
       const corners = [
         { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
         { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
@@ -383,7 +389,7 @@
       rotationHandle.classList.add('rotation-handle');
       rotationHandle.setAttribute('cx', centerX);
       rotationHandle.setAttribute('cy', topY - rotationOffset);
-      rotationHandle.setAttribute('r', 20);
+      rotationHandle.setAttribute('r', rotationRadius);
       group.appendChild(rotationHandle);
     };
 
@@ -397,8 +403,8 @@
       selectionBoxes[0].setAttribute('height', selectionBounds.height);
 
       // Update handles
-      const handleSize = 30;
-      const rotationOffset = 50;
+      const handleSize = getEffectiveHandleSize(30);
+      const rotationOffset = getEffectiveHandleSize(50);
       const corners = [
         { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
         { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
@@ -409,6 +415,8 @@
       selectionHandles.forEach((handle, i) => {
         handle.setAttribute('x', corners[i].x - handleSize / 2);
         handle.setAttribute('y', corners[i].y - handleSize / 2);
+        handle.setAttribute('width', handleSize);
+        handle.setAttribute('height', handleSize);
       });
 
       // Update rotation handle and line
@@ -421,6 +429,7 @@
         rotationLine.setAttribute('y2', topY - rotationOffset);
         rotationHandle.setAttribute('cx', centerX);
         rotationHandle.setAttribute('cy', topY - rotationOffset);
+        rotationHandle.setAttribute('r', getEffectiveHandleSize(20));
       }
 
       // Preserve rotation transform if needed
@@ -536,7 +545,7 @@
     const getHandleAtPoint = (x, y) => {
       if (!selectionBounds || selectedStrokes.length === 0) return null;
       const p = transformPointForHitTest(x, y);
-      const handleSize = 20; // Slightly larger hit area for 30px handles
+      const handleHitSize = getEffectiveHandleSize(20); // Slightly larger hit area for 30px handles
       const corners = [
         { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
         { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
@@ -544,7 +553,7 @@
         { id: 'br', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
       ];
       for (const corner of corners) {
-        if (Math.abs(p.x - corner.x) <= handleSize && Math.abs(p.y - corner.y) <= handleSize) {
+        if (Math.abs(p.x - corner.x) <= handleHitSize && Math.abs(p.y - corner.y) <= handleHitSize) {
           return corner.id;
         }
       }
@@ -631,10 +640,10 @@
     const isOnRotationHandle = (x, y) => {
       if (!selectionBounds || selectedStrokes.length === 0 || !rotationHandle) return false;
       const p = transformPointForHitTest(x, y);
-      const rotationOffset = 50;
+      const rotationOffset = getEffectiveHandleSize(50);
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const handleY = selectionBounds.y - rotationOffset;
-      const hitRadius = 25;
+      const hitRadius = getEffectiveHandleSize(25);
       return Math.hypot(p.x - centerX, p.y - handleY) <= hitRadius;
     };
 
