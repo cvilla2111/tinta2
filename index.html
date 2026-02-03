@@ -346,7 +346,7 @@
       if (rotationLine) { rotationLine.remove(); rotationLine = null; }
       if (!selectionBounds) return;
 
-      const handleSize = 20;
+      const handleSize = 30;
       const rotationOffset = 50;
       const corners = [
         { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
@@ -397,7 +397,7 @@
       selectionBoxes[0].setAttribute('height', selectionBounds.height);
 
       // Update handles
-      const handleSize = 20;
+      const handleSize = 30;
       const rotationOffset = 50;
       const corners = [
         { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
@@ -536,7 +536,7 @@
     const getHandleAtPoint = (x, y) => {
       if (!selectionBounds || selectedStrokes.length === 0) return null;
       const p = transformPointForHitTest(x, y);
-      const handleSize = 15; // Slightly larger hit area for 20px handles
+      const handleSize = 20; // Slightly larger hit area for 30px handles
       const corners = [
         { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
         { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
