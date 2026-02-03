@@ -97,7 +97,7 @@
 
     /* PDF page transition animations - carousel style */
     .pdf-page-container {
-      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .pdf-page-container.slide-out-left {
       transform: translateX(-100%);
@@ -116,6 +116,83 @@
       transform: translateX(-100%);
       opacity: 0;
       transition: none;
+    }
+
+    /* Filmstrip overlay */
+    .filmstrip-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    .filmstrip-overlay.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    .filmstrip-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 30px;
+      max-width: 90vw;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.3) transparent;
+    }
+    .filmstrip-container::-webkit-scrollbar { height: 6px; }
+    .filmstrip-container::-webkit-scrollbar-track { background: transparent; }
+    .filmstrip-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
+    .filmstrip-container::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.5); }
+    .filmstrip-item {
+      flex-shrink: 0;
+      cursor: pointer;
+      border: 3px solid transparent;
+      border-radius: 8px;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+      background: #fff;
+    }
+    .filmstrip-item:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .filmstrip-item.active {
+      border-color: var(--active);
+      box-shadow: 0 0 0 2px var(--active), 0 8px 24px rgba(59, 130, 246, 0.4);
+    }
+    .filmstrip-item canvas {
+      display: block;
+      height: 150px;
+      width: auto;
+    }
+    .filmstrip-item-number {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .filmstrip-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+      font-weight: 500;
     }
   </style>
 </head>
@@ -164,6 +241,11 @@
       <div class="color-modal-title">Choose Color</div>
       <div class="color-modal-grid" id="colorModalGrid"></div>
     </div>
+  </div>
+
+  <div class="filmstrip-overlay" id="filmstripOverlay">
+    <div class="filmstrip-container" id="filmstripContainer"></div>
+    <span class="filmstrip-hint">Tap a page to navigate • Tap outside to close</span>
   </div>
 
   <div class="loading-overlay" id="loadingOverlay">
@@ -250,6 +332,9 @@
     const pdfInput = $('pdfInput');
     const pdfControls = $('pdfControls'), pdfDivider = $('pdfDivider');
     const toolbarHoverZone = $('toolbarHoverZone');
+    const filmstripOverlay = $('filmstripOverlay');
+    const filmstripContainer = $('filmstripContainer');
+    let filmstripThumbnails = []; // Cache thumbnails
 
     // Show/hide toolbar functions
     const showToolbar = () => {
@@ -1124,6 +1209,9 @@
 
         await renderPage(1);
         loadPageAnnotations();
+
+        // Generate filmstrip thumbnails in background
+        generateFilmstripThumbnails();
       } catch (err) {
         console.error('Error loading PDF:', err);
       } finally {
@@ -1144,6 +1232,10 @@
       strokes = [];
       undoStack = [];
 
+      // Clear filmstrip
+      filmstripContainer.innerHTML = '';
+      filmstripThumbnails = [];
+
       // Reset page container and SVG to full container size
       const pageContainer = $('pdfPageContainer');
       pageContainer.style.width = '';
@@ -1161,17 +1253,28 @@
       pdfDivider.classList.remove('visible');
     }
 
-    async function goToPage(pageNum) {
+    async function goToPage(pageNum, skipAnimation = false) {
       if (!pdfDoc || pageNum < 1 || pageNum > totalPages) return;
 
       const pageContainer = $('pdfPageContainer');
+
+      if (skipAnimation) {
+        // Direct page change without animation
+        savePageAnnotations();
+        currentPage = pageNum;
+        await renderPage(pageNum);
+        loadPageAnnotations();
+        container.scrollTop = 0;
+        return;
+      }
+
       const direction = pageNum > currentPage ? 'left' : 'right';
 
       // Slide out current page
       pageContainer.classList.add(`slide-out-${direction}`);
 
-      // Wait briefly before loading new page (100ms) for more overlap
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait briefly before loading new page (50ms) for more overlap
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       savePageAnnotations();
       currentPage = pageNum;
@@ -1266,35 +1369,142 @@
     container.addEventListener('pointercancel', stop);
     container.addEventListener('contextmenu', e => e.preventDefault());
 
-    // Two-finger swipe for PDF page navigation
-    let touchStartX = 0;
-    let touchStartY = 0;
+    // Touch gestures for PDF navigation
+    let initialPinchDistance = 0;
     let isTwoFingerTouch = false;
+    let oneFingerTouchStartX = 0;
+    let oneFingerTouchStartY = 0;
+    let isOneFingerSwipe = false;
+
+    // Generate thumbnails for filmstrip
+    async function generateFilmstripThumbnails() {
+      if (!pdfDoc) return;
+
+      filmstripContainer.innerHTML = '';
+      filmstripThumbnails = [];
+
+      for (let i = 1; i <= totalPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 1 });
+        const thumbHeight = 150;
+        const scale = thumbHeight / viewport.height;
+        const scaledViewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = scaledViewport.width;
+        canvas.height = scaledViewport.height;
+        const ctx = canvas.getContext('2d');
+
+        await page.render({
+          canvasContext: ctx,
+          viewport: scaledViewport
+        }).promise;
+
+        const item = document.createElement('div');
+        item.className = 'filmstrip-item' + (i === currentPage ? ' active' : '');
+        item.dataset.page = i;
+        item.appendChild(canvas);
+
+        const pageNum = document.createElement('span');
+        pageNum.className = 'filmstrip-item-number';
+        pageNum.textContent = i;
+        item.appendChild(pageNum);
+
+        item.onclick = async () => {
+          hideFilmstrip();
+          if (i !== currentPage) {
+            await goToPage(i, true); // Skip animation when selecting from filmstrip
+          }
+        };
+
+        filmstripContainer.appendChild(item);
+        filmstripThumbnails.push(item);
+      }
+    }
+
+    function showFilmstrip() {
+      if (!pdfDoc) return;
+
+      // Update active state
+      filmstripThumbnails.forEach((item, idx) => {
+        item.classList.toggle('active', idx + 1 === currentPage);
+      });
+
+      filmstripOverlay.classList.add('visible');
+
+      // Scroll to current page
+      const activeItem = filmstripContainer.querySelector('.active');
+      if (activeItem) {
+        activeItem.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'center' });
+      }
+    }
+
+    function hideFilmstrip() {
+      filmstripOverlay.classList.remove('visible');
+    }
+
+    // Close filmstrip when clicking outside
+    filmstripOverlay.onclick = (e) => {
+      if (e.target === filmstripOverlay) {
+        hideFilmstrip();
+      }
+    };
 
     container.addEventListener('touchstart', e => {
       if (e.touches.length === 2 && pdfDoc) {
+        // Two-finger touch: prepare for pinch
         isTwoFingerTouch = true;
-        touchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        touchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        isOneFingerSwipe = false;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        initialPinchDistance = Math.hypot(dx, dy);
+        e.preventDefault();
+      } else if (e.touches.length === 1 && pdfDoc) {
+        // One-finger touch: prepare for swipe
+        isOneFingerSwipe = true;
+        isTwoFingerTouch = false;
+        oneFingerTouchStartX = e.touches[0].clientX;
+        oneFingerTouchStartY = e.touches[0].clientY;
         e.preventDefault();
       } else {
         isTwoFingerTouch = false;
+        isOneFingerSwipe = false;
         e.preventDefault();
       }
     }, { passive: false });
 
     container.addEventListener('touchmove', e => {
+      if (isTwoFingerTouch && e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const currentDistance = Math.hypot(dx, dy);
+
+        // Detect pinch-in gesture (fingers coming together)
+        if (initialPinchDistance - currentDistance > 50) {
+          isTwoFingerTouch = false;
+          showFilmstrip();
+        }
+      }
+      // If second finger added during swipe, switch to pinch mode
+      if (isOneFingerSwipe && e.touches.length === 2) {
+        isOneFingerSwipe = false;
+        isTwoFingerTouch = true;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        initialPinchDistance = Math.hypot(dx, dy);
+      }
       e.preventDefault();
     }, { passive: false });
 
     container.addEventListener('touchend', e => {
-      if (isTwoFingerTouch && pdfDoc) {
+      // Check for one-finger swipe on touch end
+      if (isOneFingerSwipe && pdfDoc && e.changedTouches.length === 1) {
         const touchEndX = e.changedTouches[0].clientX;
         const touchEndY = e.changedTouches[0].clientY;
-        const deltaX = touchEndX - touchStartX;
-        const deltaY = touchEndY - touchStartY;
-        const swipeThreshold = 80; // Minimum horizontal distance
-        const verticalTolerance = 0.5; // Allow up to 50% vertical vs horizontal
+        const deltaX = touchEndX - oneFingerTouchStartX;
+        const deltaY = touchEndY - oneFingerTouchStartY;
+        const swipeThreshold = 160;
+        const verticalTolerance = 0.5;
 
         // Check if swipe is primarily horizontal
         const isHorizontal = Math.abs(deltaY) < Math.abs(deltaX) * verticalTolerance;
@@ -1306,8 +1516,9 @@
             goToPage(currentPage + 1); // Swipe left = next page
           }
         }
-        isTwoFingerTouch = false;
       }
+      isTwoFingerTouch = false;
+      isOneFingerSwipe = false;
     }, { passive: false });
 
     window.addEventListener('resize', resize);
