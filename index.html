@@ -883,6 +883,7 @@
 
     function start(e) {
       if (!isPen(e)) return;
+      isPenActive = true; // Mark pen as active to block finger swipe
       if (isEraser(e)) {
         eraserEnd = true;
         lassoEnd = false;
@@ -1050,6 +1051,7 @@
 
     function stop(e) {
       if (e && !isPen(e)) return;
+      isPenActive = false; // Mark pen as inactive to allow finger swipe
 
       // Handle end of rotation
       if (isRotatingSelection) {
@@ -1369,12 +1371,13 @@
     container.addEventListener('pointercancel', stop);
     container.addEventListener('contextmenu', e => e.preventDefault());
 
-    // Touch gestures for PDF navigation
+    // Touch gestures for PDF navigation (finger only, not stylus)
     let initialPinchDistance = 0;
     let isTwoFingerTouch = false;
     let oneFingerTouchStartX = 0;
     let oneFingerTouchStartY = 0;
     let isOneFingerSwipe = false;
+    let isPenActive = false; // Track if stylus is currently in use
 
     // Generate thumbnails for filmstrip
     async function generateFilmstripThumbnails() {
@@ -1451,6 +1454,9 @@
     };
 
     container.addEventListener('touchstart', e => {
+      // Ignore touch events when stylus is active
+      if (isPenActive) return;
+
       if (e.touches.length === 2 && pdfDoc) {
         // Two-finger touch: prepare for pinch
         isTwoFingerTouch = true;
@@ -1474,6 +1480,9 @@
     }, { passive: false });
 
     container.addEventListener('touchmove', e => {
+      // Ignore touch events when stylus is active
+      if (isPenActive) return;
+
       if (isTwoFingerTouch && e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -1497,6 +1506,9 @@
     }, { passive: false });
 
     container.addEventListener('touchend', e => {
+      // Ignore touch events when stylus is active
+      if (isPenActive) return;
+
       // Check for one-finger swipe on touch end
       if (isOneFingerSwipe && pdfDoc && e.changedTouches.length === 1) {
         const touchEndX = e.changedTouches[0].clientX;
