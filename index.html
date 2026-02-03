@@ -11,15 +11,10 @@
     :root { --bg: #fff; --border: #e5e7eb; --btn: #f3f4f6; --btn-hover: #e5e7eb; --active: #3b82f6; --text: #1f2937; --text2: #6b7280; }
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'IBM Plex Sans', -apple-system, sans-serif; background: var(--bg); touch-action: none; }
-
-    /* Menu button in top right */
     .menu-btn { position: fixed; top: 12px; right: 12px; width: 36px; height: 36px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1001; }
     .menu-btn svg { width: 24px; height: 24px; stroke: #9ca3af; stroke-width: 1; fill: none; }
-
-    /* Unified toolbar */
     .toolbar { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); z-index: 1000; transition: opacity 0.3s, transform 0.3s; }
     .toolbar.hidden { opacity: 0; transform: translateX(-50%) translateY(-100%); pointer-events: none; }
-
     .divider { width: 1px; height: 22px; background: var(--border); margin: 0 3px; }
     .tool-btn { width: 28px; height: 28px; border: none; background: var(--btn); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
     .tool-btn:hover { background: var(--btn-hover); }
@@ -47,27 +42,33 @@
     .canvas-container.pdf-mode::-webkit-scrollbar-track { background: transparent; }
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
-    .canvas-container.pdf-mode::before { content: ''; flex: 1; min-height: 0; }
-    .canvas-container.pdf-mode::after { content: ''; flex: 1; min-height: 0; }
-    .pdf-page-container { position: relative; flex-shrink: 0; }
-    #pdf-canvas { display: block; pointer-events: none; }
-    #drawing-svg { position: absolute; top: 0; left: 0; display: block; overflow: visible; }
+    .canvas-container.pdf-mode::before, .canvas-container.pdf-mode::after { content: ''; flex: 1; min-height: 0; }
+    .canvas-container.no-pdf { background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 20px 20px; }
+    .canvas-container.lasso-mode { cursor: crosshair; }
+    .canvas-container.eraser-mode { cursor: none; }
+    .canvas-container.eraser-mode .eraser-cursor { display: block; }
+    .pdf-page-container { position: relative; flex-shrink: 0; transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+    .pdf-page-container.slide-out-left { transform: translateX(-100%); opacity: 0; }
+    .pdf-page-container.slide-out-right { transform: translateX(100%); opacity: 0; }
+    .pdf-page-container.slide-in-left { transform: translateX(100%); opacity: 0; transition: none; }
+    .pdf-page-container.slide-in-right { transform: translateX(-100%); opacity: 0; transition: none; }
     .canvas-container:not(.pdf-mode) .pdf-page-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
     .canvas-container:not(.pdf-mode) #pdf-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
     .canvas-container:not(.pdf-mode) #drawing-svg { width: 100%; height: 100%; }
+    #pdf-canvas { display: block; pointer-events: none; }
+    #drawing-svg { position: absolute; top: 0; left: 0; display: block; overflow: visible; }
+    #pdfInput { display: none; }
     .stroke-path { stroke: none; }
     .lasso-path { fill: none; stroke: var(--active); stroke-width: 2.5; stroke-dasharray: 6 4; }
     .selection-box { fill: none; stroke: var(--active); stroke-width: 2; stroke-dasharray: 5 3; }
     .selection-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: nwse-resize; }
     .rotation-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: grab; }
     .rotation-line { stroke: var(--active); stroke-width: 1.5; }
-    .canvas-container.lasso-mode { cursor: crosshair; }
+    .duplicate-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: pointer; }
+    .duplicate-handle:hover { fill: var(--active); }
+    .duplicate-handle:hover + .duplicate-icon { stroke: #fff; }
     .eraser-cursor { position: fixed; pointer-events: none; border: 1px solid #666; border-radius: 50%; transform: translate(-50%, -50%); z-index: 999; display: none; }
     .eraser-cursor.big-eraser { border-color: #ef4444; border-width: 1.5px; }
-    .canvas-container.eraser-mode { cursor: none; }
-    .canvas-container.eraser-mode .eraser-cursor { display: block; }
-
-    /* PDF Controls in unified toolbar */
     .pdf-controls { display: none; align-items: center; gap: 4px; }
     .pdf-controls.visible { display: flex; }
     .pdf-nav-btn { width: 28px; height: 28px; border: none; background: var(--btn); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
@@ -78,137 +79,32 @@
     .pdf-close-btn { background: #ef4444; }
     .pdf-close-btn:hover { background: #dc2626; }
     .pdf-close-btn svg { stroke: #fff; }
-
-    /* Loading state */
     .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 4000; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
     .loading-overlay.visible { opacity: 1; visibility: visible; }
     .loading-spinner { width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Graph paper background for no-PDF state */
-    .canvas-container.no-pdf {
-      background-color: var(--bg);
-      background-image:
-        linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px);
-      background-size: 20px 20px;
-    }
-
-    #pdfInput { display: none; }
-
-    /* PDF page transition animations - carousel style */
-    .pdf-page-container {
-      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .pdf-page-container.slide-out-left {
-      transform: translateX(-100%);
-      opacity: 0;
-    }
-    .pdf-page-container.slide-out-right {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-    .pdf-page-container.slide-in-left {
-      transform: translateX(100%);
-      opacity: 0;
-      transition: none;
-    }
-    .pdf-page-container.slide-in-right {
-      transform: translateX(-100%);
-      opacity: 0;
-      transition: none;
-    }
-
-    /* Filmstrip overlay */
-    .filmstrip-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.85);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 3000;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s, visibility 0.3s;
-    }
-    .filmstrip-overlay.visible {
-      opacity: 1;
-      visibility: visible;
-    }
-    .filmstrip-container {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 20px 30px;
-      max-width: 90vw;
-      overflow-x: auto;
-      overflow-y: hidden;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(255,255,255,0.3) transparent;
-    }
+    .filmstrip-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); display: flex; align-items: center; justify-content: center; z-index: 3000; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+    .filmstrip-overlay.visible { opacity: 1; visibility: visible; }
+    .filmstrip-container { display: flex; align-items: center; gap: 16px; padding: 20px 30px; max-width: 90vw; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.3) transparent; }
     .filmstrip-container::-webkit-scrollbar { height: 6px; }
     .filmstrip-container::-webkit-scrollbar-track { background: transparent; }
     .filmstrip-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
     .filmstrip-container::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.5); }
-    .filmstrip-item {
-      flex-shrink: 0;
-      cursor: pointer;
-      border: 3px solid transparent;
-      border-radius: 8px;
-      overflow: hidden;
-      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-      position: relative;
-      background: #fff;
-    }
-    .filmstrip-item:hover {
-      transform: scale(1.05);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    }
-    .filmstrip-item.active {
-      border-color: var(--active);
-      box-shadow: 0 0 0 2px var(--active), 0 8px 24px rgba(59, 130, 246, 0.4);
-    }
-    .filmstrip-item canvas {
-      display: block;
-      height: 220px;
-      width: auto;
-    }
-    .filmstrip-item-number {
-      position: absolute;
-      bottom: 6px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.7);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 10px;
-    }
-    .filmstrip-hint {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 12px;
-      font-weight: 500;
-    }
+    .filmstrip-item { flex-shrink: 0; cursor: pointer; border: 3px solid transparent; border-radius: 8px; overflow: hidden; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; position: relative; background: #fff; }
+    .filmstrip-item:hover { transform: scale(1.05); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
+    .filmstrip-item.active { border-color: var(--active); box-shadow: 0 0 0 2px var(--active), 0 8px 24px rgba(59, 130, 246, 0.4); }
+    .filmstrip-item canvas { display: block; height: 220px; width: auto; }
+    .filmstrip-item-number { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+    .filmstrip-hint { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255, 255, 255, 0.6); font-size: 12px; font-weight: 500; }
   </style>
 </head>
 <body>
   <input type="file" id="pdfInput" accept="application/pdf">
-
-  <!-- Menu button to toggle toolbar -->
   <button class="menu-btn" id="menuBtn" title="Menu">
     <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M13.77 3.043a34 34 0 0 0-3.54 0"/><path d="M13.771 20.956a33 33 0 0 1-3.541.001"/><path d="M20.18 17.74c-.51 1.15-1.29 1.93-2.439 2.44"/><path d="M20.18 6.259c-.51-1.148-1.291-1.929-2.44-2.438"/><path d="M20.957 10.23a33 33 0 0 1 0 3.54"/><path d="M3.043 10.23a34 34 0 0 0 .001 3.541"/><path d="M6.26 20.179c-1.15-.508-1.93-1.29-2.44-2.438"/><path d="M6.26 3.82c-1.149.51-1.93 1.291-2.44 2.44"/></svg>
   </button>
-
   <div class="toolbar hidden" id="toolbar">
-    <button class="tool-btn" id="pdfBtn" title="Open PDF">
-      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-    </button>
+    <button class="tool-btn" id="pdfBtn" title="Open PDF"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></button>
     <div class="divider"></div>
     <button class="tool-btn active" id="penTool" title="Pen (P)"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></button>
     <button class="tool-btn" id="eraserTool" title="Eraser (E)"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L13.5 3a2 2 0 012.8 0L21 7.5a2 2 0 010 2.8L11 20"/><path d="M6.5 13.5L11 9"/></svg></button>
@@ -222,39 +118,25 @@
     <button class="tool-btn" id="redoBtn" title="Redo (Ctrl+Shift+Z)"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-2.5-6.5L21 7"/></svg></button>
     <div class="divider"></div>
     <button class="tool-btn" id="clearBtn" title="Clear Page Annotations"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
-
-    <!-- PDF Controls (shown when PDF is open) -->
     <div class="divider pdf-controls" id="pdfDivider"></div>
     <div class="pdf-controls" id="pdfControls">
-      <button class="pdf-nav-btn" id="prevPage" title="Previous Page">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
+      <button class="pdf-nav-btn" id="prevPage" title="Previous Page"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
       <span class="pdf-page-info" id="pageInfo">1 / 1</span>
-      <button class="pdf-nav-btn" id="nextPage" title="Next Page">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-      <button class="pdf-nav-btn pdf-close-btn" id="closePdf" title="Close PDF">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <button class="pdf-nav-btn" id="nextPage" title="Next Page"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button class="pdf-nav-btn pdf-close-btn" id="closePdf" title="Close PDF"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
-
   <div class="color-modal-overlay" id="colorModalOverlay">
     <div class="color-modal">
       <div class="color-modal-title">Choose Color</div>
       <div class="color-modal-grid" id="colorModalGrid"></div>
     </div>
   </div>
-
   <div class="filmstrip-overlay" id="filmstripOverlay">
     <div class="filmstrip-container" id="filmstripContainer"></div>
     <span class="filmstrip-hint">Tap a page to navigate • Tap outside to close</span>
   </div>
-
-  <div class="loading-overlay" id="loadingOverlay">
-    <div class="loading-spinner"></div>
-  </div>
-
+  <div class="loading-overlay" id="loadingOverlay"><div class="loading-spinner"></div></div>
   <div class="canvas-container no-pdf" id="canvasContainer">
     <div class="pdf-page-container" id="pdfPageContainer">
       <canvas id="pdf-canvas"></canvas>
@@ -262,9 +144,7 @@
     </div>
     <div class="eraser-cursor" id="eraserCursor"></div>
   </div>
-
   <script type="module">
-    // Initialize PDF.js
     const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
 
@@ -274,90 +154,36 @@
     const colors = ['#1f2937','#6b7280','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#8b5cf6','#ec4899'];
 
     let tool = 'pen', width = 5.5, color = '#1f2937', sizeIdx = 10, drawing = false, path = null, points = [];
-    let strokes = [], undoStack = [];
+    let strokes = [], undoStack = [], pageAnnotations = {};
     let eraserEnd = false, lassoEnd = false, prevTool = 'pen', pressure = true, bigEraser = false, tapTimes = [], segLen = 0;
+    let pdfDoc = null, currentPage = 1, totalPages = 0, pdfPageWidth = 0, pdfPageHeight = 0;
+    let toolbarVisible = false, filmstripThumbnails = [];
 
-    // PDF state
-    let pdfDoc = null, currentPage = 1, totalPages = 0;
-    let pageAnnotations = {}; // Store annotations per page: { pageNum: { strokes: [], undoStack: [] } }
-
-    // PDF coordinate system - used for fixed coordinate mapping
-    let pdfPageWidth = 0, pdfPageHeight = 0;  // Native PDF page dimensions
-
-    // Get scale factor for PDF mode
-    const getPdfScale = () => {
-      if (pdfDoc && pdfPageWidth > 0) {
-        const containerWidth = container.getBoundingClientRect().width;
-        return pdfPageWidth / (containerWidth * dpr);
-      }
-      return 1;
-    };
-
-    // Get effective stroke width (scaled for PDF mode)
-    const getEffectiveWidth = () => width * getPdfScale();
-
-    // Get effective handle size (scaled for PDF mode)
-    const getEffectiveHandleSize = (size) => size * getPdfScale();
-
-    // Toolbar visibility state
-    let toolbarVisible = false;
-
-    // Lasso state
-    let lassoPath = null;
-    let lassoPoints = [];
-    let selectedStrokes = [];
-    let selectionBoxes = [];
-    let selectionHandles = [];
-    let rotationHandle = null;
-    let rotationLine = null;
-    let isDraggingSelection = false;
-    let isScalingSelection = false;
-    let isRotatingSelection = false;
-    let activeHandle = null; // 'tl', 'tr', 'bl', 'br' for corners
-    let dragStartX = 0, dragStartY = 0;
-    let selectionBounds = null;
-    let originalBounds = null;
-    let originalStrokePoints = [];
-    let rotationCenterX = 0, rotationCenterY = 0;
-    let startAngle = 0;
-    let currentRotation = 0;
-    let previousRotation = 0; // Accumulated rotation from previous operations
-    let scaleAnchorWorldX = 0, scaleAnchorWorldY = 0; // World-space anchor for scaling
+    let lassoPath = null, lassoPoints = [], selectedStrokes = [], selectionBoxes = [], selectionHandles = [];
+    let rotationHandle = null, rotationLine = null, duplicateHandle = null, duplicateIcon = null;
+    let isDraggingSelection = false, isScalingSelection = false, isRotatingSelection = false;
+    let activeHandle = null, dragStartX = 0, dragStartY = 0, selectionBounds = null, originalBounds = null, originalStrokePoints = [];
+    let rotationCenterX = 0, rotationCenterY = 0, startAngle = 0, currentRotation = 0, previousRotation = 0;
+    let scaleAnchorWorldX = 0, scaleAnchorWorldY = 0;
 
     const $ = id => document.getElementById(id);
     const svg = $('drawing-svg'), group = $('strokes-group'), container = $('canvasContainer');
     const cursor = $('eraserCursor'), sizeVal = $('sizeValue');
     const modal = $('colorModalOverlay'), grid = $('colorModalGrid');
     const pdfCanvas = $('pdf-canvas'), pdfCtx = pdfCanvas.getContext('2d');
-    const loadingOverlay = $('loadingOverlay');
-    const toolbar = $('toolbar'), pageInfo = $('pageInfo');
-    const pdfInput = $('pdfInput');
-    const pdfControls = $('pdfControls'), pdfDivider = $('pdfDivider');
-    const menuBtn = $('menuBtn');
-    const filmstripOverlay = $('filmstripOverlay');
-    const filmstripContainer = $('filmstripContainer');
-    let filmstripThumbnails = []; // Cache thumbnails
+    const loadingOverlay = $('loadingOverlay'), toolbar = $('toolbar'), pageInfo = $('pageInfo');
+    const pdfInput = $('pdfInput'), pdfControls = $('pdfControls'), pdfDivider = $('pdfDivider');
+    const menuBtn = $('menuBtn'), filmstripOverlay = $('filmstripOverlay'), filmstripContainer = $('filmstripContainer');
+    const activePointers = new Map();
+    let gestureStartDistance = 0, swipeStartX = 0, swipeStartY = 0;
 
-    // Show/hide toolbar functions
-    const showToolbar = () => {
-      toolbarVisible = true;
-      toolbar.classList.remove('hidden');
-    };
+    const getPdfScale = () => pdfDoc && pdfPageWidth > 0 ? pdfPageWidth / (container.getBoundingClientRect().width * dpr) : 1;
+    const getEffectiveWidth = () => width * getPdfScale();
+    const getEffectiveHandleSize = size => size * getPdfScale();
+    const showToolbar = () => { toolbarVisible = true; toolbar.classList.remove('hidden'); };
+    const hideToolbar = () => { toolbarVisible = false; toolbar.classList.add('hidden'); };
+    const toggleToolbar = () => toolbarVisible ? hideToolbar() : showToolbar();
 
-    const hideToolbar = () => {
-      toolbarVisible = false;
-      toolbar.classList.add('hidden');
-    };
-
-    const toggleToolbar = () => {
-      if (toolbarVisible) {
-        hideToolbar();
-      } else {
-        showToolbar();
-      }
-    };
-
-    // Initialize color palette
     colors.forEach(c => {
       const b = document.createElement('button');
       b.className = 'color-modal-btn' + (c === color ? ' selected' : '');
@@ -387,7 +213,6 @@
     };
 
     const updateCursor = () => {
-      // Cursor size in CSS pixels - diameter = width * 3 screen pixels
       const s = width * 3 * (bigEraser ? BIG_ERASER_MULT : 1);
       cursor.style.width = cursor.style.height = s + 'px';
       cursor.classList.toggle('big-eraser', bigEraser);
@@ -402,32 +227,36 @@
 
     const resetBig = () => { if (bigEraser) { bigEraser = false; tapTimes = []; updateCursor(); } };
 
-    // Lasso functions
+    const removeDuplicateUI = () => {
+      if (duplicateHandle) { duplicateHandle.remove(); duplicateHandle = null; }
+      if (duplicateIcon) { duplicateIcon.remove(); duplicateIcon = null; }
+    };
+
+    const removeRotationUI = () => {
+      if (rotationHandle) { rotationHandle.remove(); rotationHandle = null; }
+      if (rotationLine) { rotationLine.remove(); rotationLine = null; }
+    };
+
     const clearSelection = () => {
       selectedStrokes = [];
       selectionBoxes.forEach(box => box.remove());
       selectionBoxes = [];
       selectionHandles.forEach(h => h.remove());
       selectionHandles = [];
-      if (rotationHandle) { rotationHandle.remove(); rotationHandle = null; }
-      if (rotationLine) { rotationLine.remove(); rotationLine = null; }
+      removeRotationUI();
+      removeDuplicateUI();
       if (lassoPath) { lassoPath.remove(); lassoPath = null; }
       lassoPoints = [];
-      selectionBounds = null;
-      originalBounds = null;
+      selectionBounds = originalBounds = null;
       originalStrokePoints = [];
-      currentRotation = 0;
-      previousRotation = 0;
+      currentRotation = previousRotation = 0;
     };
 
     const pointInPolygon = (x, y, polygon) => {
       let inside = false;
       for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].x, yi = polygon[i].y;
-        const xj = polygon[j].x, yj = polygon[j].y;
-        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-          inside = !inside;
-        }
+        const xi = polygon[i].x, yi = polygon[i].y, xj = polygon[j].x, yj = polygon[j].y;
+        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
       }
       return inside;
     };
@@ -435,18 +264,16 @@
     const createSelectionHandles = () => {
       selectionHandles.forEach(h => h.remove());
       selectionHandles = [];
-      if (rotationHandle) { rotationHandle.remove(); rotationHandle = null; }
-      if (rotationLine) { rotationLine.remove(); rotationLine = null; }
+      removeRotationUI();
+      removeDuplicateUI();
       if (!selectionBounds) return;
 
-      const handleSize = getEffectiveHandleSize(30);
-      const rotationOffset = getEffectiveHandleSize(50);
-      const rotationRadius = getEffectiveHandleSize(20);
+      const handleSize = getEffectiveHandleSize(30), rotationOffset = getEffectiveHandleSize(50);
       const corners = [
-        { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
-        { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
-        { id: 'bl', x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
-        { id: 'br', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
+        { x: selectionBounds.x, y: selectionBounds.y },
+        { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
+        { x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
+        { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
       ];
 
       corners.forEach(corner => {
@@ -456,14 +283,11 @@
         handle.setAttribute('y', corner.y - handleSize / 2);
         handle.setAttribute('width', handleSize);
         handle.setAttribute('height', handleSize);
-        handle.setAttribute('data-handle', corner.id);
         group.appendChild(handle);
         selectionHandles.push(handle);
       });
 
-      // Create rotation line
-      const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const topY = selectionBounds.y;
+      const centerX = selectionBounds.x + selectionBounds.width / 2, topY = selectionBounds.y;
       rotationLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       rotationLine.classList.add('rotation-line');
       rotationLine.setAttribute('x1', centerX);
@@ -472,32 +296,51 @@
       rotationLine.setAttribute('y2', topY - rotationOffset);
       group.appendChild(rotationLine);
 
-      // Create rotation handle (circle at top center)
       rotationHandle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       rotationHandle.classList.add('rotation-handle');
       rotationHandle.setAttribute('cx', centerX);
       rotationHandle.setAttribute('cy', topY - rotationOffset);
-      rotationHandle.setAttribute('r', rotationRadius);
+      rotationHandle.setAttribute('r', getEffectiveHandleSize(20));
       group.appendChild(rotationHandle);
+
+      if (currentRotation === 0) {
+        const bottomY = selectionBounds.y + selectionBounds.height;
+        const duplicateOffset = getEffectiveHandleSize(50), duplicateSize = getEffectiveHandleSize(36);
+        duplicateHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        duplicateHandle.classList.add('duplicate-handle');
+        duplicateHandle.setAttribute('x', centerX - duplicateSize / 2);
+        duplicateHandle.setAttribute('y', bottomY + duplicateOffset - duplicateSize / 2);
+        duplicateHandle.setAttribute('width', duplicateSize);
+        duplicateHandle.setAttribute('height', duplicateSize);
+        duplicateHandle.setAttribute('rx', getEffectiveHandleSize(6));
+        group.appendChild(duplicateHandle);
+
+        const iconSize = getEffectiveHandleSize(14), iconOffset = getEffectiveHandleSize(4);
+        duplicateIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        duplicateIcon.classList.add('duplicate-icon');
+        duplicateIcon.setAttribute('pointer-events', 'none');
+        duplicateIcon.innerHTML = `
+          <rect x="${centerX - iconSize/2 + iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 - iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="none" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
+          <rect x="${centerX - iconSize/2 - iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 + iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="#fff" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
+        `;
+        group.appendChild(duplicateIcon);
+      }
     };
 
     const updateSelectionUI = (preserveRotation = false) => {
       if (!selectionBounds || selectionBoxes.length === 0) return;
 
-      // Update selection box
       selectionBoxes[0].setAttribute('x', selectionBounds.x);
       selectionBoxes[0].setAttribute('y', selectionBounds.y);
       selectionBoxes[0].setAttribute('width', selectionBounds.width);
       selectionBoxes[0].setAttribute('height', selectionBounds.height);
 
-      // Update handles
-      const handleSize = getEffectiveHandleSize(30);
-      const rotationOffset = getEffectiveHandleSize(50);
+      const handleSize = getEffectiveHandleSize(30), rotationOffset = getEffectiveHandleSize(50);
       const corners = [
-        { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
-        { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
-        { id: 'bl', x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
-        { id: 'br', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
+        { x: selectionBounds.x, y: selectionBounds.y },
+        { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
+        { x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
+        { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
       ];
 
       selectionHandles.forEach((handle, i) => {
@@ -507,10 +350,10 @@
         handle.setAttribute('height', handleSize);
       });
 
-      // Update rotation handle and line
+      const centerX = selectionBounds.x + selectionBounds.width / 2;
+      const topY = selectionBounds.y, bottomY = selectionBounds.y + selectionBounds.height;
+
       if (rotationHandle && rotationLine) {
-        const centerX = selectionBounds.x + selectionBounds.width / 2;
-        const topY = selectionBounds.y;
         rotationLine.setAttribute('x1', centerX);
         rotationLine.setAttribute('y1', topY);
         rotationLine.setAttribute('x2', centerX);
@@ -520,30 +363,34 @@
         rotationHandle.setAttribute('r', getEffectiveHandleSize(20));
       }
 
-      // Preserve rotation transform if needed
-      if (preserveRotation && currentRotation !== 0) {
-        const cx = selectionBounds.x + selectionBounds.width / 2;
-        const cy = selectionBounds.y + selectionBounds.height / 2;
-        const degrees = currentRotation * (180 / Math.PI);
-        const rotateTransform = `rotate(${degrees}, ${cx}, ${cy})`;
+      if (duplicateHandle && duplicateIcon) {
+        const duplicateOffset = getEffectiveHandleSize(50), duplicateSize = getEffectiveHandleSize(36);
+        duplicateHandle.setAttribute('x', centerX - duplicateSize / 2);
+        duplicateHandle.setAttribute('y', bottomY + duplicateOffset - duplicateSize / 2);
+        duplicateHandle.setAttribute('width', duplicateSize);
+        duplicateHandle.setAttribute('height', duplicateSize);
+        duplicateHandle.setAttribute('rx', getEffectiveHandleSize(6));
 
-        if (selectionBoxes[0]) {
-          selectionBoxes[0].setAttribute('transform', rotateTransform);
-        }
-        selectionHandles.forEach(handle => {
-          handle.setAttribute('transform', rotateTransform);
-        });
-        if (rotationHandle) {
-          rotationHandle.setAttribute('transform', rotateTransform);
-        }
-        if (rotationLine) {
-          rotationLine.setAttribute('transform', rotateTransform);
-        }
+        const iconSize = getEffectiveHandleSize(14), iconOffset = getEffectiveHandleSize(4);
+        duplicateIcon.innerHTML = `
+          <rect x="${centerX - iconSize/2 + iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 - iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="none" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
+          <rect x="${centerX - iconSize/2 - iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 + iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="#fff" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
+        `;
+      }
+
+      if (preserveRotation && currentRotation !== 0) {
+        const cx = selectionBounds.x + selectionBounds.width / 2, cy = selectionBounds.y + selectionBounds.height / 2;
+        const rotateTransform = `rotate(${currentRotation * (180 / Math.PI)}, ${cx}, ${cy})`;
+        selectionBoxes[0]?.setAttribute('transform', rotateTransform);
+        selectionHandles.forEach(h => h.setAttribute('transform', rotateTransform));
+        rotationHandle?.setAttribute('transform', rotateTransform);
+        rotationLine?.setAttribute('transform', rotateTransform);
+        duplicateHandle?.setAttribute('transform', rotateTransform);
+        duplicateIcon?.setAttribute('transform', rotateTransform);
       }
     };
 
     const selectStrokesInLasso = () => {
-      // Clear previous selection boxes (but not the lasso path)
       selectionBoxes.forEach(box => box.remove());
       selectionBoxes = [];
       selectionHandles.forEach(h => h.remove());
@@ -551,23 +398,13 @@
       selectedStrokes = [];
       if (lassoPoints.length < 3) return;
 
-      // Find all strokes inside the lasso
       strokes.forEach(s => {
-        const isInside = s.points.some(p => pointInPolygon(p.x, p.y, lassoPoints));
-        if (isInside) {
-          selectedStrokes.push(s);
-        }
+        if (s.points.some(p => pointInPolygon(p.x, p.y, lassoPoints))) selectedStrokes.push(s);
       });
 
-      // Create a bounding box based on the lasso selection area
       if (selectedStrokes.length > 0) {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        lassoPoints.forEach(p => {
-          minX = Math.min(minX, p.x);
-          minY = Math.min(minY, p.y);
-          maxX = Math.max(maxX, p.x);
-          maxY = Math.max(maxY, p.y);
-        });
+        lassoPoints.forEach(p => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
         selectionBounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.classList.add('selection-box');
@@ -578,8 +415,6 @@
         rect.setAttribute('rx', 3);
         group.appendChild(rect);
         selectionBoxes.push(rect);
-
-        // Add corner handles
         createSelectionHandles();
       } else {
         selectionBounds = null;
@@ -591,49 +426,82 @@
       selectedStrokes.forEach(s => {
         s.element.remove();
         const idx = strokes.indexOf(s);
-        if (idx > -1) {
-          undoStack.push(strokes.splice(idx, 1)[0]);
-        }
+        if (idx > -1) undoStack.push(strokes.splice(idx, 1)[0]);
       });
       selectedStrokes = [];
       selectionBoxes.forEach(box => box.remove());
       selectionBoxes = [];
       selectionHandles.forEach(h => h.remove());
       selectionHandles = [];
-      if (rotationHandle) { rotationHandle.remove(); rotationHandle = null; }
-      if (rotationLine) { rotationLine.remove(); rotationLine = null; }
+      removeRotationUI();
+      removeDuplicateUI();
       selectionBounds = null;
-      currentRotation = 0;
-      previousRotation = 0;
+      currentRotation = previousRotation = 0;
       savePageAnnotations();
     };
 
-    // Transform point by inverse rotation to check against unrotated bounds
+    const duplicateSelectedStrokes = () => {
+      if (selectedStrokes.length === 0) return;
+      const offset = 20 * getPdfScale();
+      const newStrokes = [];
+
+      selectedStrokes.forEach(s => {
+        const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        el.classList.add('stroke-path');
+        el.setAttribute('fill', s.color);
+        const newPoints = s.points.map(p => ({ ...p, x: p.x + offset, y: p.y + offset }));
+        el.setAttribute('d', buildPath(newPoints, s.width));
+        group.appendChild(el);
+        const newStroke = { element: el, points: newPoints, color: s.color, width: s.width };
+        strokes.push(newStroke);
+        newStrokes.push(newStroke);
+      });
+
+      selectionBoxes.forEach(box => box.remove());
+      selectionBoxes = [];
+      selectionHandles.forEach(h => h.remove());
+      selectionHandles = [];
+      removeRotationUI();
+      removeDuplicateUI();
+
+      selectedStrokes = newStrokes;
+      currentRotation = previousRotation = 0;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      newStrokes.forEach(s => s.points.forEach(p => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }));
+      selectionBounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.classList.add('selection-box');
+      rect.setAttribute('x', minX);
+      rect.setAttribute('y', minY);
+      rect.setAttribute('width', maxX - minX);
+      rect.setAttribute('height', maxY - minY);
+      rect.setAttribute('rx', 3);
+      group.appendChild(rect);
+      selectionBoxes.push(rect);
+      createSelectionHandles();
+      savePageAnnotations();
+    };
+
     const transformPointForHitTest = (x, y) => {
       if (currentRotation === 0) return { x, y };
-      const cx = selectionBounds.x + selectionBounds.width / 2;
-      const cy = selectionBounds.y + selectionBounds.height / 2;
-      const cos = Math.cos(-currentRotation);
-      const sin = Math.sin(-currentRotation);
-      const dx = x - cx;
-      const dy = y - cy;
-      return {
-        x: cx + dx * cos - dy * sin,
-        y: cy + dx * sin + dy * cos
-      };
+      const cx = selectionBounds.x + selectionBounds.width / 2, cy = selectionBounds.y + selectionBounds.height / 2;
+      const cos = Math.cos(-currentRotation), sin = Math.sin(-currentRotation);
+      const dx = x - cx, dy = y - cy;
+      return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
     };
 
     const isInsideSelectionBox = (x, y) => {
       if (!selectionBounds || selectedStrokes.length === 0) return false;
       const p = transformPointForHitTest(x, y);
-      return p.x >= selectionBounds.x && p.x <= selectionBounds.x + selectionBounds.width &&
-             p.y >= selectionBounds.y && p.y <= selectionBounds.y + selectionBounds.height;
+      return p.x >= selectionBounds.x && p.x <= selectionBounds.x + selectionBounds.width && p.y >= selectionBounds.y && p.y <= selectionBounds.y + selectionBounds.height;
     };
 
     const getHandleAtPoint = (x, y) => {
       if (!selectionBounds || selectedStrokes.length === 0) return null;
       const p = transformPointForHitTest(x, y);
-      const handleHitSize = getEffectiveHandleSize(20); // Slightly larger hit area for 30px handles
+      const handleHitSize = getEffectiveHandleSize(20);
       const corners = [
         { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
         { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
@@ -641,141 +509,101 @@
         { id: 'br', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
       ];
       for (const corner of corners) {
-        if (Math.abs(p.x - corner.x) <= handleHitSize && Math.abs(p.y - corner.y) <= handleHitSize) {
-          return corner.id;
-        }
+        if (Math.abs(p.x - corner.x) <= handleHitSize && Math.abs(p.y - corner.y) <= handleHitSize) return corner.id;
       }
       return null;
     };
 
     const moveSelection = (dx, dy) => {
-      // Move all selected strokes
       selectedStrokes.forEach(s => {
         s.points = s.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy }));
         s.element.setAttribute('d', buildPath(s.points, s.width));
       });
-      // Update selection bounds and box
       if (selectionBounds) {
         selectionBounds.x += dx;
         selectionBounds.y += dy;
-        updateSelectionUI(true); // preserve rotation
+        updateSelectionUI(true);
       }
     };
 
     const scaleSelection = (newX, newY) => {
       if (!originalBounds || !activeHandle) return;
+      const origCx = originalBounds.x + originalBounds.width / 2, origCy = originalBounds.y + originalBounds.height / 2;
+      const cos = Math.cos(currentRotation), sin = Math.sin(currentRotation);
 
-      const anchorX = scaleAnchorWorldX;
-      const anchorY = scaleAnchorWorldY;
-      const origCx = originalBounds.x + originalBounds.width / 2;
-      const origCy = originalBounds.y + originalBounds.height / 2;
-      const cos = Math.cos(currentRotation);
-      const sin = Math.sin(currentRotation);
-
-      // Get the original handle position in world space
       let handleLocalX, handleLocalY;
-      if (activeHandle === 'tl') {
-        handleLocalX = originalBounds.x;
-        handleLocalY = originalBounds.y;
-      } else if (activeHandle === 'tr') {
-        handleLocalX = originalBounds.x + originalBounds.width;
-        handleLocalY = originalBounds.y;
-      } else if (activeHandle === 'bl') {
-        handleLocalX = originalBounds.x;
-        handleLocalY = originalBounds.y + originalBounds.height;
-      } else {
-        handleLocalX = originalBounds.x + originalBounds.width;
-        handleLocalY = originalBounds.y + originalBounds.height;
-      }
+      if (activeHandle === 'tl') { handleLocalX = originalBounds.x; handleLocalY = originalBounds.y; }
+      else if (activeHandle === 'tr') { handleLocalX = originalBounds.x + originalBounds.width; handleLocalY = originalBounds.y; }
+      else if (activeHandle === 'bl') { handleLocalX = originalBounds.x; handleLocalY = originalBounds.y + originalBounds.height; }
+      else { handleLocalX = originalBounds.x + originalBounds.width; handleLocalY = originalBounds.y + originalBounds.height; }
 
-      const dxH = handleLocalX - origCx;
-      const dyH = handleLocalY - origCy;
-      const handleWorldX = origCx + dxH * cos - dyH * sin;
-      const handleWorldY = origCy + dxH * sin + dyH * cos;
-
-      const origDist = Math.hypot(handleWorldX - anchorX, handleWorldY - anchorY);
-      const newDist = Math.hypot(newX - anchorX, newY - anchorY);
-
-      // Calculate uniform scale with minimum
+      const dxH = handleLocalX - origCx, dyH = handleLocalY - origCy;
+      const handleWorldX = origCx + dxH * cos - dyH * sin, handleWorldY = origCy + dxH * sin + dyH * cos;
+      const origDist = Math.hypot(handleWorldX - scaleAnchorWorldX, handleWorldY - scaleAnchorWorldY);
+      const newDist = Math.hypot(newX - scaleAnchorWorldX, newY - scaleAnchorWorldY);
       const minScale = 20 / Math.max(originalBounds.width, originalBounds.height);
       const scale = Math.max(minScale, origDist > 0 ? newDist / origDist : 1);
 
-      // Scale all strokes from the world-space anchor
       selectedStrokes.forEach((s, i) => {
         const origPoints = originalStrokePoints[i];
-        s.points = origPoints.map(pt => ({
-          ...pt,
-          x: anchorX + (pt.x - anchorX) * scale,
-          y: anchorY + (pt.y - anchorY) * scale
-        }));
+        s.points = origPoints.map(pt => ({ ...pt, x: scaleAnchorWorldX + (pt.x - scaleAnchorWorldX) * scale, y: scaleAnchorWorldY + (pt.y - scaleAnchorWorldY) * scale }));
         s.element.setAttribute('d', buildPath(s.points, s.width));
       });
 
-      // Calculate new bounds
-      const scaledWidth = originalBounds.width * scale;
-      const scaledHeight = originalBounds.height * scale;
-      const newCx = anchorX + (origCx - anchorX) * scale;
-      const newCy = anchorY + (origCy - anchorY) * scale;
-
+      const scaledWidth = originalBounds.width * scale, scaledHeight = originalBounds.height * scale;
+      const newCx = scaleAnchorWorldX + (origCx - scaleAnchorWorldX) * scale, newCy = scaleAnchorWorldY + (origCy - scaleAnchorWorldY) * scale;
       selectionBounds.x = newCx - scaledWidth / 2;
       selectionBounds.y = newCy - scaledHeight / 2;
       selectionBounds.width = scaledWidth;
       selectionBounds.height = scaledHeight;
-
       updateSelectionUI(true);
     };
 
     const isOnRotationHandle = (x, y) => {
       if (!selectionBounds || selectedStrokes.length === 0 || !rotationHandle) return false;
       const p = transformPointForHitTest(x, y);
-      const rotationOffset = getEffectiveHandleSize(50);
       const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const handleY = selectionBounds.y - rotationOffset;
-      const hitRadius = getEffectiveHandleSize(25);
-      return Math.hypot(p.x - centerX, p.y - handleY) <= hitRadius;
+      const handleY = selectionBounds.y - getEffectiveHandleSize(50);
+      return Math.hypot(p.x - centerX, p.y - handleY) <= getEffectiveHandleSize(25);
+    };
+
+    const isOnDuplicateHandle = (x, y) => {
+      if (!selectionBounds || selectedStrokes.length === 0 || !duplicateHandle) return false;
+      const p = transformPointForHitTest(x, y);
+      const centerX = selectionBounds.x + selectionBounds.width / 2;
+      const handleY = selectionBounds.y + selectionBounds.height + getEffectiveHandleSize(50);
+      const hitSize = getEffectiveHandleSize(22);
+      return Math.abs(p.x - centerX) <= hitSize && Math.abs(p.y - handleY) <= hitSize;
     };
 
     const rotateSelection = (x, y) => {
       if (!originalBounds) return;
-
       const angle = Math.atan2(y - rotationCenterY, x - rotationCenterX);
       const deltaAngle = angle - startAngle;
       const totalRotation = previousRotation + deltaAngle;
-      const cos = Math.cos(deltaAngle);
-      const sin = Math.sin(deltaAngle);
+      const cos = Math.cos(deltaAngle), sin = Math.sin(deltaAngle);
 
-      // Rotate all strokes around the center
       selectedStrokes.forEach((s, i) => {
         const origPoints = originalStrokePoints[i];
         s.points = origPoints.map(p => {
-          const dx = p.x - rotationCenterX;
-          const dy = p.y - rotationCenterY;
+          const dx = p.x - rotationCenterX, dy = p.y - rotationCenterY;
           return { ...p, x: rotationCenterX + dx * cos - dy * sin, y: rotationCenterY + dx * sin + dy * cos };
         });
         s.element.setAttribute('d', buildPath(s.points, s.width));
       });
 
-      // Apply rotation transform to selection UI
       const rotateTransform = `rotate(${totalRotation * (180 / Math.PI)}, ${rotationCenterX}, ${rotationCenterY})`;
-      if (selectionBoxes[0]) selectionBoxes[0].setAttribute('transform', rotateTransform);
+      selectionBoxes[0]?.setAttribute('transform', rotateTransform);
       selectionHandles.forEach(h => h.setAttribute('transform', rotateTransform));
-      if (rotationHandle) rotationHandle.setAttribute('transform', rotateTransform);
-      if (rotationLine) rotationLine.setAttribute('transform', rotateTransform);
-
+      rotationHandle?.setAttribute('transform', rotateTransform);
+      rotationLine?.setAttribute('transform', rotateTransform);
       currentRotation = totalRotation;
     };
 
-    // Save current page annotations
     const savePageAnnotations = () => {
-      if (pdfDoc) {
-        pageAnnotations[currentPage] = {
-          strokes: strokes.map(s => ({ ...s })),
-          undoStack: undoStack.map(s => ({ ...s }))
-        };
-      }
+      if (pdfDoc) pageAnnotations[currentPage] = { strokes: strokes.map(s => ({ ...s })), undoStack: undoStack.map(s => ({ ...s })) };
     };
 
-    // Load page annotations
     const loadPageAnnotations = () => {
       group.innerHTML = '';
       const data = pageAnnotations[currentPage];
@@ -801,42 +629,17 @@
       }
     };
 
-    const undo = () => {
-      if (strokes.length) {
-        const s = strokes.pop();
-        undoStack.push(s);
-        s.element.remove();
-        savePageAnnotations();
-      }
-    };
-
-    const redo = () => {
-      if (undoStack.length) {
-        const s = undoStack.pop();
-        group.appendChild(s.element);
-        strokes.push(s);
-        savePageAnnotations();
-      }
-    };
-
-    const isPen = e => e.pointerType === 'pen';
+    const undo = () => { if (strokes.length) { const s = strokes.pop(); undoStack.push(s); s.element.remove(); savePageAnnotations(); } };
+    const redo = () => { if (undoStack.length) { const s = undoStack.pop(); group.appendChild(s.element); strokes.push(s); savePageAnnotations(); } };
     const isEraser = e => e.button === 5 || (e.buttons & 32) !== 0;
     const isLassoButton = e => e.button === 2 || (e.buttons & 2) !== 0;
 
-    // Convert screen coordinates to SVG/PDF-space coordinates
     const getData = e => {
       const r = svg.getBoundingClientRect();
-
       if (pdfDoc && pdfPageWidth > 0) {
-        // When PDF is loaded, SVG is sized to match PDF page
-        // Convert screen coords to PDF page coords using the viewBox
-        const x = ((e.clientX - r.left) / r.width) * pdfPageWidth;
-        const y = ((e.clientY - r.top) / r.height) * pdfPageHeight;
-        return { x, y, pressure: e.pressure ?? 0.5 };
-      } else {
-        // No PDF loaded, use screen coordinates with dpr
-        return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr, pressure: e.pressure ?? 0.5 };
+        return { x: ((e.clientX - r.left) / r.width) * pdfPageWidth, y: ((e.clientY - r.top) / r.height) * pdfPageHeight, pressure: e.pressure ?? 0.5 };
       }
+      return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr, pressure: e.pressure ?? 0.5 };
     };
 
     function buildPath(pts, w) {
@@ -872,42 +675,25 @@
       group.appendChild(path);
     };
 
-    const finalize = () => {
-      if (path && points.length > 1) {
-        strokes.push({ element: path, points: [...points], color, width: getEffectiveWidth() });
-        savePageAnnotations();
-      }
-    };
-
-    const setCursor = e => {
-      cursor.style.left = e.clientX + 'px';
-      cursor.style.top = e.clientY + 'px';
-    };
+    const finalize = () => { if (path && points.length > 1) { strokes.push({ element: path, points: [...points], color, width: getEffectiveWidth() }); savePageAnnotations(); } };
+    const setCursor = e => { cursor.style.left = e.clientX + 'px'; cursor.style.top = e.clientY + 'px'; };
 
     function start(e) {
-      // Only accept pen input (touch is handled separately for gestures)
       if (e.pointerType === 'touch') return;
       if (isEraser(e)) {
-        eraserEnd = true;
-        lassoEnd = false;
-        prevTool = tool;
+        eraserEnd = true; lassoEnd = false; prevTool = tool;
         if (tool !== 'eraser') setTool('eraser');
-        checkTap();
-        setCursor(e);
+        checkTap(); setCursor(e);
       } else if (isLassoButton(e)) {
-        lassoEnd = true;
-        eraserEnd = false;
-        prevTool = tool;
+        lassoEnd = true; eraserEnd = false; prevTool = tool;
         if (tool !== 'lasso') setTool('lasso');
       } else {
         if (e.button && e.button !== 0) return;
-        eraserEnd = false;
-        lassoEnd = false;
+        eraserEnd = lassoEnd = false;
       }
       e.preventDefault();
       const d = getData(e);
 
-      // Check if clicking on rotation handle
       if (tool === 'lasso' && isOnRotationHandle(d.x, d.y)) {
         isRotatingSelection = true;
         originalBounds = { ...selectionBounds };
@@ -915,12 +701,14 @@
         rotationCenterX = selectionBounds.x + selectionBounds.width / 2;
         rotationCenterY = selectionBounds.y + selectionBounds.height / 2;
         startAngle = Math.atan2(d.y - rotationCenterY, d.x - rotationCenterX);
-        previousRotation = currentRotation; // Store accumulated rotation
+        previousRotation = currentRotation;
+        removeDuplicateUI();
         drawing = false;
         return;
       }
 
-      // Check if clicking on a handle to scale
+      if (tool === 'lasso' && isOnDuplicateHandle(d.x, d.y)) { duplicateSelectedStrokes(); drawing = false; return; }
+
       if (tool === 'lasso') {
         const handle = getHandleAtPoint(d.x, d.y);
         if (handle) {
@@ -928,42 +716,24 @@
           activeHandle = handle;
           originalBounds = { ...selectionBounds };
           originalStrokePoints = selectedStrokes.map(s => s.points.map(p => ({ ...p })));
-
-          // Calculate world-space anchor (opposite corner) at the start of scaling
-          const cx = selectionBounds.x + selectionBounds.width / 2;
-          const cy = selectionBounds.y + selectionBounds.height / 2;
+          const cx = selectionBounds.x + selectionBounds.width / 2, cy = selectionBounds.y + selectionBounds.height / 2;
           let anchorLocalX, anchorLocalY;
-          if (handle === 'tl') {
-            anchorLocalX = selectionBounds.x + selectionBounds.width;
-            anchorLocalY = selectionBounds.y + selectionBounds.height;
-          } else if (handle === 'tr') {
-            anchorLocalX = selectionBounds.x;
-            anchorLocalY = selectionBounds.y + selectionBounds.height;
-          } else if (handle === 'bl') {
-            anchorLocalX = selectionBounds.x + selectionBounds.width;
-            anchorLocalY = selectionBounds.y;
-          } else { // br
-            anchorLocalX = selectionBounds.x;
-            anchorLocalY = selectionBounds.y;
-          }
-          // Transform anchor to world space
-          const cos = Math.cos(currentRotation);
-          const sin = Math.sin(currentRotation);
-          const dxA = anchorLocalX - cx;
-          const dyA = anchorLocalY - cy;
+          if (handle === 'tl') { anchorLocalX = selectionBounds.x + selectionBounds.width; anchorLocalY = selectionBounds.y + selectionBounds.height; }
+          else if (handle === 'tr') { anchorLocalX = selectionBounds.x; anchorLocalY = selectionBounds.y + selectionBounds.height; }
+          else if (handle === 'bl') { anchorLocalX = selectionBounds.x + selectionBounds.width; anchorLocalY = selectionBounds.y; }
+          else { anchorLocalX = selectionBounds.x; anchorLocalY = selectionBounds.y; }
+          const cos = Math.cos(currentRotation), sin = Math.sin(currentRotation);
+          const dxA = anchorLocalX - cx, dyA = anchorLocalY - cy;
           scaleAnchorWorldX = cx + dxA * cos - dyA * sin;
           scaleAnchorWorldY = cy + dxA * sin + dyA * cos;
-
           drawing = false;
           return;
         }
       }
 
-      // Check if clicking inside selection box to drag
       if (tool === 'lasso' && isInsideSelectionBox(d.x, d.y)) {
         isDraggingSelection = true;
-        dragStartX = d.x;
-        dragStartY = d.y;
+        dragStartX = d.x; dragStartY = d.y;
         drawing = false;
         return;
       }
@@ -976,13 +746,7 @@
       if (tool === 'pen') newPath();
       if (tool === 'eraser') setCursor(e);
       if (tool === 'lasso') {
-        // If there was a selection and user clicked outside, switch to pen tool
-        if (selectedStrokes.length > 0) {
-          clearSelection();
-          setTool('pen');
-          drawing = false;
-          return;
-        }
+        if (selectedStrokes.length > 0) { clearSelection(); setTool('pen'); drawing = false; return; }
         clearSelection();
         lassoPoints = [{ x: d.x, y: d.y }];
         lassoPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -993,50 +757,20 @@
     }
 
     function move(e) {
-      // Only accept pen input (touch is handled separately for gestures)
       if (e.pointerType === 'touch') return;
-
-      // Handle rotation
-      if (isRotatingSelection) {
-        e.preventDefault();
-        const d = getData(e);
-        rotateSelection(d.x, d.y);
-        return;
-      }
-
-      // Handle scaling selection
-      if (isScalingSelection) {
-        e.preventDefault();
-        const d = getData(e);
-        scaleSelection(d.x, d.y);
-        return;
-      }
-
-      // Handle dragging selection
-      if (isDraggingSelection) {
-        e.preventDefault();
-        const d = getData(e);
-        const dx = d.x - dragStartX;
-        const dy = d.y - dragStartY;
-        moveSelection(dx, dy);
-        dragStartX = d.x;
-        dragStartY = d.y;
-        return;
-      }
-
+      if (isRotatingSelection) { e.preventDefault(); rotateSelection(getData(e).x, getData(e).y); return; }
+      if (isScalingSelection) { e.preventDefault(); const d = getData(e); scaleSelection(d.x, d.y); return; }
+      if (isDraggingSelection) { e.preventDefault(); const d = getData(e); moveSelection(d.x - dragStartX, d.y - dragStartY); dragStartX = d.x; dragStartY = d.y; return; }
       if (!drawing) return;
       e.preventDefault();
       const d = getData(e);
       if (tool === 'eraser') { setCursor(e); erase(d.x, d.y); return; }
       if (tool === 'lasso') {
         const last = lassoPoints[lassoPoints.length - 1];
-        const dist = Math.hypot(d.x - last.x, d.y - last.y);
-        if (dist < 3) return;
+        if (Math.hypot(d.x - last.x, d.y - last.y) < 3) return;
         lassoPoints.push({ x: d.x, y: d.y });
         let pathD = `M${lassoPoints[0].x},${lassoPoints[0].y}`;
-        for (let i = 1; i < lassoPoints.length; i++) {
-          pathD += `L${lassoPoints[i].x},${lassoPoints[i].y}`;
-        }
+        for (let i = 1; i < lassoPoints.length; i++) pathD += `L${lassoPoints[i].x},${lassoPoints[i].y}`;
         lassoPath.setAttribute('d', pathD);
         return;
       }
@@ -1045,147 +779,66 @@
       segLen += dist;
       points.push(d);
       path.setAttribute('d', buildPath(points, getEffectiveWidth()));
-      if (segLen >= SEGMENT_MAX) {
-        finalize();
-        points = points.slice(-2);
-        segLen = 0;
-        newPath();
-      }
+      if (segLen >= SEGMENT_MAX) { finalize(); points = points.slice(-2); segLen = 0; newPath(); }
     }
 
     function stop(e) {
-      // Only accept pen input (touch is handled separately for gestures)
       if (e && e.pointerType === 'touch') return;
-
-      // Handle end of rotation
-      if (isRotatingSelection) {
-        isRotatingSelection = false;
-        // Keep the transform on UI elements - don't recalculate bounds
-        // The selection box stays rotated with the strokes
-        originalBounds = null;
-        originalStrokePoints = [];
-        savePageAnnotations();
-        return;
-      }
-
-      // Handle end of scaling selection
-      if (isScalingSelection) {
-        isScalingSelection = false;
-        activeHandle = null;
-        originalBounds = null;
-        originalStrokePoints = [];
-        savePageAnnotations();
-        return;
-      }
-
-      // Handle end of dragging selection
-      if (isDraggingSelection) {
-        isDraggingSelection = false;
-        savePageAnnotations();
-        return;
-      }
-
+      if (isRotatingSelection) { isRotatingSelection = false; originalBounds = null; originalStrokePoints = []; savePageAnnotations(); return; }
+      if (isScalingSelection) { isScalingSelection = false; activeHandle = null; originalBounds = null; originalStrokePoints = []; savePageAnnotations(); return; }
+      if (isDraggingSelection) { isDraggingSelection = false; savePageAnnotations(); return; }
       if (!drawing) return;
       drawing = false;
-      if (tool === 'pen' && path) {
-        strokes.push({ element: path, points: [...points], color, width: getEffectiveWidth() });
-        savePageAnnotations();
-        path = null;
-      }
-      if (tool === 'lasso' && lassoPath && lassoPoints.length >= 3) {
-        // Remove lasso path first, then show selection box
-        lassoPath.remove();
-        lassoPath = null;
-        selectStrokesInLasso();
-      } else if (tool === 'lasso') {
-        clearSelection();
-      }
+      if (tool === 'pen' && path) { strokes.push({ element: path, points: [...points], color, width: getEffectiveWidth() }); savePageAnnotations(); path = null; }
+      if (tool === 'lasso' && lassoPath && lassoPoints.length >= 3) { lassoPath.remove(); lassoPath = null; selectStrokesInLasso(); }
+      else if (tool === 'lasso') clearSelection();
       points = [];
-      if (eraserEnd) {
-        eraserEnd = false;
-        resetBig();
-        if (prevTool !== 'eraser') setTool(prevTool);
-      }
-      if (lassoEnd) {
-        lassoEnd = false;
-        // If strokes were selected, keep lasso tool active for manipulation
-        // Otherwise switch back to previous tool
-        if (selectedStrokes.length === 0 && prevTool !== 'lasso') {
-          setTool(prevTool);
-        }
-        // If strokes are selected, stay in lasso mode to allow rotate/move/scale
-      }
+      if (eraserEnd) { eraserEnd = false; resetBig(); if (prevTool !== 'eraser') setTool(prevTool); }
+      if (lassoEnd) { lassoEnd = false; if (selectedStrokes.length === 0 && prevTool !== 'lasso') setTool(prevTool); }
     }
 
     function erase(x, y) {
-      // Eraser radius: multiply by dpr to get consistent screen-pixel size in both modes
       const r = getEffectiveWidth() * 1.5 * (bigEraser ? BIG_ERASER_MULT : 1) * dpr;
       let erased = false;
       for (let i = strokes.length - 1; i >= 0; i--) {
         const s = strokes[i], b = s.element.getBBox();
         if (x < b.x-r || x > b.x+b.width+r || y < b.y-r || y > b.y+b.height+r) continue;
         for (const p of s.points) {
-          if (Math.hypot(x-p.x, y-p.y) < r + s.width) {
-            s.element.remove();
-            undoStack.push(strokes.splice(i,1)[0]);
-            erased = true;
-            break;
-          }
+          if (Math.hypot(x-p.x, y-p.y) < r + s.width) { s.element.remove(); undoStack.push(strokes.splice(i,1)[0]); erased = true; break; }
         }
       }
       if (erased) savePageAnnotations();
     }
 
-    // PDF rendering
     async function renderPage(pageNum) {
       if (!pdfDoc) return;
-
       const page = await pdfDoc.getPage(pageNum);
       const containerRect = container.getBoundingClientRect();
-      const horizontalMargin = 60; // 30px left + 30px right
-
-      // Get native PDF page dimensions
       const viewport = page.getViewport({ scale: 1 });
       pdfPageWidth = viewport.width;
       pdfPageHeight = viewport.height;
-
-      // Calculate scale to fit WIDTH with margins
-      const availableWidth = containerRect.width - horizontalMargin;
+      const availableWidth = containerRect.width - 60;
       const pdfScale = (availableWidth * dpr) / viewport.width;
-
       const scaledViewport = page.getViewport({ scale: pdfScale });
-
-      // Set canvas size to fit the scaled page exactly
-      const displayWidth = availableWidth;
-      const displayHeight = scaledViewport.height / dpr;
+      const displayWidth = availableWidth, displayHeight = scaledViewport.height / dpr;
 
       pdfCanvas.width = scaledViewport.width;
       pdfCanvas.height = scaledViewport.height;
       pdfCanvas.style.width = displayWidth + 'px';
       pdfCanvas.style.height = displayHeight + 'px';
 
-      // Set the page container size
       const pageContainer = $('pdfPageContainer');
       pageContainer.style.width = displayWidth + 'px';
       pageContainer.style.height = displayHeight + 'px';
 
-      // Clear and render (no offset needed - page fills width)
       pdfCtx.fillStyle = '#fff';
       pdfCtx.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+      await page.render({ canvasContext: pdfCtx, viewport: scaledViewport }).promise;
 
-      await page.render({
-        canvasContext: pdfCtx,
-        viewport: scaledViewport
-      }).promise;
-
-      // Set SVG viewBox to PDF page dimensions so strokes align with PDF content
       svg.setAttribute('viewBox', `0 0 ${pdfPageWidth} ${pdfPageHeight}`);
-
-      // SVG fills the page container
       svg.style.width = '100%';
       svg.style.height = '100%';
 
-      // Update page info
       pageInfo.textContent = `${pageNum} / ${totalPages}`;
       $('prevPage').disabled = pageNum <= 1;
       $('nextPage').disabled = pageNum >= totalPages;
@@ -1193,30 +846,20 @@
 
     async function loadPDF(file) {
       loadingOverlay.classList.add('visible');
-
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        pdfDoc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
         totalPages = pdfDoc.numPages;
         currentPage = 1;
         pageAnnotations = {};
-
-        // Clear current drawings
         group.innerHTML = '';
         strokes = [];
         undoStack = [];
-
         container.classList.remove('no-pdf');
         container.classList.add('pdf-mode');
-
-        // Show PDF controls in toolbar
         pdfControls.classList.add('visible');
         pdfDivider.classList.add('visible');
-
         await renderPage(1);
         loadPageAnnotations();
-
-        // Generate filmstrip thumbnails in background
         generateFilmstripThumbnails();
       } catch (err) {
         console.error('Error loading PDF:', err);
@@ -1230,19 +873,13 @@
       currentPage = 1;
       totalPages = 0;
       pageAnnotations = {};
-      pdfPageWidth = 0;
-      pdfPageHeight = 0;
-
+      pdfPageWidth = pdfPageHeight = 0;
       pdfCtx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
       group.innerHTML = '';
       strokes = [];
       undoStack = [];
-
-      // Clear filmstrip
       filmstripContainer.innerHTML = '';
       filmstripThumbnails = [];
-
-      // Reset page container and SVG to full container size
       const pageContainer = $('pdfPageContainer');
       pageContainer.style.width = '';
       pageContainer.style.height = '';
@@ -1250,22 +887,16 @@
       svg.style.height = '100%';
       const r = container.getBoundingClientRect();
       svg.setAttribute('viewBox', `0 0 ${r.width * dpr} ${r.height * dpr}`);
-
       container.classList.remove('pdf-mode');
       container.classList.add('no-pdf');
-
-      // Hide PDF controls in toolbar
       pdfControls.classList.remove('visible');
       pdfDivider.classList.remove('visible');
     }
 
     async function goToPage(pageNum, skipAnimation = false) {
       if (!pdfDoc || pageNum < 1 || pageNum > totalPages) return;
-
       const pageContainer = $('pdfPageContainer');
-
       if (skipAnimation) {
-        // Direct page change without animation
         savePageAnnotations();
         currentPage = pageNum;
         await renderPage(pageNum);
@@ -1273,60 +904,93 @@
         container.scrollTop = 0;
         return;
       }
-
       const direction = pageNum > currentPage ? 'left' : 'right';
-
-      // Slide out current page
       pageContainer.classList.add(`slide-out-${direction}`);
-
-      // Wait briefly before loading new page (50ms) for more overlap
       await new Promise(resolve => setTimeout(resolve, 50));
-
       savePageAnnotations();
       currentPage = pageNum;
       await renderPage(pageNum);
       loadPageAnnotations();
       container.scrollTop = 0;
-
-      // Position new page off-screen (opposite side), no transition
       pageContainer.classList.remove(`slide-out-${direction}`);
       pageContainer.classList.add(`slide-in-${direction}`);
-
-      // Force reflow
       void pageContainer.offsetWidth;
-
-      // Slide in new page with transition (overlaps with remaining slide-out)
       pageContainer.classList.remove(`slide-in-${direction}`);
     }
 
     const resize = () => {
       const r = container.getBoundingClientRect();
-      if (pdfDoc) {
-        // Re-render PDF page - this will also update SVG positioning
-        renderPage(currentPage);
-      } else {
-        // No PDF - SVG fills container
-        svg.setAttribute('viewBox', `0 0 ${r.width * dpr} ${r.height * dpr}`);
-      }
+      if (pdfDoc) renderPage(currentPage);
+      else svg.setAttribute('viewBox', `0 0 ${r.width * dpr} ${r.height * dpr}`);
     };
 
-    // Menu button toggles toolbar
-    menuBtn.onclick = (e) => {
-      e.stopPropagation();
-      toggleToolbar();
+    async function generateFilmstripThumbnails() {
+      if (!pdfDoc) return;
+      filmstripContainer.innerHTML = '';
+      filmstripThumbnails = [];
+      for (let i = 1; i <= totalPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 1 });
+        const scale = 220 / viewport.height;
+        const scaledViewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = scaledViewport.width;
+        canvas.height = scaledViewport.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
+        const item = document.createElement('div');
+        item.className = 'filmstrip-item' + (i === currentPage ? ' active' : '');
+        item.dataset.page = i;
+        item.appendChild(canvas);
+        const pageNum = document.createElement('span');
+        pageNum.className = 'filmstrip-item-number';
+        pageNum.textContent = i;
+        item.appendChild(pageNum);
+        item.onclick = async () => { hideFilmstrip(); if (i !== currentPage) await goToPage(i, true); };
+        filmstripContainer.appendChild(item);
+        filmstripThumbnails.push(item);
+      }
+    }
+
+    const showFilmstrip = () => {
+      if (!pdfDoc) return;
+      filmstripThumbnails.forEach((item, idx) => item.classList.toggle('active', idx + 1 === currentPage));
+      filmstripOverlay.classList.add('visible');
+      filmstripContainer.querySelector('.active')?.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'center' });
     };
 
-    // Hide toolbar when clicking outside
-    document.addEventListener('pointerdown', (e) => {
-      if (toolbarVisible && !toolbar.contains(e.target) && e.target !== menuBtn) {
-        hideToolbar();
-      }
-    });
+    const hideFilmstrip = () => filmstripOverlay.classList.remove('visible');
 
-    // Prevent toolbar clicks from closing it
-    toolbar.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-    });
+    function handleGestureStart(e) {
+      if (e.pointerType !== 'touch' || !pdfDoc) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (activePointers.size === 1) { swipeStartX = e.clientX; swipeStartY = e.clientY; }
+      else if (activePointers.size === 2) {
+        const pts = Array.from(activePointers.values());
+        gestureStartDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      }
+    }
+
+    function handleGestureMove(e) {
+      if (e.pointerType !== 'touch' || !pdfDoc || !activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (activePointers.size === 2) {
+        const pts = Array.from(activePointers.values());
+        if (gestureStartDistance - Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) > 150) { activePointers.clear(); showFilmstrip(); }
+      }
+    }
+
+    function handleGestureEnd(e) {
+      if (e.pointerType !== 'touch' || !pdfDoc) return;
+      if (activePointers.size === 1 && activePointers.has(e.pointerId)) {
+        const deltaX = e.clientX - swipeStartX, deltaY = e.clientY - swipeStartY;
+        if (Math.abs(deltaX) > 225 && Math.abs(deltaY) < Math.abs(deltaX) * 0.5) goToPage(deltaX > 0 ? currentPage - 1 : currentPage + 1);
+      }
+      activePointers.delete(e.pointerId);
+    }
+
+    menuBtn.onclick = e => { e.stopPropagation(); toggleToolbar(); };
+    document.addEventListener('pointerdown', e => { if (toolbarVisible && !toolbar.contains(e.target) && e.target !== menuBtn) hideToolbar(); });
+    toolbar.addEventListener('pointerdown', e => e.stopPropagation());
 
     $('penTool').onclick = () => setTool('pen');
     $('eraserTool').onclick = () => setTool('eraser');
@@ -1336,205 +1000,20 @@
     $('pressureBtn').onclick = () => { pressure = !pressure; $('pressureBtn').classList.toggle('active', pressure); };
     $('undoBtn').onclick = undo;
     $('redoBtn').onclick = redo;
-    $('clearBtn').onclick = () => {
-      if (strokes.length) {
-        undoStack.push(...strokes.reverse());
-        strokes = [];
-        group.innerHTML = '';
-        savePageAnnotations();
-      }
-    };
-
-    // PDF controls
+    $('clearBtn').onclick = () => { if (strokes.length) { undoStack.push(...strokes.reverse()); strokes = []; group.innerHTML = ''; savePageAnnotations(); } };
     $('pdfBtn').onclick = () => pdfInput.click();
-
-    pdfInput.onchange = async e => {
-      const file = e.target.files[0];
-      if (file) {
-        await loadPDF(file);
-      }
-      pdfInput.value = '';
-    };
-
+    pdfInput.onchange = async e => { if (e.target.files[0]) await loadPDF(e.target.files[0]); pdfInput.value = ''; };
     $('prevPage').onclick = () => goToPage(currentPage - 1);
     $('nextPage').onclick = () => goToPage(currentPage + 1);
     $('closePdf').onclick = closePDF;
+    filmstripOverlay.onclick = e => { if (e.target === filmstripOverlay) hideFilmstrip(); };
+    container.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; });
 
-    container.addEventListener('contextmenu', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      return false;
-    });
-
-    // Gesture detection using pointer events (finger only, not stylus)
-    const activePointers = new Map(); // Track active touch pointers
-    let gestureStartDistance = 0;
-    let swipeStartX = 0;
-    let swipeStartY = 0;
-
-    // Generate thumbnails for filmstrip
-    async function generateFilmstripThumbnails() {
-      if (!pdfDoc) return;
-
-      filmstripContainer.innerHTML = '';
-      filmstripThumbnails = [];
-
-      for (let i = 1; i <= totalPages; i++) {
-        const page = await pdfDoc.getPage(i);
-        const viewport = page.getViewport({ scale: 1 });
-        const thumbHeight = 220;
-        const scale = thumbHeight / viewport.height;
-        const scaledViewport = page.getViewport({ scale });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = scaledViewport.width;
-        canvas.height = scaledViewport.height;
-        const ctx = canvas.getContext('2d');
-
-        await page.render({
-          canvasContext: ctx,
-          viewport: scaledViewport
-        }).promise;
-
-        const item = document.createElement('div');
-        item.className = 'filmstrip-item' + (i === currentPage ? ' active' : '');
-        item.dataset.page = i;
-        item.appendChild(canvas);
-
-        const pageNum = document.createElement('span');
-        pageNum.className = 'filmstrip-item-number';
-        pageNum.textContent = i;
-        item.appendChild(pageNum);
-
-        item.onclick = async () => {
-          hideFilmstrip();
-          if (i !== currentPage) {
-            await goToPage(i, true); // Skip animation when selecting from filmstrip
-          }
-        };
-
-        filmstripContainer.appendChild(item);
-        filmstripThumbnails.push(item);
-      }
-    }
-
-    function showFilmstrip() {
-      if (!pdfDoc) return;
-
-      // Update active state
-      filmstripThumbnails.forEach((item, idx) => {
-        item.classList.toggle('active', idx + 1 === currentPage);
-      });
-
-      filmstripOverlay.classList.add('visible');
-
-      // Scroll to current page
-      const activeItem = filmstripContainer.querySelector('.active');
-      if (activeItem) {
-        activeItem.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'center' });
-      }
-    }
-
-    function hideFilmstrip() {
-      filmstripOverlay.classList.remove('visible');
-    }
-
-    // Close filmstrip when clicking outside
-    filmstripOverlay.onclick = (e) => {
-      if (e.target === filmstripOverlay) {
-        hideFilmstrip();
-      }
-    };
-
-    // Gesture functions for finger input only
-    function handleGestureStart(e) {
-      if (e.pointerType !== 'touch' || !pdfDoc) return;
-
-      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      if (activePointers.size === 1) {
-        swipeStartX = e.clientX;
-        swipeStartY = e.clientY;
-      } else if (activePointers.size === 2) {
-        const pts = Array.from(activePointers.values());
-        gestureStartDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      }
-    }
-
-    function handleGestureMove(e) {
-      if (e.pointerType !== 'touch' || !pdfDoc || !activePointers.has(e.pointerId)) return;
-
-      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      if (activePointers.size === 2) {
-        const pts = Array.from(activePointers.values());
-        const currentDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        if (gestureStartDistance - currentDistance > 150) {
-          activePointers.clear();
-          showFilmstrip();
-        }
-      }
-    }
-
-    function handleGestureEnd(e) {
-      if (e.pointerType !== 'touch' || !pdfDoc) return;
-
-      if (activePointers.size === 1 && activePointers.has(e.pointerId)) {
-        const deltaX = e.clientX - swipeStartX;
-        const deltaY = e.clientY - swipeStartY;
-        const isHorizontal = Math.abs(deltaY) < Math.abs(deltaX) * 0.5;
-
-        if (Math.abs(deltaX) > 225 && isHorizontal) {
-          goToPage(deltaX > 0 ? currentPage - 1 : currentPage + 1);
-        }
-      }
-      activePointers.delete(e.pointerId);
-    }
-
-    // Combined event listeners - pen/stylus for drawing, touch for gestures
-    container.addEventListener('pointerdown', e => {
-      e.preventDefault(); // Prevent browser from using event for scrolling
-      if (e.pointerType === 'touch') {
-        handleGestureStart(e);
-      } else {
-        // pen, mouse, or any other input type goes to drawing
-        start(e);
-      }
-    });
-
-    container.addEventListener('pointermove', e => {
-      e.preventDefault(); // Prevent browser from using event for scrolling
-      if (e.pointerType === 'touch') {
-        handleGestureMove(e);
-      } else {
-        move(e);
-      }
-    });
-
-    container.addEventListener('pointerup', e => {
-      if (e.pointerType === 'touch') {
-        handleGestureEnd(e);
-      } else {
-        stop(e);
-      }
-    });
-
-    container.addEventListener('pointerleave', e => {
-      if (e.pointerType === 'touch') {
-        activePointers.delete(e.pointerId);
-      } else {
-        stop(e);
-      }
-    });
-
-    container.addEventListener('pointercancel', e => {
-      if (e.pointerType === 'touch') {
-        activePointers.delete(e.pointerId);
-      } else {
-        stop(e);
-      }
-    });
-
+    container.addEventListener('pointerdown', e => { e.preventDefault(); e.pointerType === 'touch' ? handleGestureStart(e) : start(e); });
+    container.addEventListener('pointermove', e => { e.preventDefault(); e.pointerType === 'touch' ? handleGestureMove(e) : move(e); });
+    container.addEventListener('pointerup', e => { e.pointerType === 'touch' ? handleGestureEnd(e) : stop(e); });
+    container.addEventListener('pointerleave', e => { e.pointerType === 'touch' ? activePointers.delete(e.pointerId) : stop(e); });
+    container.addEventListener('pointercancel', e => { e.pointerType === 'touch' ? activePointers.delete(e.pointerId) : stop(e); });
     window.addEventListener('resize', resize);
 
     document.addEventListener('keydown', e => {
@@ -1546,10 +1025,8 @@
       if (e.key === ']') $('sizeUp').click();
       if (e.key === 'ArrowLeft' && pdfDoc) goToPage(currentPage - 1);
       if (e.key === 'ArrowRight' && pdfDoc) goToPage(currentPage + 1);
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedStrokes.length > 0) {
-        e.preventDefault();
-        deleteSelectedStrokes();
-      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedStrokes.length > 0) { e.preventDefault(); deleteSelectedStrokes(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedStrokes.length > 0) { e.preventDefault(); duplicateSelectedStrokes(); }
     });
 
     sizeVal.style.color = color;
