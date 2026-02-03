@@ -1470,7 +1470,7 @@
       if (activePointers.size === 2) {
         const pts = Array.from(activePointers.values());
         const currentDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        if (gestureStartDistance - currentDistance > 50) {
+        if (gestureStartDistance - currentDistance > 150) {
           activePointers.clear();
           showFilmstrip();
         }
