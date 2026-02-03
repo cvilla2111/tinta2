@@ -41,7 +41,7 @@
     .color-modal-btn:hover { transform: scale(1.15); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     .color-modal-btn.selected { border-color: var(--active); }
     .canvas-container { width: 100%; height: 100%; overflow: hidden; cursor: crosshair; position: relative; }
-    .canvas-container.pdf-mode { overflow-y: auto; overflow-x: hidden; background: #fff; display: flex; flex-direction: column; align-items: center; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.2) transparent; }
+    .canvas-container.pdf-mode { overflow-y: auto; overflow-x: hidden; background: #fff; display: flex; flex-direction: column; align-items: center; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.2) transparent; touch-action: none; }
     .canvas-container.pdf-mode::-webkit-scrollbar { width: 6px; }
     .canvas-container.pdf-mode::-webkit-scrollbar-track { background: transparent; }
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
@@ -882,8 +882,8 @@
     };
 
     function start(e) {
-      if (!isPen(e)) return;
-      isPenActive = true; // Mark pen as active to block finger swipe
+      // Only accept pen input (touch is handled separately for gestures)
+      if (e.pointerType === 'touch') return;
       if (isEraser(e)) {
         eraserEnd = true;
         lassoEnd = false;
@@ -990,7 +990,8 @@
     }
 
     function move(e) {
-      if (!isPen(e)) return;
+      // Only accept pen input (touch is handled separately for gestures)
+      if (e.pointerType === 'touch') return;
 
       // Handle rotation
       if (isRotatingSelection) {
@@ -1050,8 +1051,8 @@
     }
 
     function stop(e) {
-      if (e && !isPen(e)) return;
-      isPenActive = false; // Mark pen as inactive to allow finger swipe
+      // Only accept pen input (touch is handled separately for gestures)
+      if (e && e.pointerType === 'touch') return;
 
       // Handle end of rotation
       if (isRotatingSelection) {
@@ -1364,20 +1365,13 @@
     $('nextPage').onclick = () => goToPage(currentPage + 1);
     $('closePdf').onclick = closePDF;
 
-    container.addEventListener('pointerdown', start);
-    container.addEventListener('pointermove', move);
-    container.addEventListener('pointerup', stop);
-    container.addEventListener('pointerleave', stop);
-    container.addEventListener('pointercancel', stop);
     container.addEventListener('contextmenu', e => e.preventDefault());
 
-    // Touch gestures for PDF navigation (finger only, not stylus)
-    let initialPinchDistance = 0;
-    let isTwoFingerTouch = false;
-    let oneFingerTouchStartX = 0;
-    let oneFingerTouchStartY = 0;
-    let isOneFingerSwipe = false;
-    let isPenActive = false; // Track if stylus is currently in use
+    // Gesture detection using pointer events (finger only, not stylus)
+    const activePointers = new Map(); // Track active touch pointers
+    let gestureStartDistance = 0;
+    let swipeStartX = 0;
+    let swipeStartY = 0;
 
     // Generate thumbnails for filmstrip
     async function generateFilmstripThumbnails() {
@@ -1453,85 +1447,94 @@
       }
     };
 
-    container.addEventListener('touchstart', e => {
-      // Ignore touch events when stylus is active
-      if (isPenActive) return;
+    // Gesture functions for finger input only
+    function handleGestureStart(e) {
+      if (e.pointerType !== 'touch' || !pdfDoc) return;
 
-      if (e.touches.length === 2 && pdfDoc) {
-        // Two-finger touch: prepare for pinch
-        isTwoFingerTouch = true;
-        isOneFingerSwipe = false;
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        initialPinchDistance = Math.hypot(dx, dy);
-        e.preventDefault();
-      } else if (e.touches.length === 1 && pdfDoc) {
-        // One-finger touch: prepare for swipe
-        isOneFingerSwipe = true;
-        isTwoFingerTouch = false;
-        oneFingerTouchStartX = e.touches[0].clientX;
-        oneFingerTouchStartY = e.touches[0].clientY;
-        e.preventDefault();
-      } else {
-        isTwoFingerTouch = false;
-        isOneFingerSwipe = false;
-        e.preventDefault();
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (activePointers.size === 1) {
+        swipeStartX = e.clientX;
+        swipeStartY = e.clientY;
+      } else if (activePointers.size === 2) {
+        const pts = Array.from(activePointers.values());
+        gestureStartDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       }
-    }, { passive: false });
+    }
 
-    container.addEventListener('touchmove', e => {
-      // Ignore touch events when stylus is active
-      if (isPenActive) return;
+    function handleGestureMove(e) {
+      if (e.pointerType !== 'touch' || !pdfDoc || !activePointers.has(e.pointerId)) return;
 
-      if (isTwoFingerTouch && e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const currentDistance = Math.hypot(dx, dy);
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-        // Detect pinch-in gesture (fingers coming together)
-        if (initialPinchDistance - currentDistance > 50) {
-          isTwoFingerTouch = false;
+      if (activePointers.size === 2) {
+        const pts = Array.from(activePointers.values());
+        const currentDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if (gestureStartDistance - currentDistance > 50) {
+          activePointers.clear();
           showFilmstrip();
         }
       }
-      // If second finger added during swipe, switch to pinch mode
-      if (isOneFingerSwipe && e.touches.length === 2) {
-        isOneFingerSwipe = false;
-        isTwoFingerTouch = true;
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        initialPinchDistance = Math.hypot(dx, dy);
-      }
-      e.preventDefault();
-    }, { passive: false });
+    }
 
-    container.addEventListener('touchend', e => {
-      // Ignore touch events when stylus is active
-      if (isPenActive) return;
+    function handleGestureEnd(e) {
+      if (e.pointerType !== 'touch' || !pdfDoc) return;
 
-      // Check for one-finger swipe on touch end
-      if (isOneFingerSwipe && pdfDoc && e.changedTouches.length === 1) {
-        const touchEndX = e.changedTouches[0].clientX;
-        const touchEndY = e.changedTouches[0].clientY;
-        const deltaX = touchEndX - oneFingerTouchStartX;
-        const deltaY = touchEndY - oneFingerTouchStartY;
-        const swipeThreshold = 160;
-        const verticalTolerance = 0.5;
+      if (activePointers.size === 1 && activePointers.has(e.pointerId)) {
+        const deltaX = e.clientX - swipeStartX;
+        const deltaY = e.clientY - swipeStartY;
+        const isHorizontal = Math.abs(deltaY) < Math.abs(deltaX) * 0.5;
 
-        // Check if swipe is primarily horizontal
-        const isHorizontal = Math.abs(deltaY) < Math.abs(deltaX) * verticalTolerance;
-
-        if (Math.abs(deltaX) > swipeThreshold && isHorizontal) {
-          if (deltaX > 0) {
-            goToPage(currentPage - 1); // Swipe right = previous page
-          } else {
-            goToPage(currentPage + 1); // Swipe left = next page
-          }
+        if (Math.abs(deltaX) > 160 && isHorizontal) {
+          goToPage(deltaX > 0 ? currentPage - 1 : currentPage + 1);
         }
       }
-      isTwoFingerTouch = false;
-      isOneFingerSwipe = false;
-    }, { passive: false });
+      activePointers.delete(e.pointerId);
+    }
+
+    // Combined event listeners - pen/stylus for drawing, touch for gestures
+    container.addEventListener('pointerdown', e => {
+      e.preventDefault(); // Prevent browser from using event for scrolling
+      if (e.pointerType === 'touch') {
+        handleGestureStart(e);
+      } else {
+        // pen, mouse, or any other input type goes to drawing
+        start(e);
+      }
+    });
+
+    container.addEventListener('pointermove', e => {
+      e.preventDefault(); // Prevent browser from using event for scrolling
+      if (e.pointerType === 'touch') {
+        handleGestureMove(e);
+      } else {
+        move(e);
+      }
+    });
+
+    container.addEventListener('pointerup', e => {
+      if (e.pointerType === 'touch') {
+        handleGestureEnd(e);
+      } else {
+        stop(e);
+      }
+    });
+
+    container.addEventListener('pointerleave', e => {
+      if (e.pointerType === 'touch') {
+        activePointers.delete(e.pointerId);
+      } else {
+        stop(e);
+      }
+    });
+
+    container.addEventListener('pointercancel', e => {
+      if (e.pointerType === 'touch') {
+        activePointers.delete(e.pointerId);
+      } else {
+        stop(e);
+      }
+    });
 
     window.addEventListener('resize', resize);
 
