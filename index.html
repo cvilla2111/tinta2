@@ -171,7 +171,7 @@
     }
     .filmstrip-item canvas {
       display: block;
-      height: 150px;
+      height: 220px;
       width: auto;
     }
     .filmstrip-item-number {
@@ -1382,7 +1382,7 @@
       for (let i = 1; i <= totalPages; i++) {
         const page = await pdfDoc.getPage(i);
         const viewport = page.getViewport({ scale: 1 });
-        const thumbHeight = 150;
+        const thumbHeight = 220;
         const scale = thumbHeight / viewport.height;
         const scaledViewport = page.getViewport({ scale });
 
