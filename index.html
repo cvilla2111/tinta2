@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#ffffff">
   <title>Vector Canvas</title>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
   <style>
     :root { --bg: #fff; --border: #e5e7eb; --btn: #f3f4f6; --btn-hover: #e5e7eb; --active: #3b82f6; --text: #1f2937; --text2: #6b7280; }
@@ -98,6 +98,52 @@
     .filmstrip-placeholder { width: 156px; height: 220px; display: flex; align-items: center; justify-content: center; background: #e5e7eb; color: #6b7280; font-size: 12px; font-weight: 500; }
     .filmstrip-hint { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255, 255, 255, 0.6); font-size: 12px; font-weight: 500; }
 
+    /* Debug Panel Styles */
+    .debug-panel { position: fixed; bottom: 12px; right: 12px; width: 340px; max-height: 55vh; background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; font-family: 'IBM Plex Mono', 'SF Mono', monospace; font-size: 11px; color: #e2e8f0; z-index: 9999; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5); backdrop-filter: blur(8px); }
+    .debug-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(30, 41, 59, 0.9); border-bottom: 1px solid rgba(59, 130, 246, 0.2); }
+    .debug-title { font-weight: 600; color: #60a5fa; display: flex; align-items: center; gap: 6px; }
+    .debug-title::before { content: ''; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; animation: pulse-dot 1.5s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .debug-controls { display: flex; gap: 6px; }
+    .debug-btn { padding: 4px 8px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 4px; color: #93c5fd; cursor: pointer; font-size: 10px; transition: all 0.15s; font-family: inherit; }
+    .debug-btn:hover { background: rgba(59, 130, 246, 0.4); }
+    .debug-btn.active { background: rgba(34, 197, 94, 0.3); border-color: rgba(34, 197, 94, 0.5); color: #86efac; }
+    .debug-content { max-height: calc(55vh - 44px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(59, 130, 246, 0.3) transparent; }
+    .debug-section { padding: 10px 12px; border-bottom: 1px solid rgba(59, 130, 246, 0.1); }
+    .debug-section:last-child { border-bottom: none; }
+    .debug-section-title { font-weight: 600; color: #94a3b8; margin-bottom: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .debug-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
+    .debug-label { color: #94a3b8; }
+    .debug-value { color: #e2e8f0; font-weight: 500; }
+    .debug-value.good { color: #22c55e; }
+    .debug-value.warn { color: #eab308; }
+    .debug-value.bad { color: #ef4444; }
+    .debug-bar { height: 4px; background: rgba(59, 130, 246, 0.2); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+    .debug-bar-fill { height: 100%; background: linear-gradient(90deg, #22c55e, #3b82f6); border-radius: 2px; transition: width 0.3s; }
+    .debug-bar-fill.warn { background: linear-gradient(90deg, #eab308, #f97316); }
+    .debug-bar-fill.bad { background: linear-gradient(90deg, #ef4444, #dc2626); }
+    .debug-log { max-height: 160px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 8px; margin-top: 8px; scrollbar-width: thin; scrollbar-color: rgba(59, 130, 246, 0.3) transparent; }
+    .debug-log-entry { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; gap: 8px; font-size: 10px; }
+    .debug-log-entry:last-child { border-bottom: none; }
+    .debug-log-time { color: #64748b; min-width: 60px; }
+    .debug-log-fn { color: #60a5fa; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .debug-log-dur { color: #fbbf24; min-width: 50px; text-align: right; }
+    .debug-log-dur.slow { color: #ef4444; font-weight: 600; }
+    .debug-log-dur.very-slow { color: #dc2626; font-weight: 700; background: rgba(239, 68, 68, 0.2); padding: 0 4px; border-radius: 3px; }
+    .debug-toggle { position: fixed; bottom: 12px; right: 12px; width: 40px; height: 40px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 9998; transition: all 0.2s; }
+    .debug-toggle:hover { background: rgba(59, 130, 246, 0.3); transform: scale(1.05); }
+    .debug-toggle svg { width: 20px; height: 20px; stroke: #60a5fa; stroke-width: 2; fill: none; }
+    .debug-panel.collapsed + .debug-toggle { display: flex; }
+    .debug-panel.collapsed { display: none; }
+    .debug-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+    .debug-mini-chart { display: flex; align-items: flex-end; gap: 1px; height: 30px; margin-top: 6px; }
+    .debug-mini-chart-bar { flex: 1; background: rgba(59, 130, 246, 0.5); border-radius: 1px 1px 0 0; min-height: 2px; transition: height 0.15s; }
+    .debug-mini-chart-bar.warn { background: rgba(234, 179, 8, 0.7); }
+    .debug-mini-chart-bar.bad { background: rgba(239, 68, 68, 0.7); }
+    .debug-bottleneck { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 8px; margin-top: 8px; }
+    .debug-bottleneck-title { color: #ef4444; font-weight: 600; font-size: 10px; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+    .debug-bottleneck-title::before { content: '⚠'; }
+    .debug-bottleneck-item { color: #fca5a5; font-size: 10px; padding: 2px 0; }
   </style>
 </head>
 <body>
@@ -148,7 +194,355 @@
     </div>
     <div class="eraser-cursor" id="eraserCursor"></div>
   </div>
+
+  <!-- Debug Panel -->
+  <div class="debug-panel" id="debugPanel">
+    <div class="debug-header">
+      <span class="debug-title">Performance Monitor</span>
+      <div class="debug-controls">
+        <button class="debug-btn active" id="debugPauseBtn">Pause</button>
+        <button class="debug-btn" id="debugClearBtn">Clear</button>
+        <button class="debug-btn" id="debugExportBtn">Export</button>
+        <button class="debug-btn" id="debugCloseBtn">×</button>
+      </div>
+    </div>
+    <div class="debug-content">
+      <div class="debug-section">
+        <div class="debug-section-title">Frame Performance</div>
+        <div class="debug-grid">
+          <div class="debug-row"><span class="debug-label">FPS</span><span class="debug-value" id="debugFps">60</span></div>
+          <div class="debug-row"><span class="debug-label">Frame Time</span><span class="debug-value" id="debugFrameTime">16.7ms</span></div>
+          <div class="debug-row"><span class="debug-label">Render Calls</span><span class="debug-value" id="debugRenderCalls">0</span></div>
+          <div class="debug-row"><span class="debug-label">Dropped</span><span class="debug-value" id="debugDroppedFrames">0</span></div>
+        </div>
+        <div class="debug-mini-chart" id="debugFpsChart"></div>
+      </div>
+      <div class="debug-section">
+        <div class="debug-section-title">Drawing Stats</div>
+        <div class="debug-grid">
+          <div class="debug-row"><span class="debug-label">Strokes</span><span class="debug-value" id="debugStrokes">0</span></div>
+          <div class="debug-row"><span class="debug-label">Total Points</span><span class="debug-value" id="debugPoints">0</span></div>
+          <div class="debug-row"><span class="debug-label">SVG Elements</span><span class="debug-value" id="debugSvgElements">0</span></div>
+          <div class="debug-row"><span class="debug-label">Active Tool</span><span class="debug-value" id="debugTool">pen</span></div>
+        </div>
+      </div>
+      <div class="debug-section">
+        <div class="debug-section-title">Memory</div>
+        <div class="debug-row">
+          <span class="debug-label">Heap Used</span>
+          <span class="debug-value" id="debugMemory">-- MB</span>
+        </div>
+        <div class="debug-bar"><div class="debug-bar-fill" id="debugMemoryBar" style="width: 0%"></div></div>
+      </div>
+      <div class="debug-section">
+        <div class="debug-section-title">Event Frequency (per sec)</div>
+        <div class="debug-grid">
+          <div class="debug-row"><span class="debug-label">PointerMove</span><span class="debug-value" id="debugPointerMove">0</span></div>
+          <div class="debug-row"><span class="debug-label">PointerDown</span><span class="debug-value" id="debugPointerDown">0</span></div>
+          <div class="debug-row"><span class="debug-label">RAF Ticks</span><span class="debug-value" id="debugRafTicks">0</span></div>
+          <div class="debug-row"><span class="debug-label">Path Updates</span><span class="debug-value" id="debugPathUpdates">0</span></div>
+        </div>
+      </div>
+      <div class="debug-section">
+        <div class="debug-section-title">Function Profiling <span style="color:#64748b">(slowest first)</span></div>
+        <div id="debugBottlenecks"></div>
+        <div class="debug-log" id="debugLog"></div>
+      </div>
+    </div>
+  </div>
+  <button class="debug-toggle" id="debugToggle" title="Show Debug Panel (`)">
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+  </button>
+
   <script type="module">
+    // ═══════════════════════════════════════════════════════════════════════
+    // DEBUG MONITOR - Performance Profiling System
+    // ═══════════════════════════════════════════════════════════════════════
+    const DebugMonitor = {
+      enabled: true,
+      paused: false,
+      logs: [],
+      maxLogs: 100,
+      functionTimings: new Map(),
+      eventCounts: { pointerMove: 0, pointerDown: 0, rafTicks: 0, pathUpdates: 0 },
+      frameTimestamps: [],
+      fpsHistory: [],
+      maxFpsHistory: 40,
+      renderCalls: 0,
+      droppedFrames: 0,
+      lastFrameTime: performance.now(),
+      slowThreshold: 16, // ms - anything slower than 60fps frame budget
+      verySlowThreshold: 50, // ms - significant bottleneck
+
+      init() {
+        this.setupUI();
+        this.startMonitoring();
+        console.log('%c[DebugMonitor] Initialized - Press ` to toggle panel', 'color: #60a5fa; font-weight: bold');
+      },
+
+      setupUI() {
+        const panel = document.getElementById('debugPanel');
+        const toggle = document.getElementById('debugToggle');
+        const pauseBtn = document.getElementById('debugPauseBtn');
+        const clearBtn = document.getElementById('debugClearBtn');
+        const exportBtn = document.getElementById('debugExportBtn');
+        const closeBtn = document.getElementById('debugCloseBtn');
+
+        closeBtn.onclick = () => { panel.classList.add('collapsed'); };
+        toggle.onclick = () => { panel.classList.remove('collapsed'); };
+        pauseBtn.onclick = () => {
+          this.paused = !this.paused;
+          pauseBtn.textContent = this.paused ? 'Resume' : 'Pause';
+          pauseBtn.classList.toggle('active', !this.paused);
+        };
+        clearBtn.onclick = () => this.clearLogs();
+        exportBtn.onclick = () => this.exportReport();
+
+        // Initialize FPS chart bars
+        const chart = document.getElementById('debugFpsChart');
+        for (let i = 0; i < this.maxFpsHistory; i++) {
+          const bar = document.createElement('div');
+          bar.className = 'debug-mini-chart-bar';
+          chart.appendChild(bar);
+        }
+      },
+
+      startMonitoring() {
+        // Update stats every 500ms
+        setInterval(() => this.updateStats(), 500);
+        // Reset event counters every second
+        setInterval(() => this.resetEventCounters(), 1000);
+      },
+
+      profile(name, fn) {
+        if (!this.enabled) return fn();
+        const start = performance.now();
+        const result = fn();
+        const duration = performance.now() - start;
+        this.recordTiming(name, duration);
+        return result;
+      },
+
+      async profileAsync(name, fn) {
+        if (!this.enabled) return fn();
+        const start = performance.now();
+        const result = await fn();
+        const duration = performance.now() - start;
+        this.recordTiming(name, duration);
+        return result;
+      },
+
+      recordTiming(name, duration) {
+        if (this.paused) return;
+
+        // Track function stats
+        if (!this.functionTimings.has(name)) {
+          this.functionTimings.set(name, { count: 0, total: 0, max: 0, recent: [] });
+        }
+        const stats = this.functionTimings.get(name);
+        stats.count++;
+        stats.total += duration;
+        stats.max = Math.max(stats.max, duration);
+        stats.recent.push(duration);
+        if (stats.recent.length > 20) stats.recent.shift();
+
+        // Log slow operations
+        if (duration >= this.slowThreshold) {
+          this.addLog(name, duration);
+        }
+      },
+
+      addLog(name, duration) {
+        const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+        this.logs.unshift({ time, name, duration });
+        if (this.logs.length > this.maxLogs) this.logs.pop();
+        this.updateLogUI();
+      },
+
+      updateLogUI() {
+        const logEl = document.getElementById('debugLog');
+        logEl.innerHTML = this.logs.slice(0, 30).map(log => {
+          let durClass = '';
+          if (log.duration >= this.verySlowThreshold) durClass = 'very-slow';
+          else if (log.duration >= this.slowThreshold) durClass = 'slow';
+          return `<div class="debug-log-entry">
+            <span class="debug-log-time">${log.time}</span>
+            <span class="debug-log-fn">${log.name}</span>
+            <span class="debug-log-dur ${durClass}">${log.duration.toFixed(2)}ms</span>
+          </div>`;
+        }).join('');
+      },
+
+      trackEvent(type) {
+        if (this.paused) return;
+        if (this.eventCounts[type] !== undefined) {
+          this.eventCounts[type]++;
+        }
+      },
+
+      trackFrame() {
+        if (this.paused) return;
+        const now = performance.now();
+        const delta = now - this.lastFrameTime;
+        this.lastFrameTime = now;
+
+        this.frameTimestamps.push(now);
+        // Keep only last second of timestamps
+        const oneSecAgo = now - 1000;
+        while (this.frameTimestamps.length && this.frameTimestamps[0] < oneSecAgo) {
+          this.frameTimestamps.shift();
+        }
+
+        // Track dropped frames (>20ms = missed frame at 60fps)
+        if (delta > 20) this.droppedFrames++;
+      },
+
+      resetEventCounters() {
+        if (this.paused) return;
+        document.getElementById('debugPointerMove').textContent = this.eventCounts.pointerMove;
+        document.getElementById('debugPointerDown').textContent = this.eventCounts.pointerDown;
+        document.getElementById('debugRafTicks').textContent = this.eventCounts.rafTicks;
+        document.getElementById('debugPathUpdates').textContent = this.eventCounts.pathUpdates;
+
+        this.eventCounts = { pointerMove: 0, pointerDown: 0, rafTicks: 0, pathUpdates: 0 };
+      },
+
+      updateStats() {
+        if (this.paused) return;
+
+        // FPS calculation
+        const fps = this.frameTimestamps.length;
+        const frameTime = fps > 0 ? (1000 / fps).toFixed(1) : '0';
+
+        // Update FPS history for chart
+        this.fpsHistory.push(fps);
+        if (this.fpsHistory.length > this.maxFpsHistory) this.fpsHistory.shift();
+
+        // Update UI
+        const fpsEl = document.getElementById('debugFps');
+        fpsEl.textContent = fps;
+        fpsEl.className = 'debug-value ' + (fps >= 55 ? 'good' : fps >= 30 ? 'warn' : 'bad');
+
+        document.getElementById('debugFrameTime').textContent = frameTime + 'ms';
+        document.getElementById('debugRenderCalls').textContent = this.renderCalls;
+        document.getElementById('debugDroppedFrames').textContent = this.droppedFrames;
+
+        // Update FPS chart
+        const chartBars = document.querySelectorAll('#debugFpsChart .debug-mini-chart-bar');
+        chartBars.forEach((bar, i) => {
+          const value = this.fpsHistory[i] || 0;
+          const height = Math.min(100, (value / 60) * 100);
+          bar.style.height = height + '%';
+          bar.className = 'debug-mini-chart-bar' + (value < 30 ? ' bad' : value < 55 ? ' warn' : '');
+        });
+
+        // Memory (if available)
+        if (performance.memory) {
+          const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
+          const totalMB = (performance.memory.jsHeapSizeLimit / 1048576).toFixed(0);
+          const pct = (performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit * 100).toFixed(0);
+          document.getElementById('debugMemory').textContent = `${usedMB} / ${totalMB} MB`;
+          const memBar = document.getElementById('debugMemoryBar');
+          memBar.style.width = pct + '%';
+          memBar.className = 'debug-bar-fill' + (pct > 80 ? ' bad' : pct > 50 ? ' warn' : '');
+        }
+
+        // Update bottlenecks
+        this.updateBottlenecks();
+      },
+
+      updateBottlenecks() {
+        const bottlenecksEl = document.getElementById('debugBottlenecks');
+
+        // Find functions with high avg or max times
+        const slowFuncs = [];
+        this.functionTimings.forEach((stats, name) => {
+          const avg = stats.total / stats.count;
+          const recentAvg = stats.recent.length ? stats.recent.reduce((a, b) => a + b, 0) / stats.recent.length : 0;
+          if (stats.max >= this.slowThreshold || recentAvg >= this.slowThreshold / 2) {
+            slowFuncs.push({ name, avg, max: stats.max, recentAvg, count: stats.count });
+          }
+        });
+
+        if (slowFuncs.length === 0) {
+          bottlenecksEl.innerHTML = '<div style="color: #22c55e; font-size: 10px; padding: 4px 0;">✓ No significant bottlenecks detected</div>';
+          return;
+        }
+
+        // Sort by recent average (most impactful first)
+        slowFuncs.sort((a, b) => b.recentAvg - a.recentAvg);
+
+        bottlenecksEl.innerHTML = `<div class="debug-bottleneck">
+          <div class="debug-bottleneck-title">Potential Bottlenecks</div>
+          ${slowFuncs.slice(0, 5).map(f => `
+            <div class="debug-bottleneck-item">
+              <strong>${f.name}</strong>: avg ${f.recentAvg.toFixed(2)}ms, max ${f.max.toFixed(2)}ms (×${f.count})
+            </div>
+          `).join('')}
+        </div>`;
+      },
+
+      updateDrawingStats(strokes, tool) {
+        if (this.paused) return;
+        const totalPoints = strokes.reduce((sum, s) => sum + s.points.length, 0);
+        const svgElements = document.querySelectorAll('#strokes-group > *').length;
+
+        document.getElementById('debugStrokes').textContent = strokes.length;
+        document.getElementById('debugPoints').textContent = totalPoints;
+        document.getElementById('debugSvgElements').textContent = svgElements;
+        document.getElementById('debugTool').textContent = tool;
+      },
+
+      clearLogs() {
+        this.logs = [];
+        this.functionTimings.clear();
+        this.droppedFrames = 0;
+        this.renderCalls = 0;
+        this.fpsHistory = [];
+        document.getElementById('debugLog').innerHTML = '<div style="color: #64748b; text-align: center; padding: 8px;">Logs cleared</div>';
+        document.getElementById('debugBottlenecks').innerHTML = '';
+        console.log('%c[DebugMonitor] Logs and timings cleared', 'color: #60a5fa');
+      },
+
+      exportReport() {
+        const report = {
+          timestamp: new Date().toISOString(),
+          summary: {
+            totalDroppedFrames: this.droppedFrames,
+            totalRenderCalls: this.renderCalls,
+            avgFps: this.fpsHistory.length ? (this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length).toFixed(1) : 'N/A'
+          },
+          functionTimings: {},
+          recentLogs: this.logs.slice(0, 50)
+        };
+
+        this.functionTimings.forEach((stats, name) => {
+          report.functionTimings[name] = {
+            count: stats.count,
+            avgMs: (stats.total / stats.count).toFixed(3),
+            maxMs: stats.max.toFixed(3),
+            totalMs: stats.total.toFixed(3)
+          };
+        });
+
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `perf-report-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        console.log('%c[DebugMonitor] Report exported', 'color: #22c55e');
+      }
+    };
+
+    // Initialize debug monitor
+    DebugMonitor.init();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ORIGINAL APP CODE (with profiling instrumentation)
+    // ═══════════════════════════════════════════════════════════════════════
+
     const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
 
@@ -225,6 +619,7 @@
       container.classList.toggle('lasso-mode', t === 'lasso');
       if (t !== 'lasso' && !preserveSelection) clearSelection();
       updateCursor();
+      DebugMonitor.updateDrawingStats(strokes, tool);
     };
 
     const updateCursor = () => {
@@ -406,34 +801,36 @@
     };
 
     const selectStrokesInLasso = () => {
-      selectionBoxes.forEach(box => box.remove());
-      selectionBoxes = [];
-      selectionHandles.forEach(h => h.remove());
-      selectionHandles = [];
-      selectedStrokes = [];
-      if (lassoPoints.length < 3) return;
+      return DebugMonitor.profile('selectStrokesInLasso', () => {
+        selectionBoxes.forEach(box => box.remove());
+        selectionBoxes = [];
+        selectionHandles.forEach(h => h.remove());
+        selectionHandles = [];
+        selectedStrokes = [];
+        if (lassoPoints.length < 3) return;
 
-      strokes.forEach(s => {
-        if (s.points.some(p => pointInPolygon(p.x, p.y, lassoPoints))) selectedStrokes.push(s);
+        strokes.forEach(s => {
+          if (s.points.some(p => pointInPolygon(p.x, p.y, lassoPoints))) selectedStrokes.push(s);
+        });
+
+        if (selectedStrokes.length > 0) {
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          lassoPoints.forEach(p => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
+          selectionBounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.classList.add('selection-box');
+          rect.setAttribute('x', minX);
+          rect.setAttribute('y', minY);
+          rect.setAttribute('width', maxX - minX);
+          rect.setAttribute('height', maxY - minY);
+          rect.setAttribute('rx', 3);
+          group.appendChild(rect);
+          selectionBoxes.push(rect);
+          createSelectionHandles();
+        } else {
+          selectionBounds = null;
+        }
       });
-
-      if (selectedStrokes.length > 0) {
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        lassoPoints.forEach(p => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
-        selectionBounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.classList.add('selection-box');
-        rect.setAttribute('x', minX);
-        rect.setAttribute('y', minY);
-        rect.setAttribute('width', maxX - minX);
-        rect.setAttribute('height', maxY - minY);
-        rect.setAttribute('rx', 3);
-        group.appendChild(rect);
-        selectionBoxes.push(rect);
-        createSelectionHandles();
-      } else {
-        selectionBounds = null;
-      }
     };
 
     const deleteSelectedStrokes = () => {
@@ -453,6 +850,7 @@
       selectionBounds = null;
       currentRotation = previousRotation = 0;
       savePageAnnotations();
+      DebugMonitor.updateDrawingStats(strokes, tool);
     };
 
     const duplicateSelectedStrokes = () => {
@@ -497,6 +895,7 @@
       selectionBoxes.push(rect);
       createSelectionHandles();
       savePageAnnotations();
+      DebugMonitor.updateDrawingStats(strokes, tool);
     };
 
     const transformPointForHitTest = (x, y) => {
@@ -530,48 +929,52 @@
     };
 
     const moveSelection = (dx, dy) => {
-      selectedStrokes.forEach(s => {
-        s.points = s.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy }));
-        s.element.setAttribute('d', buildPath(s.points, s.width));
+      DebugMonitor.profile('moveSelection', () => {
+        selectedStrokes.forEach(s => {
+          s.points = s.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy }));
+          s.element.setAttribute('d', buildPath(s.points, s.width));
+        });
+        if (selectionBounds) {
+          selectionBounds.x += dx;
+          selectionBounds.y += dy;
+          updateSelectionUI(true);
+        }
       });
-      if (selectionBounds) {
-        selectionBounds.x += dx;
-        selectionBounds.y += dy;
-        updateSelectionUI(true);
-      }
     };
 
     const scaleSelection = (newX, newY) => {
-      if (!originalBounds || !activeHandle) return;
-      const origCx = originalBounds.x + originalBounds.width / 2, origCy = originalBounds.y + originalBounds.height / 2;
-      const cos = Math.cos(currentRotation), sin = Math.sin(currentRotation);
+      DebugMonitor.profile('scaleSelection', () => {
+        if (!originalBounds || !activeHandle) return;
+        const origCx = originalBounds.x + originalBounds.width / 2, origCy = originalBounds.y + originalBounds.height / 2;
+        const cos = Math.cos(currentRotation), sin = Math.sin(currentRotation);
 
-      let handleLocalX, handleLocalY;
-      if (activeHandle === 'tl') { handleLocalX = originalBounds.x; handleLocalY = originalBounds.y; }
-      else if (activeHandle === 'tr') { handleLocalX = originalBounds.x + originalBounds.width; handleLocalY = originalBounds.y; }
-      else if (activeHandle === 'bl') { handleLocalX = originalBounds.x; handleLocalY = originalBounds.y + originalBounds.height; }
-      else { handleLocalX = originalBounds.x + originalBounds.width; handleLocalY = originalBounds.y + originalBounds.height; }
+        let handleLocalX, handleLocalY;
+        if (activeHandle === 'tl') { handleLocalX = originalBounds.x; handleLocalY = originalBounds.y; }
+        else if (activeHandle === 'tr') { handleLocalX = originalBounds.x + originalBounds.width; handleLocalY = originalBounds.y; }
+        else if (activeHandle === 'bl') { handleLocalX = originalBounds.x; handleLocalY = originalBounds.y + originalBounds.height; }
+        else { handleLocalX = originalBounds.x + originalBounds.width; handleLocalY = originalBounds.y + originalBounds.height; }
 
-      const dxH = handleLocalX - origCx, dyH = handleLocalY - origCy;
-      const handleWorldX = origCx + dxH * cos - dyH * sin, handleWorldY = origCy + dxH * sin + dyH * cos;
-      const origDist = Math.hypot(handleWorldX - scaleAnchorWorldX, handleWorldY - scaleAnchorWorldY);
-      const newDist = Math.hypot(newX - scaleAnchorWorldX, newY - scaleAnchorWorldY);
-      const minScale = 20 / Math.max(originalBounds.width, originalBounds.height);
-      const scale = Math.max(minScale, origDist > 0 ? newDist / origDist : 1);
+        const dxH = handleLocalX - origCx, dyH = handleLocalY - origCy;
+        const handleWorldX = origCx + dxH * cos - dyH * sin, handleWorldY = origCy + dxH * sin + dyH * cos;
+        const origDist = Math.hypot(handleWorldX - scaleAnchorWorldX, handleWorldY - scaleAnchorWorldY);
+        const newDist = Math.hypot(newX - scaleAnchorWorldX, newY - scaleAnchorWorldY);
+        const minScale = 20 / Math.max(originalBounds.width, originalBounds.height);
+        const scale = Math.max(minScale, origDist > 0 ? newDist / origDist : 1);
 
-      selectedStrokes.forEach((s, i) => {
-        const origPoints = originalStrokePoints[i];
-        s.points = origPoints.map(pt => ({ ...pt, x: scaleAnchorWorldX + (pt.x - scaleAnchorWorldX) * scale, y: scaleAnchorWorldY + (pt.y - scaleAnchorWorldY) * scale }));
-        s.element.setAttribute('d', buildPath(s.points, s.width));
+        selectedStrokes.forEach((s, i) => {
+          const origPoints = originalStrokePoints[i];
+          s.points = origPoints.map(pt => ({ ...pt, x: scaleAnchorWorldX + (pt.x - scaleAnchorWorldX) * scale, y: scaleAnchorWorldY + (pt.y - scaleAnchorWorldY) * scale }));
+          s.element.setAttribute('d', buildPath(s.points, s.width));
+        });
+
+        const scaledWidth = originalBounds.width * scale, scaledHeight = originalBounds.height * scale;
+        const newCx = scaleAnchorWorldX + (origCx - scaleAnchorWorldX) * scale, newCy = scaleAnchorWorldY + (origCy - scaleAnchorWorldY) * scale;
+        selectionBounds.x = newCx - scaledWidth / 2;
+        selectionBounds.y = newCy - scaledHeight / 2;
+        selectionBounds.width = scaledWidth;
+        selectionBounds.height = scaledHeight;
+        updateSelectionUI(true);
       });
-
-      const scaledWidth = originalBounds.width * scale, scaledHeight = originalBounds.height * scale;
-      const newCx = scaleAnchorWorldX + (origCx - scaleAnchorWorldX) * scale, newCy = scaleAnchorWorldY + (origCy - scaleAnchorWorldY) * scale;
-      selectionBounds.x = newCx - scaledWidth / 2;
-      selectionBounds.y = newCy - scaledHeight / 2;
-      selectionBounds.width = scaledWidth;
-      selectionBounds.height = scaledHeight;
-      updateSelectionUI(true);
     };
 
     const isOnRotationHandle = (x, y) => {
@@ -592,27 +995,29 @@
     };
 
     const rotateSelection = (x, y) => {
-      if (!originalBounds) return;
-      const angle = Math.atan2(y - rotationCenterY, x - rotationCenterX);
-      const deltaAngle = angle - startAngle;
-      const totalRotation = previousRotation + deltaAngle;
-      const cos = Math.cos(deltaAngle), sin = Math.sin(deltaAngle);
+      DebugMonitor.profile('rotateSelection', () => {
+        if (!originalBounds) return;
+        const angle = Math.atan2(y - rotationCenterY, x - rotationCenterX);
+        const deltaAngle = angle - startAngle;
+        const totalRotation = previousRotation + deltaAngle;
+        const cos = Math.cos(deltaAngle), sin = Math.sin(deltaAngle);
 
-      selectedStrokes.forEach((s, i) => {
-        const origPoints = originalStrokePoints[i];
-        s.points = origPoints.map(p => {
-          const dx = p.x - rotationCenterX, dy = p.y - rotationCenterY;
-          return { ...p, x: rotationCenterX + dx * cos - dy * sin, y: rotationCenterY + dx * sin + dy * cos };
+        selectedStrokes.forEach((s, i) => {
+          const origPoints = originalStrokePoints[i];
+          s.points = origPoints.map(p => {
+            const dx = p.x - rotationCenterX, dy = p.y - rotationCenterY;
+            return { ...p, x: rotationCenterX + dx * cos - dy * sin, y: rotationCenterY + dx * sin + dy * cos };
+          });
+          s.element.setAttribute('d', buildPath(s.points, s.width));
         });
-        s.element.setAttribute('d', buildPath(s.points, s.width));
-      });
 
-      const rotateTransform = `rotate(${totalRotation * (180 / Math.PI)}, ${rotationCenterX}, ${rotationCenterY})`;
-      selectionBoxes[0]?.setAttribute('transform', rotateTransform);
-      selectionHandles.forEach(h => h.setAttribute('transform', rotateTransform));
-      rotationHandle?.setAttribute('transform', rotateTransform);
-      rotationLine?.setAttribute('transform', rotateTransform);
-      currentRotation = totalRotation;
+        const rotateTransform = `rotate(${totalRotation * (180 / Math.PI)}, ${rotationCenterX}, ${rotationCenterY})`;
+        selectionBoxes[0]?.setAttribute('transform', rotateTransform);
+        selectionHandles.forEach(h => h.setAttribute('transform', rotateTransform));
+        rotationHandle?.setAttribute('transform', rotateTransform);
+        rotationLine?.setAttribute('transform', rotateTransform);
+        currentRotation = totalRotation;
+      });
     };
 
     const savePageAnnotations = () => {
@@ -642,14 +1047,15 @@
         strokes = [];
         undoStack = [];
       }
+      DebugMonitor.updateDrawingStats(strokes, tool);
     };
 
     const pushUndo = (...items) => {
       undoStack.push(...items);
       while (undoStack.length > MAX_UNDO_STACK) undoStack.shift();
     };
-    const undo = () => { if (strokes.length) { const s = strokes.pop(); pushUndo(s); s.element.remove(); savePageAnnotations(); } };
-    const redo = () => { if (undoStack.length) { const s = undoStack.pop(); group.appendChild(s.element); strokes.push(s); savePageAnnotations(); } };
+    const undo = () => { if (strokes.length) { const s = strokes.pop(); pushUndo(s); s.element.remove(); savePageAnnotations(); DebugMonitor.updateDrawingStats(strokes, tool); } };
+    const redo = () => { if (undoStack.length) { const s = undoStack.pop(); group.appendChild(s.element); strokes.push(s); savePageAnnotations(); DebugMonitor.updateDrawingStats(strokes, tool); } };
     const isEraser = e => e.button === 5 || (e.buttons & 32) !== 0;
     const isLassoButton = e => e.button === 2 || (e.buttons & 2) !== 0;
 
@@ -686,28 +1092,30 @@
     };
 
     function buildPath(pts, w) {
-      if (pts.length < 2) {
-        const p = pts[0], r = (w * p.pressure * 1.5) / 2;
-        return `M${p.x-r},${p.y}a${r},${r} 0 1,0 ${r*2},0a${r},${r} 0 1,0 ${-r*2},0`;
-      }
-      const L = [], R = [];
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i], pr = pressure ? Math.max(0.25, Math.pow(p.pressure, 0.75)) : 0.7, hw = (w * pr * 1.5) / 2;
-        let dx, dy;
-        if (i === 0) { dx = pts[1].x - p.x; dy = pts[1].y - p.y; }
-        else if (i === pts.length - 1) { dx = p.x - pts[i-1].x; dy = p.y - pts[i-1].y; }
-        else { dx = pts[i+1].x - pts[i-1].x; dy = pts[i+1].y - pts[i-1].y; }
-        const len = Math.sqrt(dx*dx + dy*dy) || 1, nx = -dy/len, ny = dx/len;
-        L.push({ x: p.x + nx*hw, y: p.y + ny*hw });
-        R.push({ x: p.x - nx*hw, y: p.y - ny*hw });
-      }
-      let d = `M${L[0].x},${L[0].y}`;
-      for (let i = 1; i < L.length; i++) d += `Q${L[i-1].x},${L[i-1].y},${(L[i-1].x+L[i].x)/2},${(L[i-1].y+L[i].y)/2}`;
-      const ll = L[L.length-1], lr = R[R.length-1];
-      d += `L${(ll.x+lr.x)/2},${(ll.y+lr.y)/2}`;
-      for (let i = R.length-2; i >= 0; i--) d += `Q${R[i+1].x},${R[i+1].y},${(R[i+1].x+R[i].x)/2},${(R[i+1].y+R[i].y)/2}`;
-      d += `Q${R[0].x},${R[0].y},${L[0].x},${L[0].y}Z`;
-      return d;
+      return DebugMonitor.profile('buildPath', () => {
+        if (pts.length < 2) {
+          const p = pts[0], r = (w * p.pressure * 1.5) / 2;
+          return `M${p.x-r},${p.y}a${r},${r} 0 1,0 ${r*2},0a${r},${r} 0 1,0 ${-r*2},0`;
+        }
+        const L = [], R = [];
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i], pr = pressure ? Math.max(0.25, Math.pow(p.pressure, 0.75)) : 0.7, hw = (w * pr * 1.5) / 2;
+          let dx, dy;
+          if (i === 0) { dx = pts[1].x - p.x; dy = pts[1].y - p.y; }
+          else if (i === pts.length - 1) { dx = p.x - pts[i-1].x; dy = p.y - pts[i-1].y; }
+          else { dx = pts[i+1].x - pts[i-1].x; dy = pts[i+1].y - pts[i-1].y; }
+          const len = Math.sqrt(dx*dx + dy*dy) || 1, nx = -dy/len, ny = dx/len;
+          L.push({ x: p.x + nx*hw, y: p.y + ny*hw });
+          R.push({ x: p.x - nx*hw, y: p.y - ny*hw });
+        }
+        let d = `M${L[0].x},${L[0].y}`;
+        for (let i = 1; i < L.length; i++) d += `Q${L[i-1].x},${L[i-1].y},${(L[i-1].x+L[i].x)/2},${(L[i-1].y+L[i].y)/2}`;
+        const ll = L[L.length-1], lr = R[R.length-1];
+        d += `L${(ll.x+lr.x)/2},${(ll.y+lr.y)/2}`;
+        for (let i = R.length-2; i >= 0; i--) d += `Q${R[i+1].x},${R[i+1].y},${(R[i+1].x+R[i].x)/2},${(R[i+1].y+R[i].y)/2}`;
+        d += `Q${R[0].x},${R[0].y},${L[0].x},${L[0].y}Z`;
+        return d;
+      });
     }
 
     const newPath = () => {
@@ -718,11 +1126,18 @@
       group.appendChild(path);
     };
 
-    const finalize = () => { if (path && points.length > 1) { strokes.push({ element: path, points: [...points], color, width: getEffectiveWidth() }); savePageAnnotations(); } };
+    const finalize = () => {
+      if (path && points.length > 1) {
+        strokes.push({ element: path, points: [...points], color, width: getEffectiveWidth() });
+        savePageAnnotations();
+        DebugMonitor.updateDrawingStats(strokes, tool);
+      }
+    };
     const setCursor = e => { cursor.style.left = e.clientX + 'px'; cursor.style.top = e.clientY + 'px'; };
 
     function start(e) {
       if (e.pointerType === 'touch') return;
+      DebugMonitor.trackEvent('pointerDown');
       cachedSvgRect = svg.getBoundingClientRect();
       if (isEraser(e)) {
         eraserEnd = true; lassoEnd = false; prevTool = tool;
@@ -802,6 +1217,7 @@
 
     function move(e) {
       if (e.pointerType === 'touch') return;
+      DebugMonitor.trackEvent('pointerMove');
       if (isRotatingSelection) { e.preventDefault(); rotateSelection(getData(e).x, getData(e).y); return; }
       if (isScalingSelection) { e.preventDefault(); const d = getData(e); scaleSelection(d.x, d.y); return; }
       if (isDraggingSelection) { e.preventDefault(); const d = getData(e); moveSelection(d.x - dragStartX, d.y - dragStartY); dragStartX = d.x; dragStartY = d.y; return; }
@@ -823,6 +1239,7 @@
       segLen += dist;
       points.push(d);
       needsRender = true;
+      DebugMonitor.trackEvent('pathUpdates');
       if (segLen >= SEGMENT_MAX) {
         path.setAttribute('d', buildPath(points, getEffectiveWidth()));
         finalize();
@@ -848,6 +1265,7 @@
         strokes.push({ element: path, points: simplified, color, width: getEffectiveWidth() });
         savePageAnnotations();
         path = null;
+        DebugMonitor.updateDrawingStats(strokes, tool);
       }
       if (tool === 'lasso' && lassoPath && lassoPoints.length >= 3) { lassoPath.remove(); lassoPath = null; selectStrokesInLasso(); }
       else if (tool === 'lasso') clearSelection();
@@ -857,75 +1275,84 @@
     }
 
     function erase(x, y) {
-      // Skip if cursor hasn't moved enough (throttle hit-testing)
-      if (Math.hypot(x - lastEraseX, y - lastEraseY) < 5) return;
-      lastEraseX = x;
-      lastEraseY = y;
+      return DebugMonitor.profile('erase', () => {
+        // Skip if cursor hasn't moved enough (throttle hit-testing)
+        if (Math.hypot(x - lastEraseX, y - lastEraseY) < 5) return;
+        lastEraseX = x;
+        lastEraseY = y;
 
-      const r = getEffectiveWidth() * 1.5 * (bigEraser ? BIG_ERASER_MULT : 1) * dpr;
-      let erased = false;
-      for (let i = strokes.length - 1; i >= 0; i--) {
-        const s = strokes[i], b = s.element.getBBox();
-        if (x < b.x-r || x > b.x+b.width+r || y < b.y-r || y > b.y+b.height+r) continue;
-        for (const p of s.points) {
-          if (Math.hypot(x-p.x, y-p.y) < r + s.width) { s.element.remove(); pushUndo(strokes.splice(i,1)[0]); erased = true; break; }
+        const r = getEffectiveWidth() * 1.5 * (bigEraser ? BIG_ERASER_MULT : 1) * dpr;
+        let erased = false;
+        for (let i = strokes.length - 1; i >= 0; i--) {
+          const s = strokes[i], b = s.element.getBBox();
+          if (x < b.x-r || x > b.x+b.width+r || y < b.y-r || y > b.y+b.height+r) continue;
+          for (const p of s.points) {
+            if (Math.hypot(x-p.x, y-p.y) < r + s.width) { s.element.remove(); pushUndo(strokes.splice(i,1)[0]); erased = true; break; }
+          }
         }
-      }
-      if (erased) savePageAnnotations();
+        if (erased) {
+          savePageAnnotations();
+          DebugMonitor.updateDrawingStats(strokes, tool);
+        }
+      });
     }
 
     async function renderPage(pageNum) {
       if (!pdfDoc) return;
-      const page = await pdfDoc.getPage(pageNum);
-      const containerRect = container.getBoundingClientRect();
-      const viewport = page.getViewport({ scale: 1 });
-      pdfPageWidth = viewport.width;
-      pdfPageHeight = viewport.height;
-      const availableWidth = containerRect.width - 60;
-      const pdfScale = (availableWidth * dpr) / viewport.width;
-      const scaledViewport = page.getViewport({ scale: pdfScale });
-      const displayWidth = availableWidth, displayHeight = scaledViewport.height / dpr;
+      await DebugMonitor.profileAsync('renderPage', async () => {
+        const page = await pdfDoc.getPage(pageNum);
+        const containerRect = container.getBoundingClientRect();
+        const viewport = page.getViewport({ scale: 1 });
+        pdfPageWidth = viewport.width;
+        pdfPageHeight = viewport.height;
+        const availableWidth = containerRect.width - 60;
+        const pdfScale = (availableWidth * dpr) / viewport.width;
+        const scaledViewport = page.getViewport({ scale: pdfScale });
+        const displayWidth = availableWidth, displayHeight = scaledViewport.height / dpr;
 
-      pdfCanvas.width = scaledViewport.width;
-      pdfCanvas.height = scaledViewport.height;
-      pdfCanvas.style.width = displayWidth + 'px';
-      pdfCanvas.style.height = displayHeight + 'px';
+        pdfCanvas.width = scaledViewport.width;
+        pdfCanvas.height = scaledViewport.height;
+        pdfCanvas.style.width = displayWidth + 'px';
+        pdfCanvas.style.height = displayHeight + 'px';
 
-      const pageContainer = $('pdfPageContainer');
-      pageContainer.style.width = displayWidth + 'px';
-      pageContainer.style.height = displayHeight + 'px';
+        const pageContainer = $('pdfPageContainer');
+        pageContainer.style.width = displayWidth + 'px';
+        pageContainer.style.height = displayHeight + 'px';
 
-      pdfCtx.fillStyle = '#fff';
-      pdfCtx.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
-      await page.render({ canvasContext: pdfCtx, viewport: scaledViewport }).promise;
+        pdfCtx.fillStyle = '#fff';
+        pdfCtx.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+        await page.render({ canvasContext: pdfCtx, viewport: scaledViewport }).promise;
 
-      svg.setAttribute('viewBox', `0 0 ${pdfPageWidth} ${pdfPageHeight}`);
-      svg.style.width = '100%';
-      svg.style.height = '100%';
+        svg.setAttribute('viewBox', `0 0 ${pdfPageWidth} ${pdfPageHeight}`);
+        svg.style.width = '100%';
+        svg.style.height = '100%';
 
-      pageInfo.textContent = `${pageNum} / ${totalPages}`;
-      $('prevPage').disabled = pageNum <= 1;
-      $('nextPage').disabled = pageNum >= totalPages;
+        pageInfo.textContent = `${pageNum} / ${totalPages}`;
+        $('prevPage').disabled = pageNum <= 1;
+        $('nextPage').disabled = pageNum >= totalPages;
+      });
     }
 
     async function loadPDF(file) {
       loadingOverlay.classList.add('visible');
       try {
-        pdfDoc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-        totalPages = pdfDoc.numPages;
-        currentPage = 1;
-        pageAnnotations = {};
-        group.innerHTML = '';
-        strokes = [];
-        undoStack = [];
-        container.classList.remove('no-pdf');
-        container.classList.add('pdf-mode');
-        pdfControls.classList.add('visible');
-        pdfDivider.classList.add('visible');
-        hideToolbar();
-        await renderPage(1);
-        loadPageAnnotations();
-        generateFilmstripThumbnails();
+        await DebugMonitor.profileAsync('loadPDF', async () => {
+          pdfDoc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+          totalPages = pdfDoc.numPages;
+          currentPage = 1;
+          pageAnnotations = {};
+          group.innerHTML = '';
+          strokes = [];
+          undoStack = [];
+          container.classList.remove('no-pdf');
+          container.classList.add('pdf-mode');
+          pdfControls.classList.add('visible');
+          pdfDivider.classList.add('visible');
+          hideToolbar();
+          await renderPage(1);
+          loadPageAnnotations();
+          generateFilmstripThumbnails();
+        });
       } catch (err) {
         console.log('Error loading PDF:', JSON.stringify(err));
       } finally {
@@ -956,31 +1383,34 @@
       container.classList.add('no-pdf');
       pdfControls.classList.remove('visible');
       pdfDivider.classList.remove('visible');
+      DebugMonitor.updateDrawingStats(strokes, tool);
     }
 
     async function goToPage(pageNum, skipAnimation = false) {
       if (!pdfDoc || pageNum < 1 || pageNum > totalPages) return;
-      const pageContainer = $('pdfPageContainer');
-      if (skipAnimation) {
+      await DebugMonitor.profileAsync('goToPage', async () => {
+        const pageContainer = $('pdfPageContainer');
+        if (skipAnimation) {
+          savePageAnnotations();
+          currentPage = pageNum;
+          await renderPage(pageNum);
+          loadPageAnnotations();
+          container.scrollTop = 0;
+          return;
+        }
+        const direction = pageNum > currentPage ? 'left' : 'right';
+        pageContainer.classList.add(`slide-out-${direction}`);
+        await new Promise(resolve => setTimeout(resolve, 50));
         savePageAnnotations();
         currentPage = pageNum;
         await renderPage(pageNum);
         loadPageAnnotations();
         container.scrollTop = 0;
-        return;
-      }
-      const direction = pageNum > currentPage ? 'left' : 'right';
-      pageContainer.classList.add(`slide-out-${direction}`);
-      await new Promise(resolve => setTimeout(resolve, 50));
-      savePageAnnotations();
-      currentPage = pageNum;
-      await renderPage(pageNum);
-      loadPageAnnotations();
-      container.scrollTop = 0;
-      pageContainer.classList.remove(`slide-out-${direction}`);
-      pageContainer.classList.add(`slide-in-${direction}`);
-      void pageContainer.offsetWidth;
-      pageContainer.classList.remove(`slide-in-${direction}`);
+        pageContainer.classList.remove(`slide-out-${direction}`);
+        pageContainer.classList.add(`slide-in-${direction}`);
+        void pageContainer.offsetWidth;
+        pageContainer.classList.remove(`slide-in-${direction}`);
+      });
     }
 
     const resize = () => {
@@ -1014,18 +1444,20 @@
 
     async function renderThumbnail(item, pageNum) {
       if (item.dataset.rendered) return;
-      const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1 });
-      const scale = 220 / viewport.height;
-      const scaledViewport = page.getViewport({ scale });
-      const canvas = document.createElement('canvas');
-      canvas.width = scaledViewport.width;
-      canvas.height = scaledViewport.height;
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
-      const placeholder = item.querySelector('.filmstrip-placeholder');
-      if (placeholder) placeholder.remove();
-      item.insertBefore(canvas, item.firstChild);
-      item.dataset.rendered = 'true';
+      await DebugMonitor.profileAsync('renderThumbnail', async () => {
+        const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1 });
+        const scale = 220 / viewport.height;
+        const scaledViewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = scaledViewport.width;
+        canvas.height = scaledViewport.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
+        const placeholder = item.querySelector('.filmstrip-placeholder');
+        if (placeholder) placeholder.remove();
+        item.insertBefore(canvas, item.firstChild);
+        item.dataset.rendered = 'true';
+      });
     }
 
     const showFilmstrip = async () => {
@@ -1083,7 +1515,7 @@
     $('pressureBtn').onclick = () => { pressure = !pressure; $('pressureBtn').classList.toggle('active', pressure); };
     $('undoBtn').onclick = undo;
     $('redoBtn').onclick = redo;
-    $('clearBtn').onclick = () => { if (strokes.length) { pushUndo(...strokes.reverse()); strokes = []; group.innerHTML = ''; savePageAnnotations(); } };
+    $('clearBtn').onclick = () => { if (strokes.length) { pushUndo(...strokes.reverse()); strokes = []; group.innerHTML = ''; savePageAnnotations(); DebugMonitor.updateDrawingStats(strokes, tool); } };
     $('fullscreenBtn').onclick = () => {
       if (document.fullscreenElement) document.exitFullscreen();
       else document.documentElement.requestFullscreen();
@@ -1104,6 +1536,13 @@
     window.addEventListener('resize', resize);
 
     document.addEventListener('keydown', e => {
+      // Toggle debug panel with backtick
+      if (e.key === '`') {
+        e.preventDefault();
+        const panel = document.getElementById('debugPanel');
+        panel.classList.toggle('collapsed');
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
       if (e.key === 'p' || e.key === 'P') setTool('pen');
       if (e.key === 'e' || e.key === 'E') setTool('eraser');
@@ -1119,8 +1558,13 @@
 
     // RAF render loop for smooth drawing
     function renderLoop() {
+      DebugMonitor.trackFrame();
+      DebugMonitor.trackEvent('rafTicks');
       if (needsRender && drawing && tool === 'pen' && path && points.length > 0) {
-        path.setAttribute('d', buildPath(points, getEffectiveWidth()));
+        DebugMonitor.renderCalls++;
+        DebugMonitor.profile('renderLoop:setAttribute', () => {
+          path.setAttribute('d', buildPath(points, getEffectiveWidth()));
+        });
       }
       requestAnimationFrame(renderLoop);
     }
@@ -1129,6 +1573,7 @@
     sizeVal.style.color = color;
     updateCursor();
     resize();
+    DebugMonitor.updateDrawingStats(strokes, tool);
   </script>
 </body>
 </html>
