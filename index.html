@@ -118,6 +118,8 @@
     <button class="tool-btn" id="redoBtn" title="Redo (Ctrl+Shift+Z)"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-2.5-6.5L21 7"/></svg></button>
     <div class="divider"></div>
     <button class="tool-btn" id="clearBtn" title="Clear Page Annotations"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+    <div class="divider"></div>
+    <button class="tool-btn" id="fullscreenBtn" title="Fullscreen (F)"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3"/><path d="M21 8V5a2 2 0 00-2-2h-3"/><path d="M3 16v3a2 2 0 002 2h3"/><path d="M16 21h3a2 2 0 002-2v-3"/></svg></button>
     <div class="divider pdf-controls" id="pdfDivider"></div>
     <div class="pdf-controls" id="pdfControls">
       <button class="pdf-nav-btn" id="prevPage" title="Previous Page"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
@@ -858,6 +860,7 @@
         container.classList.add('pdf-mode');
         pdfControls.classList.add('visible');
         pdfDivider.classList.add('visible');
+        hideToolbar();
         await renderPage(1);
         loadPageAnnotations();
         generateFilmstripThumbnails();
@@ -1001,6 +1004,10 @@
     $('undoBtn').onclick = undo;
     $('redoBtn').onclick = redo;
     $('clearBtn').onclick = () => { if (strokes.length) { undoStack.push(...strokes.reverse()); strokes = []; group.innerHTML = ''; savePageAnnotations(); } };
+    $('fullscreenBtn').onclick = () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    };
     $('pdfBtn').onclick = () => pdfInput.click();
     pdfInput.onchange = async e => { if (e.target.files[0]) await loadPDF(e.target.files[0]); pdfInput.value = ''; };
     $('prevPage').onclick = () => goToPage(currentPage - 1);
@@ -1025,6 +1032,7 @@
       if (e.key === ']') $('sizeUp').click();
       if (e.key === 'ArrowLeft' && pdfDoc) goToPage(currentPage - 1);
       if (e.key === 'ArrowRight' && pdfDoc) goToPage(currentPage + 1);
+      if (e.key === 'f' || e.key === 'F') $('fullscreenBtn').click();
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedStrokes.length > 0) { e.preventDefault(); deleteSelectedStrokes(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedStrokes.length > 0) { e.preventDefault(); duplicateSelectedStrokes(); }
     });
