@@ -173,6 +173,12 @@
     let needsRender = false;
     // Cache for getBoundingClientRect
     let cachedSvgRect = null;
+    // Eraser throttling
+    let lastEraseX = 0, lastEraseY = 0;
+    // Point simplification epsilon (set to 0 to disable, 0.5-1.0 recommended)
+    const SIMPLIFY_EPSILON = 0;
+    // Max undo stack size
+    const MAX_UNDO_STACK = 50;
 
     const $ = id => document.getElementById(id);
     const svg = $('drawing-svg'), group = $('strokes-group'), container = $('canvasContainer');
@@ -434,7 +440,7 @@
       selectedStrokes.forEach(s => {
         s.element.remove();
         const idx = strokes.indexOf(s);
-        if (idx > -1) undoStack.push(strokes.splice(idx, 1)[0]);
+        if (idx > -1) pushUndo(strokes.splice(idx, 1)[0]);
       });
       selectedStrokes = [];
       selectionBoxes.forEach(box => box.remove());
@@ -637,7 +643,11 @@
       }
     };
 
-    const undo = () => { if (strokes.length) { const s = strokes.pop(); undoStack.push(s); s.element.remove(); savePageAnnotations(); } };
+    const pushUndo = (...items) => {
+      undoStack.push(...items);
+      while (undoStack.length > MAX_UNDO_STACK) undoStack.shift();
+    };
+    const undo = () => { if (strokes.length) { const s = strokes.pop(); pushUndo(s); s.element.remove(); savePageAnnotations(); } };
     const redo = () => { if (undoStack.length) { const s = undoStack.pop(); group.appendChild(s.element); strokes.push(s); savePageAnnotations(); } };
     const isEraser = e => e.button === 5 || (e.buttons & 32) !== 0;
     const isLassoButton = e => e.button === 2 || (e.buttons & 2) !== 0;
@@ -648,6 +658,30 @@
         return { x: ((e.clientX - r.left) / r.width) * pdfPageWidth, y: ((e.clientY - r.top) / r.height) * pdfPageHeight, pressure: e.pressure ?? 0.5 };
       }
       return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr, pressure: e.pressure ?? 0.5 };
+    };
+
+    // Ramer-Douglas-Peucker point simplification
+    const perpendicularDist = (p, a, b) => {
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      if (len === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+      return Math.abs(dy * p.x - dx * p.y + b.x * a.y - b.y * a.x) / len;
+    };
+
+    const simplifyPoints = (pts, epsilon) => {
+      if (epsilon <= 0 || pts.length <= 2) return pts;
+      let maxDist = 0, maxIdx = 0;
+      const first = pts[0], last = pts[pts.length - 1];
+      for (let i = 1; i < pts.length - 1; i++) {
+        const dist = perpendicularDist(pts[i], first, last);
+        if (dist > maxDist) { maxDist = dist; maxIdx = i; }
+      }
+      if (maxDist > epsilon) {
+        const left = simplifyPoints(pts.slice(0, maxIdx + 1), epsilon);
+        const right = simplifyPoints(pts.slice(maxIdx), epsilon);
+        return [...left.slice(0, -1), ...right];
+      }
+      return [first, last];
     };
 
     function buildPath(pts, w) {
@@ -808,8 +842,9 @@
       drawing = false;
       needsRender = false;
       if (tool === 'pen' && path) {
-        path.setAttribute('d', buildPath(points, getEffectiveWidth()));
-        strokes.push({ element: path, points: [...points], color, width: getEffectiveWidth() });
+        const simplified = simplifyPoints(points, SIMPLIFY_EPSILON);
+        path.setAttribute('d', buildPath(simplified, getEffectiveWidth()));
+        strokes.push({ element: path, points: simplified, color, width: getEffectiveWidth() });
         savePageAnnotations();
         path = null;
       }
@@ -821,13 +856,18 @@
     }
 
     function erase(x, y) {
+      // Skip if cursor hasn't moved enough (throttle hit-testing)
+      if (Math.hypot(x - lastEraseX, y - lastEraseY) < 5) return;
+      lastEraseX = x;
+      lastEraseY = y;
+
       const r = getEffectiveWidth() * 1.5 * (bigEraser ? BIG_ERASER_MULT : 1) * dpr;
       let erased = false;
       for (let i = strokes.length - 1; i >= 0; i--) {
         const s = strokes[i], b = s.element.getBBox();
         if (x < b.x-r || x > b.x+b.width+r || y < b.y-r || y > b.y+b.height+r) continue;
         for (const p of s.points) {
-          if (Math.hypot(x-p.x, y-p.y) < r + s.width) { s.element.remove(); undoStack.push(strokes.splice(i,1)[0]); erased = true; break; }
+          if (Math.hypot(x-p.x, y-p.y) < r + s.width) { s.element.remove(); pushUndo(strokes.splice(i,1)[0]); erased = true; break; }
         }
       }
       if (erased) savePageAnnotations();
@@ -1024,7 +1064,7 @@
     $('pressureBtn').onclick = () => { pressure = !pressure; $('pressureBtn').classList.toggle('active', pressure); };
     $('undoBtn').onclick = undo;
     $('redoBtn').onclick = redo;
-    $('clearBtn').onclick = () => { if (strokes.length) { undoStack.push(...strokes.reverse()); strokes = []; group.innerHTML = ''; savePageAnnotations(); } };
+    $('clearBtn').onclick = () => { if (strokes.length) { pushUndo(...strokes.reverse()); strokes = []; group.innerHTML = ''; savePageAnnotations(); } };
     $('fullscreenBtn').onclick = () => {
       if (document.fullscreenElement) document.exitFullscreen();
       else document.documentElement.requestFullscreen();
