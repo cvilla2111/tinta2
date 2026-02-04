@@ -818,15 +818,10 @@
         lassoPath.setAttribute('d', pathD);
         return;
       }
-      // Use coalesced events for smoother strokes on high-refresh displays
-      const events = e.getCoalescedEvents?.() || [e];
-      for (const evt of events) {
-        const pd = getData(evt);
-        const last = points[points.length - 1], dist = Math.hypot(pd.x - last.x, pd.y - last.y);
-        if (dist < 2) continue;
-        segLen += dist;
-        points.push(pd);
-      }
+      const last = points[points.length - 1], dist = Math.hypot(d.x - last.x, d.y - last.y);
+      if (dist < 2) return;
+      segLen += dist;
+      points.push(d);
       needsRender = true;
       if (segLen >= SEGMENT_MAX) {
         path.setAttribute('d', buildPath(points, getEffectiveWidth()));
