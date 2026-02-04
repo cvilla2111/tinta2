@@ -95,6 +95,7 @@
     .filmstrip-item.active { border-color: var(--active); box-shadow: 0 0 0 2px var(--active), 0 8px 24px rgba(59, 130, 246, 0.4); }
     .filmstrip-item canvas { display: block; height: 220px; width: auto; }
     .filmstrip-item-number { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+    .filmstrip-placeholder { width: 156px; height: 220px; display: flex; align-items: center; justify-content: center; background: #e5e7eb; color: #6b7280; font-size: 12px; font-weight: 500; }
     .filmstrip-hint { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255, 255, 255, 0.6); font-size: 12px; font-weight: 500; }
 
   </style>
@@ -988,23 +989,19 @@
       else svg.setAttribute('viewBox', `0 0 ${r.width * dpr} ${r.height * dpr}`);
     };
 
-    async function generateFilmstripThumbnails() {
+    function generateFilmstripThumbnails() {
       if (!pdfDoc) return;
       filmstripContainer.innerHTML = '';
       filmstripThumbnails = [];
+      // Create placeholders immediately (no blocking)
       for (let i = 1; i <= totalPages; i++) {
-        const page = await pdfDoc.getPage(i);
-        const viewport = page.getViewport({ scale: 1 });
-        const scale = 220 / viewport.height;
-        const scaledViewport = page.getViewport({ scale });
-        const canvas = document.createElement('canvas');
-        canvas.width = scaledViewport.width;
-        canvas.height = scaledViewport.height;
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
         const item = document.createElement('div');
         item.className = 'filmstrip-item' + (i === currentPage ? ' active' : '');
         item.dataset.page = i;
-        item.appendChild(canvas);
+        const placeholder = document.createElement('div');
+        placeholder.className = 'filmstrip-placeholder';
+        placeholder.textContent = `Page ${i}`;
+        item.appendChild(placeholder);
         const pageNum = document.createElement('span');
         pageNum.className = 'filmstrip-item-number';
         pageNum.textContent = i;
@@ -1015,11 +1012,33 @@
       }
     }
 
-    const showFilmstrip = () => {
+    async function renderThumbnail(item, pageNum) {
+      if (item.dataset.rendered) return;
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1 });
+      const scale = 220 / viewport.height;
+      const scaledViewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = scaledViewport.width;
+      canvas.height = scaledViewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
+      const placeholder = item.querySelector('.filmstrip-placeholder');
+      if (placeholder) placeholder.remove();
+      item.insertBefore(canvas, item.firstChild);
+      item.dataset.rendered = 'true';
+    }
+
+    const showFilmstrip = async () => {
       if (!pdfDoc) return;
       filmstripThumbnails.forEach((item, idx) => item.classList.toggle('active', idx + 1 === currentPage));
       filmstripOverlay.classList.add('visible');
       filmstripContainer.querySelector('.active')?.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'center' });
+      // Render thumbnails lazily in background
+      for (const item of filmstripThumbnails) {
+        if (!item.dataset.rendered) {
+          await renderThumbnail(item, parseInt(item.dataset.page));
+        }
+      }
     };
 
     const hideFilmstrip = () => filmstripOverlay.classList.remove('visible');
