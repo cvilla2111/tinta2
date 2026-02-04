@@ -96,6 +96,7 @@
     .filmstrip-item canvas { display: block; height: 220px; width: auto; }
     .filmstrip-item-number { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
     .filmstrip-hint { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255, 255, 255, 0.6); font-size: 12px; font-weight: 500; }
+
   </style>
 </head>
 <body>
@@ -167,6 +168,9 @@
     let activeHandle = null, dragStartX = 0, dragStartY = 0, selectionBounds = null, originalBounds = null, originalStrokePoints = [];
     let rotationCenterX = 0, rotationCenterY = 0, startAngle = 0, currentRotation = 0, previousRotation = 0;
     let scaleAnchorWorldX = 0, scaleAnchorWorldY = 0;
+
+    // RAF optimization for drawing
+    let needsRender = false;
 
     const $ = id => document.getElementById(id);
     const svg = $('drawing-svg'), group = $('strokes-group'), container = $('canvasContainer');
@@ -780,8 +784,15 @@
       if (dist < 2) return;
       segLen += dist;
       points.push(d);
-      path.setAttribute('d', buildPath(points, getEffectiveWidth()));
-      if (segLen >= SEGMENT_MAX) { finalize(); points = points.slice(-2); segLen = 0; newPath(); }
+      needsRender = true;
+      if (segLen >= SEGMENT_MAX) {
+        path.setAttribute('d', buildPath(points, getEffectiveWidth()));
+        finalize();
+        points = points.slice(-2);
+        segLen = 0;
+        newPath();
+        needsRender = false;
+      }
     }
 
     function stop(e) {
@@ -791,7 +802,13 @@
       if (isDraggingSelection) { isDraggingSelection = false; savePageAnnotations(); return; }
       if (!drawing) return;
       drawing = false;
-      if (tool === 'pen' && path) { strokes.push({ element: path, points: [...points], color, width: getEffectiveWidth() }); savePageAnnotations(); path = null; }
+      needsRender = false;
+      if (tool === 'pen' && path) {
+        path.setAttribute('d', buildPath(points, getEffectiveWidth()));
+        strokes.push({ element: path, points: [...points], color, width: getEffectiveWidth() });
+        savePageAnnotations();
+        path = null;
+      }
       if (tool === 'lasso' && lassoPath && lassoPoints.length >= 3) { lassoPath.remove(); lassoPath = null; selectStrokesInLasso(); }
       else if (tool === 'lasso') clearSelection();
       points = [];
@@ -865,7 +882,7 @@
         loadPageAnnotations();
         generateFilmstripThumbnails();
       } catch (err) {
-        console.error('Error loading PDF:', err);
+        console.log('Error loading PDF:', JSON.stringify(err));
       } finally {
         loadingOverlay.classList.remove('visible');
       }
@@ -1036,6 +1053,15 @@
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedStrokes.length > 0) { e.preventDefault(); deleteSelectedStrokes(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedStrokes.length > 0) { e.preventDefault(); duplicateSelectedStrokes(); }
     });
+
+    // RAF render loop for smooth drawing
+    function renderLoop() {
+      if (needsRender && drawing && tool === 'pen' && path && points.length > 0) {
+        path.setAttribute('d', buildPath(points, getEffectiveWidth()));
+      }
+      requestAnimationFrame(renderLoop);
+    }
+    renderLoop();
 
     sizeVal.style.color = color;
     updateCursor();
