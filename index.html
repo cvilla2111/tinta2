@@ -181,7 +181,7 @@
 
     let tool = 'pen', width = 4.5, color = '#1f2937', sizeIdx = 8, drawing = false, path = null, points = [];
     let strokes = [], undoStack = [], pageAnnotations = {};
-    let eraserEnd = false, lassoEnd = false, prevTool = 'pen', pressure = true, bigEraser = false, tapTimes = [], segLen = 0;
+    let eraserEnd = false, lassoEnd = false, prevTool = 'pen', pressure = true, bigEraser = false, tapTimes = [], segLen = 0, strokeStarting = false;
     let pdfDoc = null, currentPage = 1, totalPages = 0, pdfPageWidth = 0, pdfPageHeight = 0;
     let toolbarVisible = false, filmstripThumbnails = [];
 
@@ -846,10 +846,13 @@
 
     const getData = e => {
       const r = cachedSvgRect || svg.getBoundingClientRect();
+      // Reset pressure at stroke start to avoid stale values from previous stroke
+      const rawPressure = e.pressure ?? 0.5;
+      const adjustedPressure = strokeStarting ? Math.min(rawPressure, 0.3) : rawPressure;
       if (pdfDoc && pdfPageWidth > 0) {
-        return { x: ((e.clientX - r.left) / r.width) * pdfPageWidth, y: ((e.clientY - r.top) / r.height) * pdfPageHeight, pressure: e.pressure ?? 0.5 };
+        return { x: ((e.clientX - r.left) / r.width) * pdfPageWidth, y: ((e.clientY - r.top) / r.height) * pdfPageHeight, pressure: adjustedPressure };
       }
-      return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr, pressure: e.pressure ?? 0.5 };
+      return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr, pressure: adjustedPressure };
     };
 
     // Ramer-Douglas-Peucker point simplification
@@ -883,7 +886,7 @@
       }
       const L = [], R = [];
       for (let i = 0; i < pts.length; i++) {
-        const p = pts[i], pr = pressure ? Math.max(0.25, Math.pow(p.pressure, 0.75)) : 0.7, hw = (w * pr * 1.5) / 2;
+        const p = pts[i], pr = pressure ? (p.pressure <= 0.6 ? Math.max(0.25, p.pressure * p.pressure * 1.5) : 0.54 + Math.pow(p.pressure - 0.6, 2) * 9.125) : 0.6, hw = (w * pr * 1.5) / 2;
         let dx, dy;
         if (i === 0) { dx = pts[1].x - p.x; dy = pts[1].y - p.y; }
         else if (i === pts.length - 1) { dx = p.x - pts[i-1].x; dy = p.y - pts[i-1].y; }
@@ -974,6 +977,7 @@
       }
 
       drawing = true;
+      strokeStarting = true;
       points = [];
       segLen = 0;
       undoStack = [];
@@ -1013,6 +1017,8 @@
       if (dist < 2) return;
       segLen += dist;
       points.push(d);
+      // Turn off stroke starting mode after a few points to use real pressure
+      if (strokeStarting && points.length > 3) strokeStarting = false;
       needsRender = true;
       if (segLen >= SEGMENT_MAX) {
         path.setAttribute('d', buildPath(points, getEffectiveWidth()));
@@ -1032,6 +1038,7 @@
       if (isDraggingSelection) { isDraggingSelection = false; savePageAnnotations(); return; }
       if (!drawing) return;
       drawing = false;
+      strokeStarting = false;
       needsRender = false;
       if (tool === 'pen' && path) {
         const simplified = simplifyPoints(points, SIMPLIFY_EPSILON);
