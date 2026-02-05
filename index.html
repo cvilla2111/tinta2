@@ -72,7 +72,10 @@
     .eraser-cursor { position: fixed; pointer-events: none; border: 1px solid #666; border-radius: 50%; transform: translate(-50%, -50%); z-index: 999; display: none; }
     .eraser-cursor.big-eraser { border-color: #ef4444; border-width: 1.5px; }
     .palette-btn { position: fixed; bottom: 8px; left: 8px; width: 28px; height: 28px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1001; padding: 0; margin: 0; }
-    .palette-btn svg { width: 22px; height: 22px; stroke: #9ca3af; stroke-width: 1; fill: none; }
+    .palette-btn svg { width: 22px; height: 22px; stroke: var(--palette-color, #1f2937); stroke-width: 1.5; fill: none; }
+    .palette-btn .white-label { display: none; font-size: 11px; font-weight: 700; color: #1f2937; letter-spacing: -0.5px; }
+    .palette-btn.is-white svg { display: none; }
+    .palette-btn.is-white .white-label { display: block; }
     .color-carousel { position: fixed; bottom: 30px; left: 30px; width: 0; height: 0; z-index: 1000; pointer-events: none; }
     .color-carousel.visible { pointer-events: auto; }
     .color-carousel-hitarea { position: absolute; width: 240px; height: 240px; left: -20px; bottom: -20px; pointer-events: none; clip-path: polygon(0% 100%, 0% 0%, 100% 0%, 100% 100%, 50% 100%, 0% 50%); border-radius: 0 100% 0 0; }
@@ -118,6 +121,7 @@
   <input type="file" id="pdfInput" accept="application/pdf">
   <button class="palette-btn" id="paletteBtn" title="Color Picker">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+    <span class="white-label">WHITE</span>
   </button>
   <div class="color-carousel" id="colorCarousel"><div class="color-carousel-hitarea" id="carouselHitarea"></div></div>
   <button class="menu-btn" id="menuBtn" title="Menu">
@@ -249,7 +253,10 @@
       b.dataset.color = c;
       b.onclick = () => {
         color = c;
-        sizeVal.style.color = c === '#ffffff' ? '#1f2937' : c;
+        const displayColor = c === '#ffffff' ? '#1f2937' : c;
+        sizeVal.style.color = displayColor;
+        $('paletteBtn').style.setProperty('--palette-color', displayColor);
+        $('paletteBtn').classList.toggle('is-white', c === '#ffffff');
         grid.querySelectorAll('.color-modal-btn').forEach(x => x.classList.toggle('selected', x.dataset.color === c));
         carousel.querySelectorAll('.color-carousel-item').forEach(x => x.classList.toggle('selected', x.dataset.color === c));
         modal.classList.remove('visible');
@@ -264,7 +271,10 @@
       item.onclick = e => {
         e.stopPropagation();
         color = c;
-        sizeVal.style.color = c === '#ffffff' ? '#1f2937' : c;
+        const displayColor = c === '#ffffff' ? '#1f2937' : c;
+        sizeVal.style.color = displayColor;
+        $('paletteBtn').style.setProperty('--palette-color', displayColor);
+        $('paletteBtn').classList.toggle('is-white', c === '#ffffff');
         grid.querySelectorAll('.color-modal-btn').forEach(x => x.classList.toggle('selected', x.dataset.color === c));
         carousel.querySelectorAll('.color-carousel-item').forEach(x => x.classList.toggle('selected', x.dataset.color === c));
         hideCarousel();
@@ -348,6 +358,14 @@
     document.addEventListener('pointercancel', handleCarouselUp);
 
     const showCarousel = () => {
+      // Rotate carousel so current color is in visible area
+      const currentColorIndex = colors.indexOf(color);
+      if (currentColorIndex !== -1) {
+        // Position the current color at the center of visible arc (around -π/4, which is 45° from origin)
+        const targetAngle = -Math.PI / 4;
+        const colorBaseAngle = -Math.PI / 2 + currentColorIndex * arcStep;
+        carouselRotation = targetAngle - colorBaseAngle;
+      }
       carouselVisible = true;
       carousel.classList.add('visible');
       updateCarouselPositions();
