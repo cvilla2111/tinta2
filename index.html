@@ -32,10 +32,12 @@
     .color-modal { background: var(--bg); border-radius: 16px; padding: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); transform: scale(0.9); transition: transform 0.2s; }
     .color-modal-overlay.visible .color-modal { transform: scale(1); }
     .color-modal-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; text-align: center; }
-    .color-modal-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .color-modal-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
     .color-modal-btn { width: 40px; height: 40px; border: 3px solid transparent; border-radius: 50%; cursor: pointer; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
     .color-modal-btn:hover { transform: scale(1.15); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     .color-modal-btn.selected { border-color: var(--active); }
+    .color-modal-btn.white-color { border-color: #d1d5db; }
+    .color-modal-btn.white-color.selected { border-color: var(--active); }
     .canvas-container { width: 100%; height: 100%; overflow: hidden; cursor: crosshair; position: relative; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
     .canvas-container.pdf-mode { overflow-y: auto; overflow-x: hidden; background: #fff; display: flex; flex-direction: column; align-items: center; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.2) transparent; touch-action: none; }
     .canvas-container.pdf-mode::-webkit-scrollbar { width: 6px; }
@@ -69,8 +71,18 @@
     .duplicate-handle:hover + .duplicate-icon { stroke: #fff; }
     .eraser-cursor { position: fixed; pointer-events: none; border: 1px solid #666; border-radius: 50%; transform: translate(-50%, -50%); z-index: 999; display: none; }
     .eraser-cursor.big-eraser { border-color: #ef4444; border-width: 1.5px; }
-    .palette-btn { position: fixed; bottom: 12px; left: 12px; width: 36px; height: 36px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1001; }
-    .palette-btn svg { width: 24px; height: 24px; stroke: #9ca3af; stroke-width: 1; fill: none; }
+    .palette-btn { position: fixed; bottom: 8px; left: 8px; width: 28px; height: 28px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1001; padding: 0; margin: 0; }
+    .palette-btn svg { width: 22px; height: 22px; stroke: #9ca3af; stroke-width: 1; fill: none; }
+    .color-carousel { position: fixed; bottom: 30px; left: 30px; width: 0; height: 0; z-index: 1000; pointer-events: none; }
+    .color-carousel.visible { pointer-events: auto; }
+    .color-carousel-hitarea { position: absolute; width: 240px; height: 240px; left: -20px; bottom: -20px; pointer-events: none; clip-path: polygon(0% 100%, 0% 0%, 100% 0%, 100% 100%, 50% 100%, 0% 50%); border-radius: 0 100% 0 0; }
+    .color-carousel.visible .color-carousel-hitarea { pointer-events: auto; }
+    .color-carousel-item { position: absolute; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transform: scale(0); opacity: 0; transition: opacity 0.2s, border-color 0.15s, box-shadow 0.15s; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .color-carousel.visible .color-carousel-item { transform: scale(1); opacity: 1; }
+    .color-carousel-item:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+    .color-carousel-item.selected { border-color: #fff; box-shadow: 0 0 0 2px var(--active), 0 4px 16px rgba(0,0,0,0.3); }
+    .color-carousel-item.white-color { border-color: #d1d5db; }
+    .color-carousel-item.white-color.selected { border-color: #fff; box-shadow: 0 0 0 2px var(--active), 0 4px 16px rgba(0,0,0,0.3); }
     .pdf-controls { display: none; align-items: center; gap: 4px; }
     .pdf-controls.visible { display: flex; }
     .pdf-nav-btn { width: 28px; height: 28px; border: none; background: var(--btn); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
@@ -107,6 +119,7 @@
   <button class="palette-btn" id="paletteBtn" title="Color Picker">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/></svg>
   </button>
+  <div class="color-carousel" id="colorCarousel"><div class="color-carousel-hitarea" id="carouselHitarea"></div></div>
   <button class="menu-btn" id="menuBtn" title="Menu">
     <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M13.77 3.043a34 34 0 0 0-3.54 0"/><path d="M13.771 20.956a33 33 0 0 1-3.541.001"/><path d="M20.18 17.74c-.51 1.15-1.29 1.93-2.439 2.44"/><path d="M20.18 6.259c-.51-1.148-1.291-1.929-2.44-2.438"/><path d="M20.957 10.23a33 33 0 0 1 0 3.54"/><path d="M3.043 10.23a34 34 0 0 0 .001 3.541"/><path d="M6.26 20.179c-1.15-.508-1.93-1.29-2.44-2.438"/><path d="M6.26 3.82c-1.149.51-1.93 1.291-2.44 2.44"/></svg>
   </button>
@@ -160,7 +173,7 @@
     const dpr = window.devicePixelRatio || 1;
     const SEGMENT_MAX = 1200, BIG_ERASER_MULT = 6, TAP_THRESHOLD = 500;
     const sizes = Array.from({length: 63}, (_, i) => (i + 1) * 0.5);
-    const colors = ['#1f2937','#6b7280','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#8b5cf6','#ec4899'];
+    const colors = ['#1f2937','#6b7280','#ef4444','#f97316','#eab308','#84cc16','#22c55e','#14b8a6','#06b6d4','#3b82f6','#6366f1','#8b5cf6','#a855f7','#d946ef','#ec4899','#f43f5e','#78716c','#ffffff'];
 
     let tool = 'pen', width = 5.5, color = '#1f2937', sizeIdx = 10, drawing = false, path = null, points = [];
     let strokes = [], undoStack = [], pageAnnotations = {};
@@ -205,19 +218,153 @@
     const hideToolbar = () => { toolbarVisible = false; toolbar.classList.add('hidden'); };
     const toggleToolbar = () => toolbarVisible ? hideToolbar() : showToolbar();
 
-    colors.forEach(c => {
+    const carousel = $('colorCarousel');
+    let carouselVisible = false;
+    let carouselRotation = 0; // Current rotation offset in radians
+    const carouselItems = [];
+
+    // Create full circle carousel items with even spacing
+    const carouselRadius = 160;
+    const totalArc = Math.PI * 2; // Full circle
+    const arcStep = totalArc / colors.length; // Even spacing around the circle
+
+    const updateCarouselPositions = () => {
+      carouselItems.forEach((item, i) => {
+        const baseAngle = -Math.PI / 2 + i * arcStep; // Start from top
+        const angle = baseAngle + carouselRotation;
+        const x = Math.cos(angle) * carouselRadius;
+        const y = Math.sin(angle) * carouselRadius;
+        item.style.left = (x - 20) + 'px';
+        item.style.bottom = (-y - 20) + 'px';
+        // Fade out items that are behind/below
+        const normalizedAngle = ((angle % totalArc) + totalArc) % totalArc;
+        const opacity = (normalizedAngle > Math.PI / 2 && normalizedAngle < Math.PI * 1.5) ? 0.3 : 1;
+        item.style.opacity = carouselVisible ? opacity : 0;
+      });
+    };
+
+    colors.forEach((c, i) => {
+      const isWhite = c === '#ffffff';
+      // Grid modal colors (keeping for stepper click)
       const b = document.createElement('button');
-      b.className = 'color-modal-btn' + (c === color ? ' selected' : '');
+      b.className = 'color-modal-btn' + (c === color ? ' selected' : '') + (isWhite ? ' white-color' : '');
       b.style.background = c;
       b.dataset.color = c;
       b.onclick = () => {
         color = c;
-        sizeVal.style.color = c;
+        sizeVal.style.color = c === '#ffffff' ? '#1f2937' : c;
         grid.querySelectorAll('.color-modal-btn').forEach(x => x.classList.toggle('selected', x.dataset.color === c));
+        carousel.querySelectorAll('.color-carousel-item').forEach(x => x.classList.toggle('selected', x.dataset.color === c));
         modal.classList.remove('visible');
       };
       grid.appendChild(b);
+
+      // Carousel colors
+      const item = document.createElement('div');
+      item.className = 'color-carousel-item' + (c === color ? ' selected' : '') + (isWhite ? ' white-color' : '');
+      item.style.background = c;
+      item.dataset.color = c;
+      item.onclick = e => {
+        e.stopPropagation();
+        color = c;
+        sizeVal.style.color = c === '#ffffff' ? '#1f2937' : c;
+        grid.querySelectorAll('.color-modal-btn').forEach(x => x.classList.toggle('selected', x.dataset.color === c));
+        carousel.querySelectorAll('.color-carousel-item').forEach(x => x.classList.toggle('selected', x.dataset.color === c));
+        hideCarousel();
+      };
+      carousel.appendChild(item);
+      carouselItems.push(item);
     });
+
+    // Touch/drag spin handling
+    let spinVelocity = 0;
+    let spinAnimationId = null;
+    let isDraggingCarousel = false;
+    let lastDragX = 0, lastDragY = 0;
+    let lastDragTime = 0;
+
+    const carouselOriginX = 30; // carousel position from left
+    const carouselOriginY = window.innerHeight - 30; // carousel position from top
+
+    const handleCarouselDown = e => {
+      if (!carouselVisible) return;
+      isDraggingCarousel = true;
+      lastDragX = e.clientX;
+      lastDragY = e.clientY;
+      lastDragTime = Date.now();
+      spinVelocity = 0;
+      if (spinAnimationId) { cancelAnimationFrame(spinAnimationId); spinAnimationId = null; }
+      e.stopPropagation();
+    };
+
+    const handleCarouselMove = e => {
+      if (!isDraggingCarousel || !carouselVisible) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const now = Date.now();
+      const dt = Math.max(1, now - lastDragTime);
+
+      // Calculate angle change based on drag around the origin point
+      const prevAngle = Math.atan2(carouselOriginY - lastDragY, lastDragX - carouselOriginX);
+      const currAngle = Math.atan2(carouselOriginY - e.clientY, e.clientX - carouselOriginX);
+      let deltaAngle = currAngle - prevAngle;
+
+      // Handle angle wrap-around
+      if (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
+      if (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
+
+      carouselRotation -= deltaAngle;
+      spinVelocity = -deltaAngle / dt * 16; // Normalize to ~60fps
+
+      lastDragX = e.clientX;
+      lastDragY = e.clientY;
+      lastDragTime = now;
+
+      updateCarouselPositions();
+    };
+
+    const handleCarouselUp = e => {
+      if (!isDraggingCarousel) return;
+      isDraggingCarousel = false;
+      // Start momentum animation if there's velocity
+      if (Math.abs(spinVelocity) > 0.001 && !spinAnimationId) animateSpin();
+    };
+
+    const animateSpin = () => {
+      carouselRotation += spinVelocity;
+      spinVelocity *= 0.92; // Friction
+      updateCarouselPositions();
+      if (Math.abs(spinVelocity) > 0.001) {
+        spinAnimationId = requestAnimationFrame(animateSpin);
+      } else {
+        spinVelocity = 0;
+        spinAnimationId = null;
+      }
+    };
+
+    const hitarea = $('carouselHitarea');
+    carousel.addEventListener('pointerdown', handleCarouselDown);
+    hitarea.addEventListener('pointerdown', handleCarouselDown);
+    document.addEventListener('pointermove', handleCarouselMove);
+    document.addEventListener('pointerup', handleCarouselUp);
+    document.addEventListener('pointercancel', handleCarouselUp);
+
+    const showCarousel = () => {
+      carouselVisible = true;
+      carousel.classList.add('visible');
+      updateCarouselPositions();
+    };
+    const hideCarousel = () => {
+      carouselVisible = false;
+      carousel.classList.remove('visible');
+      if (spinAnimationId) { cancelAnimationFrame(spinAnimationId); spinAnimationId = null; }
+      spinVelocity = 0;
+    };
+    const toggleCarousel = () => carouselVisible ? hideCarousel() : showCarousel();
+
+    // Initialize positions
+    updateCarouselPositions();
 
     sizeVal.onclick = () => modal.classList.add('visible');
     modal.onclick = e => { if (e.target === modal) modal.classList.remove('visible'); };
@@ -1101,8 +1248,11 @@
     }
 
     menuBtn.onclick = e => { e.stopPropagation(); toggleToolbar(); };
-    $('paletteBtn').onclick = () => modal.classList.add('visible');
-    document.addEventListener('pointerdown', e => { if (toolbarVisible && !toolbar.contains(e.target) && e.target !== menuBtn) hideToolbar(); });
+    $('paletteBtn').onclick = e => { e.stopPropagation(); toggleCarousel(); };
+    document.addEventListener('pointerdown', e => {
+      if (toolbarVisible && !toolbar.contains(e.target) && e.target !== menuBtn) hideToolbar();
+      if (carouselVisible && !carousel.contains(e.target) && e.target !== $('paletteBtn') && e.target !== hitarea) hideCarousel();
+    });
     toolbar.addEventListener('pointerdown', e => e.stopPropagation());
 
     $('penTool').onclick = () => setTool('pen');
