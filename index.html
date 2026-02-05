@@ -263,7 +263,6 @@
       const item = document.createElement('div');
       item.className = 'color-carousel-item' + (c === color ? ' selected' : '') + (isWhite ? ' white-color' : '');
       item.style.background = c;
-      item.style.transitionDelay = (i * 0.025) + 's'; // Staggered animation
       item.dataset.color = c;
       item.onclick = e => {
         e.stopPropagation();
