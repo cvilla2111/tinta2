@@ -178,8 +178,9 @@
     let lastEraseX = 0, lastEraseY = 0;
     // Point simplification epsilon (set to 0 to disable, 0.5-1.0 recommended)
     const SIMPLIFY_EPSILON = 0;
-    // Max undo stack size
+    // Max undo/redo stack size (older strokes become permanent)
     const MAX_UNDO_STACK = 10;
+    const MAX_UNDO_STROKES = 10;
 
     const $ = id => document.getElementById(id);
     const svg = $('drawing-svg'), group = $('strokes-group'), container = $('canvasContainer');
@@ -468,7 +469,7 @@
         el.setAttribute('d', buildPath(newPoints, s.width));
         group.appendChild(el);
         const newStroke = { element: el, points: newPoints, color: s.color, width: s.width };
-        strokes.push(newStroke);
+        addStroke(newStroke);
         newStrokes.push(newStroke);
       });
 
@@ -638,9 +639,11 @@
           el.setAttribute('d', buildPath(s.points, s.width));
           return { ...s, element: el };
         });
+        undoableCount = Math.min(strokes.length, MAX_UNDO_STROKES);
       } else {
         strokes = [];
         undoStack = [];
+        undoableCount = 0;
       }
     };
 
@@ -648,8 +651,29 @@
       undoStack.push(...items);
       while (undoStack.length > MAX_UNDO_STACK) undoStack.shift();
     };
-    const undo = () => { if (strokes.length) { const s = strokes.pop(); pushUndo(s); s.element.remove(); savePageAnnotations(); } };
-    const redo = () => { if (undoStack.length) { const s = undoStack.pop(); group.appendChild(s.element); strokes.push(s); savePageAnnotations(); } };
+    // Track how many recent strokes can be undone
+    let undoableCount = 0;
+    const addStroke = (stroke) => {
+      strokes.push(stroke);
+      undoableCount = Math.min(undoableCount + 1, MAX_UNDO_STROKES);
+    };
+    const undo = () => {
+      if (strokes.length && undoableCount > 0) {
+        const s = strokes.pop();
+        undoableCount--;
+        pushUndo(s);
+        s.element.remove();
+        savePageAnnotations();
+      }
+    };
+    const redo = () => {
+      if (undoStack.length) {
+        const s = undoStack.pop();
+        group.appendChild(s.element);
+        addStroke(s);
+        savePageAnnotations();
+      }
+    };
     const isEraser = e => e.button === 5 || (e.buttons & 32) !== 0;
     const isLassoButton = e => e.button === 2 || (e.buttons & 2) !== 0;
 
@@ -718,7 +742,7 @@
       group.appendChild(path);
     };
 
-    const finalize = () => { if (path && points.length > 1) { strokes.push({ element: path, points: [...points], color, width: getEffectiveWidth() }); savePageAnnotations(); } };
+    const finalize = () => { if (path && points.length > 1) { addStroke({ element: path, points: [...points], color, width: getEffectiveWidth() }); savePageAnnotations(); } };
     const setCursor = e => { cursor.style.left = e.clientX + 'px'; cursor.style.top = e.clientY + 'px'; };
 
     function start(e) {
@@ -845,7 +869,7 @@
       if (tool === 'pen' && path) {
         const simplified = simplifyPoints(points, SIMPLIFY_EPSILON);
         path.setAttribute('d', buildPath(simplified, getEffectiveWidth()));
-        strokes.push({ element: path, points: simplified, color, width: getEffectiveWidth() });
+        addStroke({ element: path, points: simplified, color, width: getEffectiveWidth() });
         savePageAnnotations();
         path = null;
       }
