@@ -1060,7 +1060,7 @@
       lastEraseY = y;
 
       const eraserSize = bigEraser ? BIG_ERASER_SIZE : ERASER_SIZE;
-      const r = eraserSize * getPdfScale() * 0.5;
+      const r = eraserSize * getPdfScale() * dpr * 0.5;
       let erased = false;
       for (let i = strokes.length - 1; i >= 0; i--) {
         const s = strokes[i], b = s.element.getBBox();
