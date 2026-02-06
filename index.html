@@ -1211,31 +1211,44 @@
     }
 
     async function renderThumbnail(item, pageNum) {
-      if (item.dataset.rendered) return;
       const page = await pdfDoc.getPage(pageNum);
       const viewport = page.getViewport({ scale: 1 });
-      const scale = 220 / viewport.height;
-      const scaledViewport = page.getViewport({ scale });
-      const canvas = document.createElement('canvas');
+      const thumbScale = 220 / viewport.height;
+      const scaledViewport = page.getViewport({ scale: thumbScale });
+      let canvas = item.querySelector('canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        const placeholder = item.querySelector('.filmstrip-placeholder');
+        if (placeholder) placeholder.remove();
+        item.insertBefore(canvas, item.firstChild);
+      }
       canvas.width = scaledViewport.width;
       canvas.height = scaledViewport.height;
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
-      const placeholder = item.querySelector('.filmstrip-placeholder');
-      if (placeholder) placeholder.remove();
-      item.insertBefore(canvas, item.firstChild);
-      item.dataset.rendered = 'true';
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+      // Draw stroke annotations on thumbnail
+      const annotations = pageAnnotations[pageNum];
+      if (annotations && annotations.strokes.length > 0) {
+        ctx.save();
+        ctx.scale(thumbScale, thumbScale);
+        annotations.strokes.forEach(s => {
+          const path2d = new Path2D(buildPath(s.points, s.width));
+          ctx.fillStyle = s.color;
+          ctx.fill(path2d);
+        });
+        ctx.restore();
+      }
     }
 
     const showFilmstrip = async () => {
       if (!pdfDoc) return;
+      savePageAnnotations();
       filmstripThumbnails.forEach((item, idx) => item.classList.toggle('active', idx + 1 === currentPage));
       filmstripOverlay.classList.add('visible');
       filmstripContainer.querySelector('.active')?.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'center' });
-      // Render thumbnails lazily in background
+      // Render all thumbnails with current annotations
       for (const item of filmstripThumbnails) {
-        if (!item.dataset.rendered) {
-          await renderThumbnail(item, parseInt(item.dataset.page));
-        }
+        await renderThumbnail(item, parseInt(item.dataset.page));
       }
     };
 
