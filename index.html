@@ -9,11 +9,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
   <style>
     :root { --bg: #fff; --border: #e5e7eb; --btn: #f3f4f6; --btn-hover: #e5e7eb; --active: #3b82f6; --text: #1f2937; --text2: #6b7280; }
+
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'IBM Plex Sans', -apple-system, sans-serif; background: var(--bg); touch-action: none; }
     .menu-btn { position: fixed; top: 12px; right: 12px; width: 36px; height: 36px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1001; }
     .menu-btn svg { width: 24px; height: 24px; stroke: #9ca3af; stroke-width: 1; fill: none; }
     .toolbar { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); z-index: 1000; transition: opacity 0.3s, transform 0.3s; }
+
     .toolbar.hidden { opacity: 0; transform: translateX(-50%) translateY(-100%); pointer-events: none; }
     .divider { width: 1px; height: 22px; background: var(--border); margin: 0 3px; }
     .tool-btn { width: 28px; height: 28px; border: none; background: var(--btn); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
@@ -25,11 +27,13 @@
     .stepper-btn { width: 22px; height: 22px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: var(--text); transition: background 0.15s; }
     .stepper-btn:hover { background: var(--btn-hover); }
     .stepper-btn:active { background: #d1d5db; }
+
     .stepper-value { min-width: 26px; text-align: center; font-size: 11px; font-weight: 600; padding: 0 2px; cursor: pointer; border-radius: 4px; transition: background 0.15s; }
     .stepper-value:hover { background: var(--btn-hover); }
     .color-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: opacity 0.2s, visibility 0.2s; }
     .color-modal-overlay.visible { opacity: 1; visibility: visible; }
     .color-modal { background: var(--bg); border-radius: 16px; padding: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); transform: scale(0.9); transition: transform 0.2s; }
+
     .color-modal-overlay.visible .color-modal { transform: scale(1); }
     .color-modal-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; text-align: center; }
     .color-modal-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
@@ -40,12 +44,14 @@
     .color-modal-btn.white-color.selected { border-color: var(--active); }
     .canvas-container { width: 100%; height: 100%; overflow: hidden; cursor: crosshair; position: relative; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
     .canvas-container.pdf-mode { overflow-y: auto; overflow-x: hidden; background: #fff; display: flex; flex-direction: column; align-items: center; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.2) transparent; touch-action: none; }
+
     .canvas-container.pdf-mode::-webkit-scrollbar { width: 6px; }
     .canvas-container.pdf-mode::-webkit-scrollbar-track { background: transparent; }
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
     .canvas-container.pdf-mode::before, .canvas-container.pdf-mode::after { content: ''; flex: 1; min-height: 0; }
     .canvas-container.no-pdf { background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 20px 20px; }
+
     .canvas-container.lasso-mode { cursor: crosshair; }
     .canvas-container.eraser-mode { cursor: none; }
     .canvas-container.eraser-mode .eraser-cursor { display: block; }
@@ -63,23 +69,23 @@
     .stroke-path { stroke: none; }
     .lasso-path { fill: none; stroke: var(--active); stroke-width: 2.5; stroke-dasharray: 6 4; }
     .selection-box { fill: none; stroke: var(--active); stroke-width: 2; stroke-dasharray: 5 3; }
-    .selection-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: nwse-resize; }
-    .rotation-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: grab; }
+    .selection-handle { fill: var(--bg); stroke: var(--active); stroke-width: 1.5; cursor: nwse-resize; }
+    .rotation-handle { fill: var(--bg); stroke: var(--active); stroke-width: 1.5; cursor: grab; }
     .rotation-line { stroke: var(--active); stroke-width: 1.5; }
-    .sel-toolbar-bg { fill: #fff; stroke: var(--active); stroke-width: 1.5; }
-    .sel-toolbar-div { stroke: var(--active); stroke-width: 1; opacity: 0.3; }
+    .sel-toolbar-bg { fill: #1f2937; stroke: none; rx: 12; }
+    .sel-toolbar-div { stroke: rgba(255,255,255,0.2); stroke-width: 1; }
     .duplicate-handle { fill: transparent; stroke: none; cursor: pointer; }
-    .duplicate-handle:hover { fill: var(--active); fill-opacity: 0.12; }
-    .duplicate-handle:hover + .duplicate-icon { stroke: var(--active); }
+    .duplicate-handle:hover { fill: rgba(255,255,255,0.15); }
     .lock-handle { fill: transparent; stroke: none; cursor: pointer; }
-    .lock-handle:hover { fill: var(--active); fill-opacity: 0.12; }
-    .lock-handle:hover + .lock-icon { stroke: var(--active); }
+    .lock-handle:hover { fill: rgba(255,255,255,0.15); }
+    .trash-handle { fill: transparent; stroke: none; cursor: pointer; }
+    .trash-handle:hover { fill: rgba(255,255,255,0.15); }
     .stroke-path.locked-blink { fill: #ef4444; }
     .eraser-cursor { position: fixed; pointer-events: none; border: 1px solid #666; border-radius: 50%; transform: translate(-50%, -50%); z-index: 999; display: none; }
     .eraser-cursor.big-eraser { border-color: #ef4444; border-width: 1.5px; }
     .palette-btn { position: fixed; bottom: 8px; left: 8px; width: 28px; height: 28px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1001; padding: 0; margin: 0; }
     .palette-btn svg { width: 22px; height: 22px; stroke: var(--palette-color, #1f2937); stroke-width: 1.5; fill: none; }
-    .palette-btn .white-label { display: none; font-size: 11px; font-weight: 700; color: #1f2937; letter-spacing: -0.5px; }
+    .palette-btn .white-label { display: none; font-size: 11px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
     .palette-btn.is-white svg { display: none; }
     .palette-btn.is-white .white-label { display: block; }
     .color-carousel { position: fixed; bottom: 30px; left: 30px; width: 0; height: 0; z-index: 1000; pointer-events: none; }
@@ -120,7 +126,6 @@
     .filmstrip-item-number { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
     .filmstrip-placeholder { width: 156px; height: 220px; display: flex; align-items: center; justify-content: center; background: #e5e7eb; color: #6b7280; font-size: 12px; font-weight: 500; }
     .filmstrip-hint { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255, 255, 255, 0.6); font-size: 12px; font-weight: 500; }
-
   </style>
 </head>
 <body>
@@ -193,22 +198,17 @@
     let toolbarVisible = false, filmstripThumbnails = [];
 
     let lassoPath = null, lassoPoints = [], selectedStrokes = [], selectionBoxes = [], selectionHandles = [];
-    let rotationHandle = null, rotationLine = null, duplicateHandle = null, duplicateIcon = null, lockHandle = null, lockIcon = null, selToolbar = null, selToolbarDiv = null;
+    let rotationHandle = null, rotationLine = null, duplicateHandle = null, duplicateIcon = null, lockHandle = null, lockIcon = null, trashHandle = null, trashIcon = null, selToolbar = null, selToolbarDiv = null, selToolbarDiv2 = null;
     const blinkingStrokes = new Set();
     let isDraggingSelection = false, isScalingSelection = false, isRotatingSelection = false;
     let activeHandle = null, dragStartX = 0, dragStartY = 0, selectionBounds = null, originalBounds = null, originalStrokePoints = [];
     let rotationCenterX = 0, rotationCenterY = 0, startAngle = 0, currentRotation = 0, previousRotation = 0;
     let scaleAnchorWorldX = 0, scaleAnchorWorldY = 0;
 
-    // RAF optimization for drawing
     let needsRender = false;
-    // Cache for getBoundingClientRect
     let cachedSvgRect = null;
-    // Eraser throttling
     let lastEraseX = 0, lastEraseY = 0;
-    // Point simplification epsilon (set to 0 to disable, 0.5-1.0 recommended)
     const SIMPLIFY_EPSILON = 0;
-    // Max undo/redo stack size (older strokes become permanent)
     const MAX_UNDO_STACK = 10;
     const MAX_UNDO_STROKES = 10;
 
@@ -232,17 +232,16 @@
 
     const carousel = $('colorCarousel');
     let carouselVisible = false;
-    let carouselRotation = 0; // Current rotation offset in radians
+    let carouselRotation = 0;
     const carouselItems = [];
 
-    // Create full circle carousel items with even spacing
     const carouselRadius = 160;
-    const totalArc = Math.PI * 2; // Full circle
-    const arcStep = totalArc / colors.length; // Even spacing around the circle
+    const totalArc = Math.PI * 2;
+    const arcStep = totalArc / colors.length;
 
     const updateCarouselPositions = () => {
       carouselItems.forEach((item, i) => {
-        const baseAngle = -Math.PI / 2 + i * arcStep; // Start from top
+        const baseAngle = -Math.PI / 2 + i * arcStep;
         const angle = baseAngle + carouselRotation;
         const x = Math.cos(angle) * carouselRadius;
         const y = Math.sin(angle) * carouselRadius;
@@ -254,7 +253,6 @@
 
     colors.forEach((c, i) => {
       const isWhite = c === '#ffffff';
-      // Grid modal colors (keeping for stepper click)
       const b = document.createElement('button');
       b.className = 'color-modal-btn' + (c === color ? ' selected' : '') + (isWhite ? ' white-color' : '');
       b.style.background = c;
@@ -271,7 +269,6 @@
       };
       grid.appendChild(b);
 
-      // Carousel colors
       const item = document.createElement('div');
       item.className = 'color-carousel-item' + (c === color ? ' selected' : '') + (isWhite ? ' white-color' : '');
       item.style.background = c;
@@ -291,15 +288,14 @@
       carouselItems.push(item);
     });
 
-    // Touch/drag spin handling
     let spinVelocity = 0;
     let spinAnimationId = null;
     let isDraggingCarousel = false;
     let lastDragX = 0, lastDragY = 0;
     let lastDragTime = 0;
 
-    const carouselOriginX = 30; // carousel position from left
-    const carouselOriginY = window.innerHeight - 30; // carousel position from top
+    const carouselOriginX = 30;
+    const carouselOriginY = window.innerHeight - 30;
 
     const handleCarouselDown = e => {
       if (!carouselVisible) return;
@@ -320,17 +316,15 @@
       const now = Date.now();
       const dt = Math.max(1, now - lastDragTime);
 
-      // Calculate angle change based on drag around the origin point
       const prevAngle = Math.atan2(carouselOriginY - lastDragY, lastDragX - carouselOriginX);
       const currAngle = Math.atan2(carouselOriginY - e.clientY, e.clientX - carouselOriginX);
       let deltaAngle = currAngle - prevAngle;
 
-      // Handle angle wrap-around
       if (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
       if (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
 
       carouselRotation -= deltaAngle;
-      spinVelocity = -deltaAngle / dt * 16; // Normalize to ~60fps
+      spinVelocity = -deltaAngle / dt * 16;
 
       lastDragX = e.clientX;
       lastDragY = e.clientY;
@@ -339,16 +333,15 @@
       updateCarouselPositions();
     };
 
-    const handleCarouselUp = e => {
+    const handleCarouselUp = () => {
       if (!isDraggingCarousel) return;
       isDraggingCarousel = false;
-      // Start momentum animation if there's velocity
       if (Math.abs(spinVelocity) > 0.001 && !spinAnimationId) animateSpin();
     };
 
     const animateSpin = () => {
       carouselRotation += spinVelocity;
-      spinVelocity *= 0.92; // Friction
+      spinVelocity *= 0.92;
       updateCarouselPositions();
       if (Math.abs(spinVelocity) > 0.001) {
         spinAnimationId = requestAnimationFrame(animateSpin);
@@ -366,10 +359,8 @@
     document.addEventListener('pointercancel', handleCarouselUp);
 
     const showCarousel = () => {
-      // Rotate carousel so current color is in visible area
       const currentColorIndex = colors.indexOf(color);
       if (currentColorIndex !== -1) {
-        // Position the current color at the center of visible arc (around -π/4, which is 45° from origin)
         const targetAngle = -Math.PI / 4;
         const colorBaseAngle = -Math.PI / 2 + currentColorIndex * arcStep;
         carouselRotation = targetAngle - colorBaseAngle;
@@ -386,7 +377,6 @@
     };
     const toggleCarousel = () => carouselVisible ? hideCarousel() : showCarousel();
 
-    // Initialize positions
     updateCarouselPositions();
 
     sizeVal.onclick = () => modal.classList.add('visible');
@@ -428,9 +418,15 @@
       if (lockIcon) { lockIcon.remove(); lockIcon = null; }
     };
 
+    const removeTrashUI = () => {
+      if (trashHandle) { trashHandle.remove(); trashHandle = null; }
+      if (trashIcon) { trashIcon.remove(); trashIcon = null; }
+    };
+
     const removeSelToolbar = () => {
       if (selToolbar) { selToolbar.remove(); selToolbar = null; }
       if (selToolbarDiv) { selToolbarDiv.remove(); selToolbarDiv = null; }
+      if (selToolbarDiv2) { selToolbarDiv2.remove(); selToolbarDiv2 = null; }
     };
 
     const removeRotationUI = () => {
@@ -447,6 +443,7 @@
       removeRotationUI();
       removeDuplicateUI();
       removeLockUI();
+      removeTrashUI();
       removeSelToolbar();
       if (lassoPath) { lassoPath.remove(); lassoPath = null; }
       lassoPoints = [];
@@ -469,18 +466,30 @@
       const lsr = getEffectiveHandleSize(8), lsh = getEffectiveHandleSize(10);
       const lsw = getEffectiveHandleSize(2.5);
       const lbx = cx - lbw / 2, lby = cy + getEffectiveHandleSize(3);
-      const body = `<rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(3)}" fill="none" stroke="var(--active)" stroke-width="${lsw}"/>`;
+      const body = `<rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(3)}" fill="none" stroke="#fff" stroke-width="${lsw}"/>`;
       if (isLocked) {
-        return body + `<path d="M${cx - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${cx + lsr},${lby - lsh} V${lby - lsh + getEffectiveHandleSize(4)}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>`;
+        return body + `<path d="M${cx - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${cx + lsr},${lby - lsh} V${lby - lsh + getEffectiveHandleSize(4)}" fill="none" stroke="#fff" stroke-width="${lsw}" stroke-linecap="round"/>`;
       }
-      return body + `<path d="M${cx - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${cx + lsr},${lby - lsh} V${lby}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>`;
+      return body + `<path d="M${cx - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${cx + lsr},${lby - lsh} V${lby}" fill="none" stroke="#fff" stroke-width="${lsw}" stroke-linecap="round"/>`;
     };
 
     const buildDupIconSVG = (cx, cy) => {
       const iconSize = getEffectiveHandleSize(28), iconOffset = getEffectiveHandleSize(8);
       return `
-        <rect x="${cx - iconSize/2 + iconOffset/2}" y="${cy - iconSize/2 - iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(4)}" fill="none" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(3)}"/>
-        <rect x="${cx - iconSize/2 - iconOffset/2}" y="${cy - iconSize/2 + iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(4)}" fill="#fff" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(3)}"/>
+        <rect x="${cx - iconSize/2 + iconOffset/2}" y="${cy - iconSize/2 - iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(4)}" fill="none" stroke="#fff" stroke-width="${getEffectiveHandleSize(3)}"/>
+        <rect x="${cx - iconSize/2 - iconOffset/2}" y="${cy - iconSize/2 + iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(4)}" fill="#1f2937" stroke="#fff" stroke-width="${getEffectiveHandleSize(3)}"/>
+      `;
+    };
+
+    const buildTrashIconSVG = (cx, cy) => {
+      const sw = getEffectiveHandleSize(2.5);
+      const s = getEffectiveHandleSize;
+      return `
+        <line x1="${cx - s(14)}" y1="${cy - s(8)}" x2="${cx + s(14)}" y2="${cy - s(8)}" stroke="#fff" stroke-width="${sw}" stroke-linecap="round"/>
+        <path d="M${cx - s(4)},${cy - s(8)} V${cy - s(14)} a${s(4)},${s(4)} 0 0,1 ${s(8)},0 V${cy - s(8)}" fill="none" stroke="#fff" stroke-width="${sw}" stroke-linecap="round"/>
+        <path d="M${cx - s(10)},${cy - s(5)} L${cx - s(8)},${cy + s(14)} a${s(3)},${s(3)} 0 0,0 ${s(16)},0 L${cx + s(10)},${cy - s(5)}" fill="none" stroke="#fff" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="${cx - s(3)}" y1="${cy - s(2)}" x2="${cx - s(2)}" y2="${cy + s(9)}" stroke="#fff" stroke-width="${sw}" stroke-linecap="round"/>
+        <line x1="${cx + s(3)}" y1="${cy - s(2)}" x2="${cx + s(2)}" y2="${cy + s(9)}" stroke="#fff" stroke-width="${sw}" stroke-linecap="round"/>
       `;
     };
 
@@ -490,6 +499,7 @@
       removeRotationUI();
       removeDuplicateUI();
       removeLockUI();
+      removeTrashUI();
       removeSelToolbar();
       if (!selectionBounds) return;
 
@@ -515,7 +525,6 @@
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const topY = selectionBounds.y, bottomY = selectionBounds.y + selectionBounds.height;
 
-      // Rotation handle at BOTTOM
       rotationLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       rotationLine.classList.add('rotation-line');
       rotationLine.setAttribute('x1', centerX);
@@ -532,11 +541,11 @@
       group.appendChild(rotationHandle);
 
       if (currentRotation === 0) {
-        // Top toolbar with duplicate + lock (sharp corners)
         const btnSize = getEffectiveHandleSize(72);
-        const toolbarW = btnSize * 2, toolbarH = btnSize;
+        const toolbarW = btnSize * 3, toolbarH = btnSize;
         const toolbarX = centerX - toolbarW / 2;
         const toolbarY = topY - rotationOffset - toolbarH;
+        const toolbarR = getEffectiveHandleSize(12);
 
         selToolbar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         selToolbar.classList.add('sel-toolbar-bg');
@@ -544,17 +553,28 @@
         selToolbar.setAttribute('y', toolbarY);
         selToolbar.setAttribute('width', toolbarW);
         selToolbar.setAttribute('height', toolbarH);
+        selToolbar.setAttribute('rx', toolbarR);
         group.appendChild(selToolbar);
 
+        // Divider between duplicate and lock
         selToolbarDiv = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         selToolbarDiv.classList.add('sel-toolbar-div');
-        selToolbarDiv.setAttribute('x1', centerX);
+        selToolbarDiv.setAttribute('x1', toolbarX + btnSize);
         selToolbarDiv.setAttribute('y1', toolbarY + getEffectiveHandleSize(12));
-        selToolbarDiv.setAttribute('x2', centerX);
+        selToolbarDiv.setAttribute('x2', toolbarX + btnSize);
         selToolbarDiv.setAttribute('y2', toolbarY + toolbarH - getEffectiveHandleSize(12));
         group.appendChild(selToolbarDiv);
 
-        // Duplicate button (left half)
+        // Divider between lock and trash
+        selToolbarDiv2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        selToolbarDiv2.classList.add('sel-toolbar-div');
+        selToolbarDiv2.setAttribute('x1', toolbarX + btnSize * 2);
+        selToolbarDiv2.setAttribute('y1', toolbarY + getEffectiveHandleSize(12));
+        selToolbarDiv2.setAttribute('x2', toolbarX + btnSize * 2);
+        selToolbarDiv2.setAttribute('y2', toolbarY + toolbarH - getEffectiveHandleSize(12));
+        group.appendChild(selToolbarDiv2);
+
+        // Duplicate button (left)
         const dupCX = toolbarX + btnSize / 2, dupCY = toolbarY + btnSize / 2;
         duplicateHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         duplicateHandle.classList.add('duplicate-handle');
@@ -570,7 +590,7 @@
         duplicateIcon.innerHTML = buildDupIconSVG(dupCX, dupCY);
         group.appendChild(duplicateIcon);
 
-        // Lock button (right half)
+        // Lock button (center)
         const lockCX = toolbarX + btnSize + btnSize / 2, lockCY = dupCY;
         lockHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         lockHandle.classList.add('lock-handle');
@@ -586,6 +606,22 @@
         lockIcon.setAttribute('pointer-events', 'none');
         lockIcon.innerHTML = buildLockIconSVG(lockCX, lockCY, anyLocked);
         group.appendChild(lockIcon);
+
+        // Trash button (right)
+        const trashCX = toolbarX + btnSize * 2 + btnSize / 2, trashCY = dupCY;
+        trashHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        trashHandle.classList.add('trash-handle');
+        trashHandle.setAttribute('x', toolbarX + btnSize * 2);
+        trashHandle.setAttribute('y', toolbarY);
+        trashHandle.setAttribute('width', btnSize);
+        trashHandle.setAttribute('height', toolbarH);
+        group.appendChild(trashHandle);
+
+        trashIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        trashIcon.classList.add('trash-icon');
+        trashIcon.setAttribute('pointer-events', 'none');
+        trashIcon.innerHTML = buildTrashIconSVG(trashCX, trashCY);
+        group.appendChild(trashIcon);
       }
     };
 
@@ -615,7 +651,6 @@
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const topY = selectionBounds.y, bottomY = selectionBounds.y + selectionBounds.height;
 
-      // Rotation at BOTTOM
       if (rotationHandle && rotationLine) {
         rotationLine.setAttribute('x1', centerX);
         rotationLine.setAttribute('y1', bottomY);
@@ -626,10 +661,9 @@
         rotationHandle.setAttribute('r', getEffectiveHandleSize(20));
       }
 
-      // Top toolbar with duplicate + lock
       if (duplicateHandle && duplicateIcon) {
         const btnSize = getEffectiveHandleSize(72);
-        const toolbarW = btnSize * 2, toolbarH = btnSize;
+        const toolbarW = btnSize * 3, toolbarH = btnSize;
         const toolbarX = centerX - toolbarW / 2;
         const toolbarY = topY - rotationOffset - toolbarH;
 
@@ -638,12 +672,19 @@
           selToolbar.setAttribute('y', toolbarY);
           selToolbar.setAttribute('width', toolbarW);
           selToolbar.setAttribute('height', toolbarH);
+          selToolbar.setAttribute('rx', getEffectiveHandleSize(12));
         }
         if (selToolbarDiv) {
-          selToolbarDiv.setAttribute('x1', centerX);
+          selToolbarDiv.setAttribute('x1', toolbarX + btnSize);
           selToolbarDiv.setAttribute('y1', toolbarY + getEffectiveHandleSize(12));
-          selToolbarDiv.setAttribute('x2', centerX);
+          selToolbarDiv.setAttribute('x2', toolbarX + btnSize);
           selToolbarDiv.setAttribute('y2', toolbarY + toolbarH - getEffectiveHandleSize(12));
+        }
+        if (selToolbarDiv2) {
+          selToolbarDiv2.setAttribute('x1', toolbarX + btnSize * 2);
+          selToolbarDiv2.setAttribute('y1', toolbarY + getEffectiveHandleSize(12));
+          selToolbarDiv2.setAttribute('x2', toolbarX + btnSize * 2);
+          selToolbarDiv2.setAttribute('y2', toolbarY + toolbarH - getEffectiveHandleSize(12));
         }
 
         const dupCX = toolbarX + btnSize / 2, dupCY = toolbarY + btnSize / 2;
@@ -662,6 +703,15 @@
           const anyLocked = selectedStrokes.some(s => s.locked);
           lockIcon.innerHTML = buildLockIconSVG(lockCX, lockCY, anyLocked);
         }
+
+        if (trashHandle && trashIcon) {
+          const trashCX = toolbarX + btnSize * 2 + btnSize / 2, trashCY = dupCY;
+          trashHandle.setAttribute('x', toolbarX + btnSize * 2);
+          trashHandle.setAttribute('y', toolbarY);
+          trashHandle.setAttribute('width', btnSize);
+          trashHandle.setAttribute('height', toolbarH);
+          trashIcon.innerHTML = buildTrashIconSVG(trashCX, trashCY);
+        }
       }
 
       if (preserveRotation && currentRotation !== 0) {
@@ -677,6 +727,9 @@
         duplicateIcon?.setAttribute('transform', rotateTransform);
         lockHandle?.setAttribute('transform', rotateTransform);
         lockIcon?.setAttribute('transform', rotateTransform);
+        trashHandle?.setAttribute('transform', rotateTransform);
+        trashIcon?.setAttribute('transform', rotateTransform);
+        selToolbarDiv2?.setAttribute('transform', rotateTransform);
       }
     };
 
@@ -726,6 +779,7 @@
       removeRotationUI();
       removeDuplicateUI();
       removeLockUI();
+      removeTrashUI();
       removeSelToolbar();
       selectionBounds = null;
       currentRotation = previousRotation = 0;
@@ -756,6 +810,7 @@
       removeRotationUI();
       removeDuplicateUI();
       removeLockUI();
+      removeTrashUI();
       removeSelToolbar();
 
       selectedStrokes = newStrokes;
@@ -866,7 +921,7 @@
       const p = transformPointForHitTest(x, y);
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const btnSize = getEffectiveHandleSize(72);
-      const toolbarX = centerX - btnSize;
+      const toolbarX = centerX - btnSize * 1.5;
       const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize;
       return p.x >= toolbarX && p.x <= toolbarX + btnSize && p.y >= toolbarY && p.y <= toolbarY + btnSize;
     };
@@ -876,7 +931,17 @@
       const p = transformPointForHitTest(x, y);
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const btnSize = getEffectiveHandleSize(72);
-      const toolbarX = centerX;
+      const toolbarX = centerX - btnSize * 1.5 + btnSize;
+      const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize;
+      return p.x >= toolbarX && p.x <= toolbarX + btnSize && p.y >= toolbarY && p.y <= toolbarY + btnSize;
+    };
+
+    const isOnTrashHandle = (x, y) => {
+      if (!selectionBounds || selectedStrokes.length === 0 || !trashHandle) return false;
+      const p = transformPointForHitTest(x, y);
+      const centerX = selectionBounds.x + selectionBounds.width / 2;
+      const btnSize = getEffectiveHandleSize(72);
+      const toolbarX = centerX - btnSize * 1.5 + btnSize * 2;
       const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize;
       return p.x >= toolbarX && p.x <= toolbarX + btnSize && p.y >= toolbarY && p.y <= toolbarY + btnSize;
     };
@@ -948,7 +1013,6 @@
       undoStack.push(...items);
       while (undoStack.length > MAX_UNDO_STACK) undoStack.shift();
     };
-    // Track how many recent strokes can be undone
     let undoableCount = 0;
     const addStroke = (stroke) => {
       strokes.push(stroke);
@@ -983,7 +1047,6 @@
       return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr, pressure: pressureValue };
     };
 
-    // Ramer-Douglas-Peucker point simplification
     const perpendicularDist = (p, a, b) => {
       const dx = b.x - a.x, dy = b.y - a.y;
       const len = Math.hypot(dx, dy);
@@ -1070,6 +1133,7 @@
         previousRotation = currentRotation;
         removeDuplicateUI();
         removeLockUI();
+        removeTrashUI();
         removeSelToolbar();
         drawing = false;
         return;
@@ -1077,6 +1141,7 @@
 
       if (tool === 'lasso' && isOnDuplicateHandle(d.x, d.y)) { duplicateSelectedStrokes(); drawing = false; return; }
       if (tool === 'lasso' && isOnLockHandle(d.x, d.y)) { toggleLockSelectedStrokes(); drawing = false; return; }
+      if (tool === 'lasso' && isOnTrashHandle(d.x, d.y)) { deleteSelectedStrokes(); drawing = false; return; }
 
       if (tool === 'lasso') {
         const handle = getHandleAtPoint(d.x, d.y);
@@ -1148,7 +1213,6 @@
       if (dist < 2) return;
       segLen += dist;
       points.push(d);
-      // Turn off stroke starting mode after a few points to use real pressure
       if (strokeStarting && points.length > 3) strokeStarting = false;
       needsRender = true;
       if (segLen >= SEGMENT_MAX) {
@@ -1186,7 +1250,6 @@
     }
 
     function erase(x, y) {
-      // Skip if cursor hasn't moved enough (throttle hit-testing)
       if (Math.hypot(x - lastEraseX, y - lastEraseY) < 5) return;
       lastEraseX = x;
       lastEraseY = y;
@@ -1334,7 +1397,6 @@
       if (!pdfDoc) return;
       filmstripContainer.innerHTML = '';
       filmstripThumbnails = [];
-      // Create placeholders immediately (no blocking)
       for (let i = 1; i <= totalPages; i++) {
         const item = document.createElement('div');
         item.className = 'filmstrip-item' + (i === currentPage ? ' active' : '');
@@ -1369,7 +1431,6 @@
       canvas.height = scaledViewport.height;
       const ctx = canvas.getContext('2d');
       await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
-      // Draw stroke annotations on thumbnail
       const annotations = pageAnnotations[pageNum];
       if (annotations && annotations.strokes.length > 0) {
         ctx.save();
@@ -1389,7 +1450,6 @@
       filmstripThumbnails.forEach((item, idx) => item.classList.toggle('active', idx + 1 === currentPage));
       filmstripOverlay.classList.add('visible');
       filmstripContainer.querySelector('.active')?.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'center' });
-      // Render all thumbnails with current annotations
       for (const item of filmstripThumbnails) {
         await renderThumbnail(item, parseInt(item.dataset.page));
       }
@@ -1475,7 +1535,6 @@
       if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedStrokes.length > 0) { e.preventDefault(); duplicateSelectedStrokes(); }
     });
 
-    // RAF render loop for smooth drawing
     function renderLoop() {
       if (needsRender && drawing && tool === 'pen' && path && points.length > 0) {
         path.setAttribute('d', buildPath(points, getEffectiveWidth()));
