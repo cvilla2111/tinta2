@@ -45,7 +45,7 @@
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
     .canvas-container.pdf-mode::before, .canvas-container.pdf-mode::after { content: ''; flex: 1; min-height: 0; }
-    .canvas-container.no-pdf { background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 40px 40px; }
+    .canvas-container.no-pdf { background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 20px 20px; }
     .canvas-container.lasso-mode { cursor: crosshair; }
     .canvas-container.eraser-mode { cursor: none; }
     .canvas-container.eraser-mode .eraser-cursor { display: block; }
@@ -69,6 +69,10 @@
     .duplicate-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: pointer; }
     .duplicate-handle:hover { fill: var(--active); }
     .duplicate-handle:hover + .duplicate-icon { stroke: #fff; }
+    .lock-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: pointer; }
+    .lock-handle:hover { fill: var(--active); }
+    .lock-handle:hover + .lock-icon { stroke: #fff; }
+    .stroke-path.locked-blink { fill: #ef4444; }
     .eraser-cursor { position: fixed; pointer-events: none; border: 1px solid #666; border-radius: 50%; transform: translate(-50%, -50%); z-index: 999; display: none; }
     .eraser-cursor.big-eraser { border-color: #ef4444; border-width: 1.5px; }
     .palette-btn { position: fixed; bottom: 8px; left: 8px; width: 28px; height: 28px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1001; padding: 0; margin: 0; }
@@ -187,7 +191,8 @@
     let toolbarVisible = false, filmstripThumbnails = [];
 
     let lassoPath = null, lassoPoints = [], selectedStrokes = [], selectionBoxes = [], selectionHandles = [];
-    let rotationHandle = null, rotationLine = null, duplicateHandle = null, duplicateIcon = null;
+    let rotationHandle = null, rotationLine = null, duplicateHandle = null, duplicateIcon = null, lockHandle = null, lockIcon = null;
+    const blinkingStrokes = new Set();
     let isDraggingSelection = false, isScalingSelection = false, isRotatingSelection = false;
     let activeHandle = null, dragStartX = 0, dragStartY = 0, selectionBounds = null, originalBounds = null, originalStrokePoints = [];
     let rotationCenterX = 0, rotationCenterY = 0, startAngle = 0, currentRotation = 0, previousRotation = 0;
@@ -416,6 +421,11 @@
       if (duplicateIcon) { duplicateIcon.remove(); duplicateIcon = null; }
     };
 
+    const removeLockUI = () => {
+      if (lockHandle) { lockHandle.remove(); lockHandle = null; }
+      if (lockIcon) { lockIcon.remove(); lockIcon = null; }
+    };
+
     const removeRotationUI = () => {
       if (rotationHandle) { rotationHandle.remove(); rotationHandle = null; }
       if (rotationLine) { rotationLine.remove(); rotationLine = null; }
@@ -429,6 +439,7 @@
       selectionHandles = [];
       removeRotationUI();
       removeDuplicateUI();
+      removeLockUI();
       if (lassoPath) { lassoPath.remove(); lassoPath = null; }
       lassoPoints = [];
       selectionBounds = originalBounds = null;
@@ -450,6 +461,7 @@
       selectionHandles = [];
       removeRotationUI();
       removeDuplicateUI();
+      removeLockUI();
       if (!selectionBounds) return;
 
       const handleSize = getEffectiveHandleSize(30), rotationOffset = getEffectiveHandleSize(50);
@@ -508,6 +520,42 @@
           <rect x="${centerX - iconSize/2 - iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 + iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="#fff" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
         `;
         group.appendChild(duplicateIcon);
+
+        // Lock/Unlock handle (to the right of duplicate)
+        const anyLocked = selectedStrokes.some(s => s.locked);
+        const lockGap = getEffectiveHandleSize(8);
+        const lockCX = centerX + duplicateSize / 2 + lockGap + duplicateSize / 2;
+        const lockCY = bottomY + duplicateOffset;
+        lockHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        lockHandle.classList.add('lock-handle');
+        lockHandle.setAttribute('x', lockCX - duplicateSize / 2);
+        lockHandle.setAttribute('y', lockCY - duplicateSize / 2);
+        lockHandle.setAttribute('width', duplicateSize);
+        lockHandle.setAttribute('height', duplicateSize);
+        lockHandle.setAttribute('rx', getEffectiveHandleSize(6));
+        group.appendChild(lockHandle);
+
+        lockIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        lockIcon.classList.add('lock-icon');
+        lockIcon.setAttribute('pointer-events', 'none');
+        const lbw = getEffectiveHandleSize(11), lbh = getEffectiveHandleSize(8);
+        const lsr = getEffectiveHandleSize(4), lsh = getEffectiveHandleSize(5);
+        const lsw = getEffectiveHandleSize(1.5);
+        const lbx = lockCX - lbw / 2, lby = lockCY + getEffectiveHandleSize(1.5);
+        if (anyLocked) {
+          // Unlock icon — open shackle
+          lockIcon.innerHTML = `
+            <rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(1.5)}" fill="none" stroke="var(--active)" stroke-width="${lsw}"/>
+            <path d="M${lockCX - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${lockCX + lsr},${lby - lsh} V${lby - lsh + getEffectiveHandleSize(2)}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>
+          `;
+        } else {
+          // Lock icon — closed shackle
+          lockIcon.innerHTML = `
+            <rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(1.5)}" fill="none" stroke="var(--active)" stroke-width="${lsw}"/>
+            <path d="M${lockCX - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${lockCX + lsr},${lby - lsh} V${lby}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>
+          `;
+        }
+        group.appendChild(lockIcon);
       }
     };
 
@@ -560,6 +608,33 @@
           <rect x="${centerX - iconSize/2 + iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 - iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="none" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
           <rect x="${centerX - iconSize/2 - iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 + iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="#fff" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
         `;
+
+        if (lockHandle && lockIcon) {
+          const lockGap = getEffectiveHandleSize(8);
+          const lockCX = centerX + duplicateSize / 2 + lockGap + duplicateSize / 2;
+          const lockCY = bottomY + duplicateOffset;
+          lockHandle.setAttribute('x', lockCX - duplicateSize / 2);
+          lockHandle.setAttribute('y', lockCY - duplicateSize / 2);
+          lockHandle.setAttribute('width', duplicateSize);
+          lockHandle.setAttribute('height', duplicateSize);
+          lockHandle.setAttribute('rx', getEffectiveHandleSize(6));
+          const anyLocked = selectedStrokes.some(s => s.locked);
+          const lbw = getEffectiveHandleSize(11), lbh = getEffectiveHandleSize(8);
+          const lsr = getEffectiveHandleSize(4), lsh = getEffectiveHandleSize(5);
+          const lsw = getEffectiveHandleSize(1.5);
+          const lbx = lockCX - lbw / 2, lby = lockCY + getEffectiveHandleSize(1.5);
+          if (anyLocked) {
+            lockIcon.innerHTML = `
+              <rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(1.5)}" fill="none" stroke="var(--active)" stroke-width="${lsw}"/>
+              <path d="M${lockCX - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${lockCX + lsr},${lby - lsh} V${lby - lsh + getEffectiveHandleSize(2)}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>
+            `;
+          } else {
+            lockIcon.innerHTML = `
+              <rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(1.5)}" fill="none" stroke="var(--active)" stroke-width="${lsw}"/>
+              <path d="M${lockCX - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${lockCX + lsr},${lby - lsh} V${lby}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>
+            `;
+          }
+        }
       }
 
       if (preserveRotation && currentRotation !== 0) {
@@ -571,6 +646,8 @@
         rotationLine?.setAttribute('transform', rotateTransform);
         duplicateHandle?.setAttribute('transform', rotateTransform);
         duplicateIcon?.setAttribute('transform', rotateTransform);
+        lockHandle?.setAttribute('transform', rotateTransform);
+        lockIcon?.setAttribute('transform', rotateTransform);
       }
     };
 
@@ -619,6 +696,7 @@
       selectionHandles = [];
       removeRotationUI();
       removeDuplicateUI();
+      removeLockUI();
       selectionBounds = null;
       currentRotation = previousRotation = 0;
       savePageAnnotations();
@@ -647,6 +725,7 @@
       selectionHandles = [];
       removeRotationUI();
       removeDuplicateUI();
+      removeLockUI();
 
       selectedStrokes = newStrokes;
       currentRotation = previousRotation = 0;
@@ -758,6 +837,25 @@
       const handleY = selectionBounds.y + selectionBounds.height + getEffectiveHandleSize(50);
       const hitSize = getEffectiveHandleSize(22);
       return Math.abs(p.x - centerX) <= hitSize && Math.abs(p.y - handleY) <= hitSize;
+    };
+
+    const isOnLockHandle = (x, y) => {
+      if (!selectionBounds || selectedStrokes.length === 0 || !lockHandle) return false;
+      const p = transformPointForHitTest(x, y);
+      const centerX = selectionBounds.x + selectionBounds.width / 2;
+      const duplicateSize = getEffectiveHandleSize(36), lockGap = getEffectiveHandleSize(8);
+      const lockCX = centerX + duplicateSize / 2 + lockGap + duplicateSize / 2;
+      const handleY = selectionBounds.y + selectionBounds.height + getEffectiveHandleSize(50);
+      const hitSize = getEffectiveHandleSize(22);
+      return Math.abs(p.x - lockCX) <= hitSize && Math.abs(p.y - handleY) <= hitSize;
+    };
+
+    const toggleLockSelectedStrokes = () => {
+      if (selectedStrokes.length === 0) return;
+      const anyLocked = selectedStrokes.some(s => s.locked);
+      selectedStrokes.forEach(s => { s.locked = !anyLocked; });
+      createSelectionHandles();
+      savePageAnnotations();
     };
 
     const rotateSelection = (x, y) => {
@@ -945,6 +1043,7 @@
       }
 
       if (tool === 'lasso' && isOnDuplicateHandle(d.x, d.y)) { duplicateSelectedStrokes(); drawing = false; return; }
+      if (tool === 'lasso' && isOnLockHandle(d.x, d.y)) { toggleLockSelectedStrokes(); drawing = false; return; }
 
       if (tool === 'lasso') {
         const handle = getHandleAtPoint(d.x, d.y);
@@ -1066,7 +1165,18 @@
         const s = strokes[i], b = s.element.getBBox();
         if (x < b.x-r || x > b.x+b.width+r || y < b.y-r || y > b.y+b.height+r) continue;
         for (const p of s.points) {
-          if (Math.hypot(x-p.x, y-p.y) < r + s.width) { s.element.remove(); pushUndo(strokes.splice(i,1)[0]); erased = true; break; }
+          if (Math.hypot(x-p.x, y-p.y) < r + s.width) {
+            if (s.locked) {
+              if (!blinkingStrokes.has(s)) {
+                blinkingStrokes.add(s);
+                s.element.classList.add('locked-blink');
+                setTimeout(() => { s.element.classList.remove('locked-blink'); blinkingStrokes.delete(s); }, 300);
+              }
+            } else {
+              s.element.remove(); pushUndo(strokes.splice(i,1)[0]); erased = true;
+            }
+            break;
+          }
         }
       }
       if (erased) savePageAnnotations();
