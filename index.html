@@ -66,12 +66,14 @@
     .selection-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: nwse-resize; }
     .rotation-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: grab; }
     .rotation-line { stroke: var(--active); stroke-width: 1.5; }
-    .duplicate-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: pointer; }
-    .duplicate-handle:hover { fill: var(--active); }
-    .duplicate-handle:hover + .duplicate-icon { stroke: #fff; }
-    .lock-handle { fill: #fff; stroke: var(--active); stroke-width: 1.5; cursor: pointer; }
-    .lock-handle:hover { fill: var(--active); }
-    .lock-handle:hover + .lock-icon { stroke: #fff; }
+    .sel-toolbar-bg { fill: #fff; stroke: var(--active); stroke-width: 1.5; }
+    .sel-toolbar-div { stroke: var(--active); stroke-width: 1; opacity: 0.3; }
+    .duplicate-handle { fill: transparent; stroke: none; cursor: pointer; }
+    .duplicate-handle:hover { fill: var(--active); fill-opacity: 0.12; }
+    .duplicate-handle:hover + .duplicate-icon { stroke: var(--active); }
+    .lock-handle { fill: transparent; stroke: none; cursor: pointer; }
+    .lock-handle:hover { fill: var(--active); fill-opacity: 0.12; }
+    .lock-handle:hover + .lock-icon { stroke: var(--active); }
     .stroke-path.locked-blink { fill: #ef4444; }
     .eraser-cursor { position: fixed; pointer-events: none; border: 1px solid #666; border-radius: 50%; transform: translate(-50%, -50%); z-index: 999; display: none; }
     .eraser-cursor.big-eraser { border-color: #ef4444; border-width: 1.5px; }
@@ -191,7 +193,7 @@
     let toolbarVisible = false, filmstripThumbnails = [];
 
     let lassoPath = null, lassoPoints = [], selectedStrokes = [], selectionBoxes = [], selectionHandles = [];
-    let rotationHandle = null, rotationLine = null, duplicateHandle = null, duplicateIcon = null, lockHandle = null, lockIcon = null;
+    let rotationHandle = null, rotationLine = null, duplicateHandle = null, duplicateIcon = null, lockHandle = null, lockIcon = null, selToolbar = null, selToolbarDiv = null;
     const blinkingStrokes = new Set();
     let isDraggingSelection = false, isScalingSelection = false, isRotatingSelection = false;
     let activeHandle = null, dragStartX = 0, dragStartY = 0, selectionBounds = null, originalBounds = null, originalStrokePoints = [];
@@ -426,6 +428,11 @@
       if (lockIcon) { lockIcon.remove(); lockIcon = null; }
     };
 
+    const removeSelToolbar = () => {
+      if (selToolbar) { selToolbar.remove(); selToolbar = null; }
+      if (selToolbarDiv) { selToolbarDiv.remove(); selToolbarDiv = null; }
+    };
+
     const removeRotationUI = () => {
       if (rotationHandle) { rotationHandle.remove(); rotationHandle = null; }
       if (rotationLine) { rotationLine.remove(); rotationLine = null; }
@@ -440,6 +447,7 @@
       removeRotationUI();
       removeDuplicateUI();
       removeLockUI();
+      removeSelToolbar();
       if (lassoPath) { lassoPath.remove(); lassoPath = null; }
       lassoPoints = [];
       selectionBounds = originalBounds = null;
@@ -456,12 +464,33 @@
       return inside;
     };
 
+    const buildLockIconSVG = (cx, cy, isLocked) => {
+      const lbw = getEffectiveHandleSize(22), lbh = getEffectiveHandleSize(16);
+      const lsr = getEffectiveHandleSize(8), lsh = getEffectiveHandleSize(10);
+      const lsw = getEffectiveHandleSize(2.5);
+      const lbx = cx - lbw / 2, lby = cy + getEffectiveHandleSize(3);
+      const body = `<rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(3)}" fill="none" stroke="var(--active)" stroke-width="${lsw}"/>`;
+      if (isLocked) {
+        return body + `<path d="M${cx - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${cx + lsr},${lby - lsh} V${lby - lsh + getEffectiveHandleSize(4)}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>`;
+      }
+      return body + `<path d="M${cx - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${cx + lsr},${lby - lsh} V${lby}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>`;
+    };
+
+    const buildDupIconSVG = (cx, cy) => {
+      const iconSize = getEffectiveHandleSize(28), iconOffset = getEffectiveHandleSize(8);
+      return `
+        <rect x="${cx - iconSize/2 + iconOffset/2}" y="${cy - iconSize/2 - iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(4)}" fill="none" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(3)}"/>
+        <rect x="${cx - iconSize/2 - iconOffset/2}" y="${cy - iconSize/2 + iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(4)}" fill="#fff" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(3)}"/>
+      `;
+    };
+
     const createSelectionHandles = () => {
       selectionHandles.forEach(h => h.remove());
       selectionHandles = [];
       removeRotationUI();
       removeDuplicateUI();
       removeLockUI();
+      removeSelToolbar();
       if (!selectionBounds) return;
 
       const handleSize = getEffectiveHandleSize(30), rotationOffset = getEffectiveHandleSize(50);
@@ -483,78 +512,79 @@
         selectionHandles.push(handle);
       });
 
-      const centerX = selectionBounds.x + selectionBounds.width / 2, topY = selectionBounds.y;
+      const centerX = selectionBounds.x + selectionBounds.width / 2;
+      const topY = selectionBounds.y, bottomY = selectionBounds.y + selectionBounds.height;
+
+      // Rotation handle at BOTTOM
       rotationLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       rotationLine.classList.add('rotation-line');
       rotationLine.setAttribute('x1', centerX);
-      rotationLine.setAttribute('y1', topY);
+      rotationLine.setAttribute('y1', bottomY);
       rotationLine.setAttribute('x2', centerX);
-      rotationLine.setAttribute('y2', topY - rotationOffset);
+      rotationLine.setAttribute('y2', bottomY + rotationOffset);
       group.appendChild(rotationLine);
 
       rotationHandle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       rotationHandle.classList.add('rotation-handle');
       rotationHandle.setAttribute('cx', centerX);
-      rotationHandle.setAttribute('cy', topY - rotationOffset);
+      rotationHandle.setAttribute('cy', bottomY + rotationOffset);
       rotationHandle.setAttribute('r', getEffectiveHandleSize(20));
       group.appendChild(rotationHandle);
 
       if (currentRotation === 0) {
-        const bottomY = selectionBounds.y + selectionBounds.height;
-        const duplicateOffset = getEffectiveHandleSize(50), duplicateSize = getEffectiveHandleSize(36);
+        // Top toolbar with duplicate + lock (sharp corners)
+        const btnSize = getEffectiveHandleSize(72);
+        const toolbarW = btnSize * 2, toolbarH = btnSize;
+        const toolbarX = centerX - toolbarW / 2;
+        const toolbarY = topY - rotationOffset - toolbarH;
+
+        selToolbar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        selToolbar.classList.add('sel-toolbar-bg');
+        selToolbar.setAttribute('x', toolbarX);
+        selToolbar.setAttribute('y', toolbarY);
+        selToolbar.setAttribute('width', toolbarW);
+        selToolbar.setAttribute('height', toolbarH);
+        group.appendChild(selToolbar);
+
+        selToolbarDiv = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        selToolbarDiv.classList.add('sel-toolbar-div');
+        selToolbarDiv.setAttribute('x1', centerX);
+        selToolbarDiv.setAttribute('y1', toolbarY + getEffectiveHandleSize(12));
+        selToolbarDiv.setAttribute('x2', centerX);
+        selToolbarDiv.setAttribute('y2', toolbarY + toolbarH - getEffectiveHandleSize(12));
+        group.appendChild(selToolbarDiv);
+
+        // Duplicate button (left half)
+        const dupCX = toolbarX + btnSize / 2, dupCY = toolbarY + btnSize / 2;
         duplicateHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         duplicateHandle.classList.add('duplicate-handle');
-        duplicateHandle.setAttribute('x', centerX - duplicateSize / 2);
-        duplicateHandle.setAttribute('y', bottomY + duplicateOffset - duplicateSize / 2);
-        duplicateHandle.setAttribute('width', duplicateSize);
-        duplicateHandle.setAttribute('height', duplicateSize);
-        duplicateHandle.setAttribute('rx', getEffectiveHandleSize(6));
+        duplicateHandle.setAttribute('x', toolbarX);
+        duplicateHandle.setAttribute('y', toolbarY);
+        duplicateHandle.setAttribute('width', btnSize);
+        duplicateHandle.setAttribute('height', toolbarH);
         group.appendChild(duplicateHandle);
 
-        const iconSize = getEffectiveHandleSize(14), iconOffset = getEffectiveHandleSize(4);
         duplicateIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         duplicateIcon.classList.add('duplicate-icon');
         duplicateIcon.setAttribute('pointer-events', 'none');
-        duplicateIcon.innerHTML = `
-          <rect x="${centerX - iconSize/2 + iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 - iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="none" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
-          <rect x="${centerX - iconSize/2 - iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 + iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="#fff" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
-        `;
+        duplicateIcon.innerHTML = buildDupIconSVG(dupCX, dupCY);
         group.appendChild(duplicateIcon);
 
-        // Lock/Unlock handle (to the right of duplicate)
-        const anyLocked = selectedStrokes.some(s => s.locked);
-        const lockGap = getEffectiveHandleSize(8);
-        const lockCX = centerX + duplicateSize / 2 + lockGap + duplicateSize / 2;
-        const lockCY = bottomY + duplicateOffset;
+        // Lock button (right half)
+        const lockCX = toolbarX + btnSize + btnSize / 2, lockCY = dupCY;
         lockHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         lockHandle.classList.add('lock-handle');
-        lockHandle.setAttribute('x', lockCX - duplicateSize / 2);
-        lockHandle.setAttribute('y', lockCY - duplicateSize / 2);
-        lockHandle.setAttribute('width', duplicateSize);
-        lockHandle.setAttribute('height', duplicateSize);
-        lockHandle.setAttribute('rx', getEffectiveHandleSize(6));
+        lockHandle.setAttribute('x', toolbarX + btnSize);
+        lockHandle.setAttribute('y', toolbarY);
+        lockHandle.setAttribute('width', btnSize);
+        lockHandle.setAttribute('height', toolbarH);
         group.appendChild(lockHandle);
 
+        const anyLocked = selectedStrokes.some(s => s.locked);
         lockIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         lockIcon.classList.add('lock-icon');
         lockIcon.setAttribute('pointer-events', 'none');
-        const lbw = getEffectiveHandleSize(11), lbh = getEffectiveHandleSize(8);
-        const lsr = getEffectiveHandleSize(4), lsh = getEffectiveHandleSize(5);
-        const lsw = getEffectiveHandleSize(1.5);
-        const lbx = lockCX - lbw / 2, lby = lockCY + getEffectiveHandleSize(1.5);
-        if (anyLocked) {
-          // Unlock icon — open shackle
-          lockIcon.innerHTML = `
-            <rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(1.5)}" fill="none" stroke="var(--active)" stroke-width="${lsw}"/>
-            <path d="M${lockCX - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${lockCX + lsr},${lby - lsh} V${lby - lsh + getEffectiveHandleSize(2)}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>
-          `;
-        } else {
-          // Lock icon — closed shackle
-          lockIcon.innerHTML = `
-            <rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(1.5)}" fill="none" stroke="var(--active)" stroke-width="${lsw}"/>
-            <path d="M${lockCX - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${lockCX + lsr},${lby - lsh} V${lby}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>
-          `;
-        }
+        lockIcon.innerHTML = buildLockIconSVG(lockCX, lockCY, anyLocked);
         group.appendChild(lockIcon);
       }
     };
@@ -585,55 +615,52 @@
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const topY = selectionBounds.y, bottomY = selectionBounds.y + selectionBounds.height;
 
+      // Rotation at BOTTOM
       if (rotationHandle && rotationLine) {
         rotationLine.setAttribute('x1', centerX);
-        rotationLine.setAttribute('y1', topY);
+        rotationLine.setAttribute('y1', bottomY);
         rotationLine.setAttribute('x2', centerX);
-        rotationLine.setAttribute('y2', topY - rotationOffset);
+        rotationLine.setAttribute('y2', bottomY + rotationOffset);
         rotationHandle.setAttribute('cx', centerX);
-        rotationHandle.setAttribute('cy', topY - rotationOffset);
+        rotationHandle.setAttribute('cy', bottomY + rotationOffset);
         rotationHandle.setAttribute('r', getEffectiveHandleSize(20));
       }
 
+      // Top toolbar with duplicate + lock
       if (duplicateHandle && duplicateIcon) {
-        const duplicateOffset = getEffectiveHandleSize(50), duplicateSize = getEffectiveHandleSize(36);
-        duplicateHandle.setAttribute('x', centerX - duplicateSize / 2);
-        duplicateHandle.setAttribute('y', bottomY + duplicateOffset - duplicateSize / 2);
-        duplicateHandle.setAttribute('width', duplicateSize);
-        duplicateHandle.setAttribute('height', duplicateSize);
-        duplicateHandle.setAttribute('rx', getEffectiveHandleSize(6));
+        const btnSize = getEffectiveHandleSize(72);
+        const toolbarW = btnSize * 2, toolbarH = btnSize;
+        const toolbarX = centerX - toolbarW / 2;
+        const toolbarY = topY - rotationOffset - toolbarH;
 
-        const iconSize = getEffectiveHandleSize(14), iconOffset = getEffectiveHandleSize(4);
-        duplicateIcon.innerHTML = `
-          <rect x="${centerX - iconSize/2 + iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 - iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="none" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
-          <rect x="${centerX - iconSize/2 - iconOffset/2}" y="${bottomY + duplicateOffset - iconSize/2 + iconOffset/2}" width="${iconSize}" height="${iconSize}" rx="${getEffectiveHandleSize(2)}" fill="#fff" stroke="var(--active)" stroke-width="${getEffectiveHandleSize(1.5)}"/>
-        `;
+        if (selToolbar) {
+          selToolbar.setAttribute('x', toolbarX);
+          selToolbar.setAttribute('y', toolbarY);
+          selToolbar.setAttribute('width', toolbarW);
+          selToolbar.setAttribute('height', toolbarH);
+        }
+        if (selToolbarDiv) {
+          selToolbarDiv.setAttribute('x1', centerX);
+          selToolbarDiv.setAttribute('y1', toolbarY + getEffectiveHandleSize(12));
+          selToolbarDiv.setAttribute('x2', centerX);
+          selToolbarDiv.setAttribute('y2', toolbarY + toolbarH - getEffectiveHandleSize(12));
+        }
+
+        const dupCX = toolbarX + btnSize / 2, dupCY = toolbarY + btnSize / 2;
+        duplicateHandle.setAttribute('x', toolbarX);
+        duplicateHandle.setAttribute('y', toolbarY);
+        duplicateHandle.setAttribute('width', btnSize);
+        duplicateHandle.setAttribute('height', toolbarH);
+        duplicateIcon.innerHTML = buildDupIconSVG(dupCX, dupCY);
 
         if (lockHandle && lockIcon) {
-          const lockGap = getEffectiveHandleSize(8);
-          const lockCX = centerX + duplicateSize / 2 + lockGap + duplicateSize / 2;
-          const lockCY = bottomY + duplicateOffset;
-          lockHandle.setAttribute('x', lockCX - duplicateSize / 2);
-          lockHandle.setAttribute('y', lockCY - duplicateSize / 2);
-          lockHandle.setAttribute('width', duplicateSize);
-          lockHandle.setAttribute('height', duplicateSize);
-          lockHandle.setAttribute('rx', getEffectiveHandleSize(6));
+          const lockCX = toolbarX + btnSize + btnSize / 2, lockCY = dupCY;
+          lockHandle.setAttribute('x', toolbarX + btnSize);
+          lockHandle.setAttribute('y', toolbarY);
+          lockHandle.setAttribute('width', btnSize);
+          lockHandle.setAttribute('height', toolbarH);
           const anyLocked = selectedStrokes.some(s => s.locked);
-          const lbw = getEffectiveHandleSize(11), lbh = getEffectiveHandleSize(8);
-          const lsr = getEffectiveHandleSize(4), lsh = getEffectiveHandleSize(5);
-          const lsw = getEffectiveHandleSize(1.5);
-          const lbx = lockCX - lbw / 2, lby = lockCY + getEffectiveHandleSize(1.5);
-          if (anyLocked) {
-            lockIcon.innerHTML = `
-              <rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(1.5)}" fill="none" stroke="var(--active)" stroke-width="${lsw}"/>
-              <path d="M${lockCX - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${lockCX + lsr},${lby - lsh} V${lby - lsh + getEffectiveHandleSize(2)}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>
-            `;
-          } else {
-            lockIcon.innerHTML = `
-              <rect x="${lbx}" y="${lby}" width="${lbw}" height="${lbh}" rx="${getEffectiveHandleSize(1.5)}" fill="none" stroke="var(--active)" stroke-width="${lsw}"/>
-              <path d="M${lockCX - lsr},${lby} V${lby - lsh} A${lsr},${lsr} 0 0,1 ${lockCX + lsr},${lby - lsh} V${lby}" fill="none" stroke="var(--active)" stroke-width="${lsw}" stroke-linecap="round"/>
-            `;
-          }
+          lockIcon.innerHTML = buildLockIconSVG(lockCX, lockCY, anyLocked);
         }
       }
 
@@ -644,6 +671,8 @@
         selectionHandles.forEach(h => h.setAttribute('transform', rotateTransform));
         rotationHandle?.setAttribute('transform', rotateTransform);
         rotationLine?.setAttribute('transform', rotateTransform);
+        selToolbar?.setAttribute('transform', rotateTransform);
+        selToolbarDiv?.setAttribute('transform', rotateTransform);
         duplicateHandle?.setAttribute('transform', rotateTransform);
         duplicateIcon?.setAttribute('transform', rotateTransform);
         lockHandle?.setAttribute('transform', rotateTransform);
@@ -697,6 +726,7 @@
       removeRotationUI();
       removeDuplicateUI();
       removeLockUI();
+      removeSelToolbar();
       selectionBounds = null;
       currentRotation = previousRotation = 0;
       savePageAnnotations();
@@ -726,6 +756,7 @@
       removeRotationUI();
       removeDuplicateUI();
       removeLockUI();
+      removeSelToolbar();
 
       selectedStrokes = newStrokes;
       currentRotation = previousRotation = 0;
@@ -826,7 +857,7 @@
       if (!selectionBounds || selectedStrokes.length === 0 || !rotationHandle) return false;
       const p = transformPointForHitTest(x, y);
       const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const handleY = selectionBounds.y - getEffectiveHandleSize(50);
+      const handleY = selectionBounds.y + selectionBounds.height + getEffectiveHandleSize(50);
       return Math.hypot(p.x - centerX, p.y - handleY) <= getEffectiveHandleSize(25);
     };
 
@@ -834,20 +865,20 @@
       if (!selectionBounds || selectedStrokes.length === 0 || !duplicateHandle) return false;
       const p = transformPointForHitTest(x, y);
       const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const handleY = selectionBounds.y + selectionBounds.height + getEffectiveHandleSize(50);
-      const hitSize = getEffectiveHandleSize(22);
-      return Math.abs(p.x - centerX) <= hitSize && Math.abs(p.y - handleY) <= hitSize;
+      const btnSize = getEffectiveHandleSize(72);
+      const toolbarX = centerX - btnSize;
+      const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize;
+      return p.x >= toolbarX && p.x <= toolbarX + btnSize && p.y >= toolbarY && p.y <= toolbarY + btnSize;
     };
 
     const isOnLockHandle = (x, y) => {
       if (!selectionBounds || selectedStrokes.length === 0 || !lockHandle) return false;
       const p = transformPointForHitTest(x, y);
       const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const duplicateSize = getEffectiveHandleSize(36), lockGap = getEffectiveHandleSize(8);
-      const lockCX = centerX + duplicateSize / 2 + lockGap + duplicateSize / 2;
-      const handleY = selectionBounds.y + selectionBounds.height + getEffectiveHandleSize(50);
-      const hitSize = getEffectiveHandleSize(22);
-      return Math.abs(p.x - lockCX) <= hitSize && Math.abs(p.y - handleY) <= hitSize;
+      const btnSize = getEffectiveHandleSize(72);
+      const toolbarX = centerX;
+      const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize;
+      return p.x >= toolbarX && p.x <= toolbarX + btnSize && p.y >= toolbarY && p.y <= toolbarY + btnSize;
     };
 
     const toggleLockSelectedStrokes = () => {
@@ -1038,6 +1069,8 @@
         startAngle = Math.atan2(d.y - rotationCenterY, d.x - rotationCenterX);
         previousRotation = currentRotation;
         removeDuplicateUI();
+        removeLockUI();
+        removeSelToolbar();
         drawing = false;
         return;
       }
