@@ -50,7 +50,7 @@
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
     .canvas-container.pdf-mode::before, .canvas-container.pdf-mode::after { content: ''; flex: 1; min-height: 0; }
-    .canvas-container.no-pdf { background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 20px 20px; }
+    .canvas-container.no-pdf { background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 30px 30px; }
 
     .canvas-container.lasso-mode { cursor: crosshair; }
     .canvas-container.eraser-mode { cursor: none; }
@@ -72,7 +72,7 @@
     .selection-handle { fill: var(--bg); stroke: var(--active); stroke-width: 1.5; cursor: nwse-resize; }
     .rotation-handle { fill: var(--bg); stroke: var(--active); stroke-width: 1.5; cursor: grab; }
     .rotation-line { stroke: var(--active); stroke-width: 1.5; }
-    .sel-toolbar-bg { fill: #1f2937; stroke: none; rx: 12; }
+    .sel-toolbar-bg { fill: #1f2937; stroke: none; }
     .sel-toolbar-div { stroke: rgba(255,255,255,0.2); stroke-width: 1; }
     .duplicate-handle { fill: transparent; stroke: none; cursor: pointer; }
     .duplicate-handle:hover { fill: rgba(255,255,255,0.15); }
@@ -546,14 +546,14 @@
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const toolbarY = selectionBounds.y - rotationOffset - btnSize;
 
-      // Layout: 2 rows x 9 columns of color swatches, same height as parent toolbar
+      // Layout: 2 rows x 9 columns of color swatches
       const cols = 9, rows = 2;
-      const pad = getEffectiveHandleSize(8);
-      const swatchGap = getEffectiveHandleSize(4);
-      const swatchR = (btnSize - pad * 2 - swatchGap) / (rows * 2);
+      const pad = getEffectiveHandleSize(14);
+      const swatchGap = getEffectiveHandleSize(8);
+      const swatchR = getEffectiveHandleSize(16);
       const swatchDiameter = swatchR * 2;
       const modalW = pad * 2 + cols * swatchDiameter + (cols - 1) * swatchGap;
-      const modalH = btnSize;
+      const modalH = pad * 2 + rows * swatchDiameter + (rows - 1) * swatchGap;
       const modalX = centerX - modalW / 2;
       const modalY = toolbarY - modalH - getEffectiveHandleSize(8);
       const modalR = getEffectiveHandleSize(12);
