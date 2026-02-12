@@ -80,8 +80,14 @@
     .lock-handle:hover { fill: rgba(255,255,255,0.15); }
     .trash-handle { fill: transparent; stroke: none; cursor: pointer; }
     .trash-handle:hover { fill: rgba(255,255,255,0.15); }
+    .color-handle { fill: transparent; stroke: none; cursor: pointer; }
+    .color-handle:hover { fill: rgba(255,255,255,0.15); }
     .sel-toolbar-group.animate-in { animation: toolbarGrowUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
     .sel-toolbar-group.animate-out { animation: toolbarFadeOut 0.12s ease-out forwards; pointer-events: none; }
+    .color-modal-group.animate-in { animation: toolbarGrowUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    .color-modal-group.animate-out { animation: toolbarFadeOut 0.12s ease-out forwards; pointer-events: none; }
+    .color-swatch { cursor: pointer; }
+    .color-swatch:hover { opacity: 0.8; }
     @keyframes toolbarGrowUp { from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: scale(1); } }
     @keyframes toolbarFadeOut { from { opacity: 1; } to { opacity: 0; } }
     .stroke-path.locked-blink { fill: #ef4444; }
@@ -202,8 +208,9 @@
     let toolbarVisible = false, filmstripThumbnails = [];
 
     let lassoPath = null, lassoPoints = [], selectedStrokes = [], selectionBoxes = [], selectionHandles = [];
-    let rotationHandle = null, rotationLine = null, duplicateHandle = null, duplicateIcon = null, lockHandle = null, lockIcon = null, trashHandle = null, trashIcon = null, selToolbar = null, selToolbarDiv = null, selToolbarDiv2 = null, selToolbarGroup = null;
+    let rotationHandle = null, rotationLine = null, duplicateHandle = null, duplicateIcon = null, lockHandle = null, lockIcon = null, trashHandle = null, trashIcon = null, colorHandle = null, colorIcon = null, selToolbar = null, selToolbarDiv = null, selToolbarDiv2 = null, selToolbarDiv3 = null, selToolbarGroup = null;
     let toolbarAnimTimer = null;
+    let colorModalGroup = null, colorModalOpen = false, colorSwatchRects = [];
     const blinkingStrokes = new Set();
     let isDraggingSelection = false, isScalingSelection = false, isRotatingSelection = false;
     let activeHandle = null, dragStartX = 0, dragStartY = 0, selectionBounds = null, originalBounds = null, originalStrokePoints = [];
@@ -428,13 +435,20 @@
       if (trashIcon) { trashIcon.remove(); trashIcon = null; }
     };
 
+    const removeColorUI = () => {
+      if (colorHandle) { colorHandle.remove(); colorHandle = null; }
+      if (colorIcon) { colorIcon.remove(); colorIcon = null; }
+    };
+
     const removeSelToolbar = () => {
       if (toolbarAnimTimer) { clearTimeout(toolbarAnimTimer); toolbarAnimTimer = null; }
-      group.querySelectorAll('.animate-out').forEach(el => el.remove());
+      group.querySelectorAll('.sel-toolbar-group.animate-out').forEach(el => el.remove());
+      group.querySelectorAll('.color-modal-group.animate-out').forEach(el => el.remove());
       if (selToolbarGroup) { selToolbarGroup.remove(); selToolbarGroup = null; }
       if (selToolbar) { selToolbar.remove(); selToolbar = null; }
       if (selToolbarDiv) { selToolbarDiv.remove(); selToolbarDiv = null; }
       if (selToolbarDiv2) { selToolbarDiv2.remove(); selToolbarDiv2 = null; }
+      if (selToolbarDiv3) { selToolbarDiv3.remove(); selToolbarDiv3 = null; }
     };
 
     const removeRotationUI = () => {
@@ -443,6 +457,7 @@
     };
 
     const clearSelection = () => {
+      hideColorModal();
       selectedStrokes = [];
       selectionBoxes.forEach(box => box.remove());
       selectionBoxes = [];
@@ -452,6 +467,7 @@
       removeDuplicateUI();
       removeLockUI();
       removeTrashUI();
+      removeColorUI();
       removeSelToolbar();
       if (lassoPath) { lassoPath.remove(); lassoPath = null; }
       lassoPoints = [];
@@ -501,7 +517,109 @@
       `;
     };
 
+    const buildColorIconSVG = (cx, cy) => {
+      const s = getEffectiveHandleSize;
+      const sw = s(2.5);
+      const r = s(11);
+      return `
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" stroke="#fff" stroke-width="${sw}"/>
+      `;
+    };
+
+    const hideColorModal = () => {
+      if (!colorModalGroup) return;
+      const g = colorModalGroup;
+      g.classList.remove('animate-in');
+      g.classList.add('color-modal-group', 'animate-out');
+      g.addEventListener('animationend', () => g.remove(), { once: true });
+      colorModalGroup = null;
+      colorSwatchRects = [];
+      colorModalOpen = false;
+    };
+
+    const showColorModal = () => {
+      hideColorModal();
+      if (!selectionBounds || currentRotation !== 0) return;
+
+      const btnSize = getEffectiveHandleSize(72);
+      const rotationOffset = getEffectiveHandleSize(50);
+      const centerX = selectionBounds.x + selectionBounds.width / 2;
+      const toolbarY = selectionBounds.y - rotationOffset - btnSize;
+
+      // Layout: 2 rows x 9 columns of color swatches, same height as parent toolbar
+      const cols = 9, rows = 2;
+      const pad = getEffectiveHandleSize(8);
+      const swatchGap = getEffectiveHandleSize(4);
+      const swatchR = (btnSize - pad * 2 - swatchGap) / (rows * 2);
+      const swatchDiameter = swatchR * 2;
+      const modalW = pad * 2 + cols * swatchDiameter + (cols - 1) * swatchGap;
+      const modalH = btnSize;
+      const modalX = centerX - modalW / 2;
+      const modalY = toolbarY - modalH - getEffectiveHandleSize(8);
+      const modalR = getEffectiveHandleSize(12);
+
+      colorModalGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      colorModalGroup.classList.add('color-modal-group', 'animate-in');
+      colorModalGroup.style.transformOrigin = `${centerX}px ${modalY + modalH}px`;
+      group.appendChild(colorModalGroup);
+
+      const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bg.setAttribute('x', modalX);
+      bg.setAttribute('y', modalY);
+      bg.setAttribute('width', modalW);
+      bg.setAttribute('height', modalH);
+      bg.setAttribute('rx', modalR);
+      bg.setAttribute('fill', '#1f2937');
+      colorModalGroup.appendChild(bg);
+
+      colorSwatchRects = [];
+      colors.forEach((c, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const cx = modalX + pad + swatchR + col * (swatchDiameter + swatchGap);
+        const cy = modalY + pad + swatchR + row * (swatchDiameter + swatchGap);
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.classList.add('color-swatch');
+        circle.setAttribute('cx', cx);
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r', swatchR);
+        circle.setAttribute('fill', c);
+        if (c === '#ffffff') {
+          circle.setAttribute('stroke', '#9ca3af');
+          circle.setAttribute('stroke-width', getEffectiveHandleSize(1.5));
+        }
+        colorModalGroup.appendChild(circle);
+
+        colorSwatchRects.push({ cx, cy, r: swatchR + getEffectiveHandleSize(4), color: c });
+      });
+
+      colorModalOpen = true;
+    };
+
+    const isOnColorSwatch = (x, y) => {
+      if (!colorModalOpen || colorSwatchRects.length === 0) return null;
+      const p = transformPointForHitTest(x, y);
+      for (const sw of colorSwatchRects) {
+        if (Math.hypot(p.x - sw.cx, p.y - sw.cy) <= sw.r) return sw.color;
+      }
+      return null;
+    };
+
+    const isOnColorModal = (x, y) => {
+      if (!colorModalOpen || !colorModalGroup) return false;
+      const p = transformPointForHitTest(x, y);
+      const bgRect = colorModalGroup.querySelector('rect');
+      if (!bgRect) return false;
+      const mx = parseFloat(bgRect.getAttribute('x'));
+      const my = parseFloat(bgRect.getAttribute('y'));
+      const mw = parseFloat(bgRect.getAttribute('width'));
+      const mh = parseFloat(bgRect.getAttribute('height'));
+      return p.x >= mx && p.x <= mx + mw && p.y >= my && p.y <= my + mh;
+    };
+
     const animateToolbarOut = () => {
+      hideColorModal();
       if (!selToolbarGroup) return;
       const g = selToolbarGroup;
       g.classList.remove('animate-in');
@@ -511,12 +629,15 @@
       selToolbar = null;
       selToolbarDiv = null;
       selToolbarDiv2 = null;
+      selToolbarDiv3 = null;
       duplicateHandle = null;
       duplicateIcon = null;
       lockHandle = null;
       lockIcon = null;
       trashHandle = null;
       trashIcon = null;
+      colorHandle = null;
+      colorIcon = null;
     };
 
     const buildToolbarElements = (animate) => {
@@ -524,13 +645,14 @@
       removeDuplicateUI();
       removeLockUI();
       removeTrashUI();
+      removeColorUI();
       removeSelToolbar();
 
       const rotationOffset = getEffectiveHandleSize(50);
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const topY = selectionBounds.y;
       const btnSize = getEffectiveHandleSize(72);
-      const toolbarW = btnSize * 3, toolbarH = btnSize;
+      const toolbarW = btnSize * 4, toolbarH = btnSize;
       const toolbarX = centerX - toolbarW / 2;
       const toolbarY = topY - rotationOffset - toolbarH;
       const toolbarR = getEffectiveHandleSize(12);
@@ -554,23 +676,24 @@
       selToolbar.setAttribute('rx', toolbarR);
       selToolbarGroup.appendChild(selToolbar);
 
-      selToolbarDiv = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      selToolbarDiv.classList.add('sel-toolbar-div');
-      selToolbarDiv.setAttribute('x1', toolbarX + btnSize);
-      selToolbarDiv.setAttribute('y1', toolbarY + getEffectiveHandleSize(12));
-      selToolbarDiv.setAttribute('x2', toolbarX + btnSize);
-      selToolbarDiv.setAttribute('y2', toolbarY + toolbarH - getEffectiveHandleSize(12));
-      selToolbarGroup.appendChild(selToolbarDiv);
+      const divPad = getEffectiveHandleSize(12);
+      for (let di = 1; di <= 3; di++) {
+        const div = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        div.classList.add('sel-toolbar-div');
+        div.setAttribute('x1', toolbarX + btnSize * di);
+        div.setAttribute('y1', toolbarY + divPad);
+        div.setAttribute('x2', toolbarX + btnSize * di);
+        div.setAttribute('y2', toolbarY + toolbarH - divPad);
+        selToolbarGroup.appendChild(div);
+        if (di === 1) selToolbarDiv = div;
+        else if (di === 2) selToolbarDiv2 = div;
+        else selToolbarDiv3 = div;
+      }
 
-      selToolbarDiv2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      selToolbarDiv2.classList.add('sel-toolbar-div');
-      selToolbarDiv2.setAttribute('x1', toolbarX + btnSize * 2);
-      selToolbarDiv2.setAttribute('y1', toolbarY + getEffectiveHandleSize(12));
-      selToolbarDiv2.setAttribute('x2', toolbarX + btnSize * 2);
-      selToolbarDiv2.setAttribute('y2', toolbarY + toolbarH - getEffectiveHandleSize(12));
-      selToolbarGroup.appendChild(selToolbarDiv2);
+      const btnCY = toolbarY + btnSize / 2;
 
-      const dupCX = toolbarX + btnSize / 2, dupCY = toolbarY + btnSize / 2;
+      // Button 0: Duplicate
+      const dupCX = toolbarX + btnSize / 2;
       duplicateHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       duplicateHandle.classList.add('duplicate-handle');
       duplicateHandle.setAttribute('x', toolbarX);
@@ -578,14 +701,14 @@
       duplicateHandle.setAttribute('width', btnSize);
       duplicateHandle.setAttribute('height', toolbarH);
       selToolbarGroup.appendChild(duplicateHandle);
-
       duplicateIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       duplicateIcon.classList.add('duplicate-icon');
       duplicateIcon.setAttribute('pointer-events', 'none');
-      duplicateIcon.innerHTML = buildDupIconSVG(dupCX, dupCY);
+      duplicateIcon.innerHTML = buildDupIconSVG(dupCX, btnCY);
       selToolbarGroup.appendChild(duplicateIcon);
 
-      const lockCX = toolbarX + btnSize + btnSize / 2, lockCY = dupCY;
+      // Button 1: Lock
+      const lockCX = toolbarX + btnSize + btnSize / 2;
       lockHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       lockHandle.classList.add('lock-handle');
       lockHandle.setAttribute('x', toolbarX + btnSize);
@@ -593,27 +716,41 @@
       lockHandle.setAttribute('width', btnSize);
       lockHandle.setAttribute('height', toolbarH);
       selToolbarGroup.appendChild(lockHandle);
-
       const anyLocked = selectedStrokes.some(s => s.locked);
       lockIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       lockIcon.classList.add('lock-icon');
       lockIcon.setAttribute('pointer-events', 'none');
-      lockIcon.innerHTML = buildLockIconSVG(lockCX, lockCY, anyLocked);
+      lockIcon.innerHTML = buildLockIconSVG(lockCX, btnCY, anyLocked);
       selToolbarGroup.appendChild(lockIcon);
 
-      const trashCX = toolbarX + btnSize * 2 + btnSize / 2, trashCY = dupCY;
+      // Button 2: Color
+      const colorCX = toolbarX + btnSize * 2 + btnSize / 2;
+      colorHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      colorHandle.classList.add('color-handle');
+      colorHandle.setAttribute('x', toolbarX + btnSize * 2);
+      colorHandle.setAttribute('y', toolbarY);
+      colorHandle.setAttribute('width', btnSize);
+      colorHandle.setAttribute('height', toolbarH);
+      selToolbarGroup.appendChild(colorHandle);
+      colorIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      colorIcon.classList.add('color-icon');
+      colorIcon.setAttribute('pointer-events', 'none');
+      colorIcon.innerHTML = buildColorIconSVG(colorCX, btnCY);
+      selToolbarGroup.appendChild(colorIcon);
+
+      // Button 3: Trash
+      const trashCX = toolbarX + btnSize * 3 + btnSize / 2;
       trashHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       trashHandle.classList.add('trash-handle');
-      trashHandle.setAttribute('x', toolbarX + btnSize * 2);
+      trashHandle.setAttribute('x', toolbarX + btnSize * 3);
       trashHandle.setAttribute('y', toolbarY);
       trashHandle.setAttribute('width', btnSize);
       trashHandle.setAttribute('height', toolbarH);
       selToolbarGroup.appendChild(trashHandle);
-
       trashIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       trashIcon.classList.add('trash-icon');
       trashIcon.setAttribute('pointer-events', 'none');
-      trashIcon.innerHTML = buildTrashIconSVG(trashCX, trashCY);
+      trashIcon.innerHTML = buildTrashIconSVG(trashCX, btnCY);
       selToolbarGroup.appendChild(trashIcon);
     };
 
@@ -624,6 +761,7 @@
       removeDuplicateUI();
       removeLockUI();
       removeTrashUI();
+      removeColorUI();
       removeSelToolbar();
       if (!selectionBounds) return;
 
@@ -712,9 +850,11 @@
 
       if (duplicateHandle && duplicateIcon) {
         const btnSize = getEffectiveHandleSize(72);
-        const toolbarW = btnSize * 3, toolbarH = btnSize;
+        const toolbarW = btnSize * 4, toolbarH = btnSize;
         const toolbarX = centerX - toolbarW / 2;
         const toolbarY = topY - rotationOffset - toolbarH;
+        const divPad = getEffectiveHandleSize(12);
+        const btnCY = toolbarY + btnSize / 2;
 
         if (selToolbar) {
           selToolbar.setAttribute('x', toolbarX);
@@ -723,43 +863,44 @@
           selToolbar.setAttribute('height', toolbarH);
           selToolbar.setAttribute('rx', getEffectiveHandleSize(12));
         }
-        if (selToolbarDiv) {
-          selToolbarDiv.setAttribute('x1', toolbarX + btnSize);
-          selToolbarDiv.setAttribute('y1', toolbarY + getEffectiveHandleSize(12));
-          selToolbarDiv.setAttribute('x2', toolbarX + btnSize);
-          selToolbarDiv.setAttribute('y2', toolbarY + toolbarH - getEffectiveHandleSize(12));
-        }
-        if (selToolbarDiv2) {
-          selToolbarDiv2.setAttribute('x1', toolbarX + btnSize * 2);
-          selToolbarDiv2.setAttribute('y1', toolbarY + getEffectiveHandleSize(12));
-          selToolbarDiv2.setAttribute('x2', toolbarX + btnSize * 2);
-          selToolbarDiv2.setAttribute('y2', toolbarY + toolbarH - getEffectiveHandleSize(12));
-        }
+        [selToolbarDiv, selToolbarDiv2, selToolbarDiv3].forEach((div, i) => {
+          if (div) {
+            div.setAttribute('x1', toolbarX + btnSize * (i + 1));
+            div.setAttribute('y1', toolbarY + divPad);
+            div.setAttribute('x2', toolbarX + btnSize * (i + 1));
+            div.setAttribute('y2', toolbarY + toolbarH - divPad);
+          }
+        });
 
-        const dupCX = toolbarX + btnSize / 2, dupCY = toolbarY + btnSize / 2;
         duplicateHandle.setAttribute('x', toolbarX);
         duplicateHandle.setAttribute('y', toolbarY);
         duplicateHandle.setAttribute('width', btnSize);
         duplicateHandle.setAttribute('height', toolbarH);
-        duplicateIcon.innerHTML = buildDupIconSVG(dupCX, dupCY);
+        duplicateIcon.innerHTML = buildDupIconSVG(toolbarX + btnSize / 2, btnCY);
 
         if (lockHandle && lockIcon) {
-          const lockCX = toolbarX + btnSize + btnSize / 2, lockCY = dupCY;
           lockHandle.setAttribute('x', toolbarX + btnSize);
           lockHandle.setAttribute('y', toolbarY);
           lockHandle.setAttribute('width', btnSize);
           lockHandle.setAttribute('height', toolbarH);
           const anyLocked = selectedStrokes.some(s => s.locked);
-          lockIcon.innerHTML = buildLockIconSVG(lockCX, lockCY, anyLocked);
+          lockIcon.innerHTML = buildLockIconSVG(toolbarX + btnSize + btnSize / 2, btnCY, anyLocked);
+        }
+
+        if (colorHandle && colorIcon) {
+          colorHandle.setAttribute('x', toolbarX + btnSize * 2);
+          colorHandle.setAttribute('y', toolbarY);
+          colorHandle.setAttribute('width', btnSize);
+          colorHandle.setAttribute('height', toolbarH);
+          colorIcon.innerHTML = buildColorIconSVG(toolbarX + btnSize * 2 + btnSize / 2, btnCY);
         }
 
         if (trashHandle && trashIcon) {
-          const trashCX = toolbarX + btnSize * 2 + btnSize / 2, trashCY = dupCY;
-          trashHandle.setAttribute('x', toolbarX + btnSize * 2);
+          trashHandle.setAttribute('x', toolbarX + btnSize * 3);
           trashHandle.setAttribute('y', toolbarY);
           trashHandle.setAttribute('width', btnSize);
           trashHandle.setAttribute('height', toolbarH);
-          trashIcon.innerHTML = buildTrashIconSVG(trashCX, trashCY);
+          trashIcon.innerHTML = buildTrashIconSVG(toolbarX + btnSize * 3 + btnSize / 2, btnCY);
         }
       }
 
@@ -807,6 +948,7 @@
 
     const deleteSelectedStrokes = () => {
       if (selectedStrokes.length === 0) return;
+      hideColorModal();
       selectedStrokes.forEach(s => {
         s.element.remove();
         const idx = strokes.indexOf(s);
@@ -821,6 +963,7 @@
       removeDuplicateUI();
       removeLockUI();
       removeTrashUI();
+      removeColorUI();
       removeSelToolbar();
       selectionBounds = null;
       currentRotation = previousRotation = 0;
@@ -829,6 +972,7 @@
 
     const duplicateSelectedStrokes = () => {
       if (selectedStrokes.length === 0) return;
+      hideColorModal();
       const offset = 20 * getPdfScale();
       const newStrokes = [];
 
@@ -852,6 +996,7 @@
       removeDuplicateUI();
       removeLockUI();
       removeTrashUI();
+      removeColorUI();
       removeSelToolbar();
 
       selectedStrokes = newStrokes;
@@ -957,40 +1102,36 @@
       return Math.hypot(p.x - centerX, p.y - handleY) <= getEffectiveHandleSize(25);
     };
 
-    const isOnDuplicateHandle = (x, y) => {
-      if (!selectionBounds || selectedStrokes.length === 0 || !duplicateHandle) return false;
+    const isOnToolbarBtn = (x, y, btnIndex, handle) => {
+      if (!selectionBounds || selectedStrokes.length === 0 || !handle) return false;
       const p = transformPointForHitTest(x, y);
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const btnSize = getEffectiveHandleSize(72);
-      const toolbarX = centerX - btnSize * 1.5;
+      const toolbarX = centerX - btnSize * 2 + btnSize * btnIndex;
       const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize;
       return p.x >= toolbarX && p.x <= toolbarX + btnSize && p.y >= toolbarY && p.y <= toolbarY + btnSize;
     };
 
-    const isOnLockHandle = (x, y) => {
-      if (!selectionBounds || selectedStrokes.length === 0 || !lockHandle) return false;
-      const p = transformPointForHitTest(x, y);
-      const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const btnSize = getEffectiveHandleSize(72);
-      const toolbarX = centerX - btnSize * 1.5 + btnSize;
-      const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize;
-      return p.x >= toolbarX && p.x <= toolbarX + btnSize && p.y >= toolbarY && p.y <= toolbarY + btnSize;
-    };
-
-    const isOnTrashHandle = (x, y) => {
-      if (!selectionBounds || selectedStrokes.length === 0 || !trashHandle) return false;
-      const p = transformPointForHitTest(x, y);
-      const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const btnSize = getEffectiveHandleSize(72);
-      const toolbarX = centerX - btnSize * 1.5 + btnSize * 2;
-      const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize;
-      return p.x >= toolbarX && p.x <= toolbarX + btnSize && p.y >= toolbarY && p.y <= toolbarY + btnSize;
-    };
+    const isOnDuplicateHandle = (x, y) => isOnToolbarBtn(x, y, 0, duplicateHandle);
+    const isOnLockHandle = (x, y) => isOnToolbarBtn(x, y, 1, lockHandle);
+    const isOnColorHandle = (x, y) => isOnToolbarBtn(x, y, 2, colorHandle);
+    const isOnTrashHandle = (x, y) => isOnToolbarBtn(x, y, 3, trashHandle);
 
     const toggleLockSelectedStrokes = () => {
       if (selectedStrokes.length === 0) return;
       const anyLocked = selectedStrokes.some(s => s.locked);
       selectedStrokes.forEach(s => { s.locked = !anyLocked; });
+      createSelectionHandles();
+      savePageAnnotations();
+    };
+
+    const recolorSelectedStrokes = (newColor) => {
+      if (selectedStrokes.length === 0) return;
+      const c = newColor || color;
+      selectedStrokes.forEach(s => {
+        s.color = c;
+        s.element.setAttribute('fill', c);
+      });
       createSelectionHandles();
       savePageAnnotations();
     };
@@ -1164,6 +1305,21 @@
       e.preventDefault();
       const d = getData(e);
 
+      if (tool === 'lasso' && colorModalOpen) {
+        const swatchColor = isOnColorSwatch(d.x, d.y);
+        if (swatchColor) {
+          recolorSelectedStrokes(swatchColor);
+          hideColorModal();
+          drawing = false;
+          return;
+        }
+        if (isOnColorModal(d.x, d.y)) {
+          drawing = false;
+          return;
+        }
+        hideColorModal();
+      }
+
       if (tool === 'lasso' && isOnRotationHandle(d.x, d.y)) {
         isRotatingSelection = true;
         originalBounds = { ...selectionBounds };
@@ -1179,6 +1335,7 @@
 
       if (tool === 'lasso' && isOnDuplicateHandle(d.x, d.y)) { duplicateSelectedStrokes(); drawing = false; return; }
       if (tool === 'lasso' && isOnLockHandle(d.x, d.y)) { toggleLockSelectedStrokes(); drawing = false; return; }
+      if (tool === 'lasso' && isOnColorHandle(d.x, d.y)) { showColorModal(); drawing = false; return; }
       if (tool === 'lasso' && isOnTrashHandle(d.x, d.y)) { deleteSelectedStrokes(); drawing = false; return; }
 
       if (tool === 'lasso') {
