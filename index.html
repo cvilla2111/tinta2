@@ -457,6 +457,7 @@
     };
 
     const clearSelection = () => {
+      if (shrinkAnimId) { cancelAnimationFrame(shrinkAnimId); shrinkAnimId = null; }
       hideColorModal();
       selectedStrokes = [];
       selectionBoxes.forEach(box => box.remove());
@@ -915,7 +916,9 @@
       }
     };
 
+    let shrinkAnimId = null;
     const selectStrokesInLasso = () => {
+      if (shrinkAnimId) { cancelAnimationFrame(shrinkAnimId); shrinkAnimId = null; }
       selectionBoxes.forEach(box => box.remove());
       selectionBoxes = [];
       selectionHandles.forEach(h => h.remove());
@@ -928,19 +931,56 @@
       });
 
       if (selectedStrokes.length > 0) {
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        lassoPoints.forEach(p => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
-        selectionBounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        // Lasso polygon bounds (start)
+        let lMinX = Infinity, lMinY = Infinity, lMaxX = -Infinity, lMaxY = -Infinity;
+        lassoPoints.forEach(p => { lMinX = Math.min(lMinX, p.x); lMinY = Math.min(lMinY, p.y); lMaxX = Math.max(lMaxX, p.x); lMaxY = Math.max(lMaxY, p.y); });
+
+        // Stroke bounds + padding (target)
+        let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
+        selectedStrokes.forEach(s => s.points.forEach(p => { sMinX = Math.min(sMinX, p.x); sMinY = Math.min(sMinY, p.y); sMaxX = Math.max(sMaxX, p.x); sMaxY = Math.max(sMaxY, p.y); }));
+        const selPad = getEffectiveHandleSize(10);
+        sMinX -= selPad; sMinY -= selPad; sMaxX += selPad; sMaxY += selPad;
+
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.classList.add('selection-box');
-        rect.setAttribute('x', minX);
-        rect.setAttribute('y', minY);
-        rect.setAttribute('width', maxX - minX);
-        rect.setAttribute('height', maxY - minY);
+        rect.setAttribute('x', lMinX);
+        rect.setAttribute('y', lMinY);
+        rect.setAttribute('width', lMaxX - lMinX);
+        rect.setAttribute('height', lMaxY - lMinY);
         rect.setAttribute('rx', 3);
         group.appendChild(rect);
         selectionBoxes.push(rect);
-        createSelectionHandles(true);
+
+        // Animate shrink from lasso bounds to stroke bounds
+        const duration = 600;
+        const startTime = performance.now();
+        const ease = t => { const c = 1.7; return Math.min(1, 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2)); };
+
+        const animateShrink = (now) => {
+          const elapsed = now - startTime;
+          const t = Math.min(1, elapsed / duration);
+          const et = ease(t);
+          const curMinX = lMinX + (sMinX - lMinX) * et;
+          const curMinY = lMinY + (sMinY - lMinY) * et;
+          const curMaxX = lMaxX + (sMaxX - lMaxX) * et;
+          const curMaxY = lMaxY + (sMaxY - lMaxY) * et;
+          rect.setAttribute('x', curMinX);
+          rect.setAttribute('y', curMinY);
+          rect.setAttribute('width', curMaxX - curMinX);
+          rect.setAttribute('height', curMaxY - curMinY);
+
+          if (t < 1) {
+            shrinkAnimId = requestAnimationFrame(animateShrink);
+          } else {
+            shrinkAnimId = null;
+            selectionBounds = { x: sMinX, y: sMinY, width: sMaxX - sMinX, height: sMaxY - sMinY };
+            createSelectionHandles(true);
+          }
+        };
+
+        // Set temporary bounds so toolbar delay knows where to position
+        selectionBounds = { x: lMinX, y: lMinY, width: lMaxX - lMinX, height: lMaxY - lMinY };
+        shrinkAnimId = requestAnimationFrame(animateShrink);
       } else {
         selectionBounds = null;
       }
