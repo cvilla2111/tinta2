@@ -917,6 +917,18 @@
     };
 
     let shrinkAnimId = null;
+    let shrinkTargetBounds = null;
+    const finishShrinkAnimation = () => {
+      if (!shrinkAnimId) return;
+      cancelAnimationFrame(shrinkAnimId);
+      shrinkAnimId = null;
+      if (shrinkTargetBounds) {
+        selectionBounds = { ...shrinkTargetBounds };
+        updateSelectionUI();
+        buildToolbarElements(false);
+        shrinkTargetBounds = null;
+      }
+    };
     const selectStrokesInLasso = () => {
       if (shrinkAnimId) { cancelAnimationFrame(shrinkAnimId); shrinkAnimId = null; }
       selectionBoxes.forEach(box => box.remove());
@@ -951,8 +963,43 @@
         group.appendChild(rect);
         selectionBoxes.push(rect);
 
+        // Set initial bounds at lasso polygon and create handles immediately
+        shrinkTargetBounds = { x: sMinX, y: sMinY, width: sMaxX - sMinX, height: sMaxY - sMinY };
+        selectionBounds = { x: lMinX, y: lMinY, width: lMaxX - lMinX, height: lMaxY - lMinY };
+
+        const handleSize = getEffectiveHandleSize(30), rotationOffset = getEffectiveHandleSize(50);
+        const initCorners = [
+          { x: lMinX, y: lMinY }, { x: lMaxX, y: lMinY },
+          { x: lMinX, y: lMaxY }, { x: lMaxX, y: lMaxY }
+        ];
+        initCorners.forEach(corner => {
+          const h = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          h.classList.add('selection-handle');
+          h.setAttribute('x', corner.x - handleSize / 2);
+          h.setAttribute('y', corner.y - handleSize / 2);
+          h.setAttribute('width', handleSize);
+          h.setAttribute('height', handleSize);
+          group.appendChild(h);
+          selectionHandles.push(h);
+        });
+        const initCX = (lMinX + lMaxX) / 2, initBY = lMaxY;
+        rotationLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        rotationLine.classList.add('rotation-line');
+        rotationLine.setAttribute('x1', initCX); rotationLine.setAttribute('y1', initBY);
+        rotationLine.setAttribute('x2', initCX); rotationLine.setAttribute('y2', initBY + rotationOffset);
+        group.appendChild(rotationLine);
+        rotationHandle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        rotationHandle.classList.add('rotation-handle');
+        rotationHandle.setAttribute('cx', initCX);
+        rotationHandle.setAttribute('cy', initBY + rotationOffset);
+        rotationHandle.setAttribute('r', getEffectiveHandleSize(20));
+        group.appendChild(rotationHandle);
+
         // Animate shrink from lasso bounds to stroke bounds
         const duration = 600;
+        const toolbarAnimDuration = 280;
+        const toolbarStartAt = duration - toolbarAnimDuration - 120;
+        let toolbarStarted = false;
         const startTime = performance.now();
         const ease = t => { const c = 1.7; return Math.min(1, 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2)); };
 
@@ -964,22 +1011,26 @@
           const curMinY = lMinY + (sMinY - lMinY) * et;
           const curMaxX = lMaxX + (sMaxX - lMaxX) * et;
           const curMaxY = lMaxY + (sMaxY - lMaxY) * et;
-          rect.setAttribute('x', curMinX);
-          rect.setAttribute('y', curMinY);
-          rect.setAttribute('width', curMaxX - curMinX);
-          rect.setAttribute('height', curMaxY - curMinY);
+
+          selectionBounds = { x: curMinX, y: curMinY, width: curMaxX - curMinX, height: curMaxY - curMinY };
+          updateSelectionUI();
+
+          if (!toolbarStarted && elapsed >= toolbarStartAt) {
+            toolbarStarted = true;
+            buildToolbarElements(true);
+          }
 
           if (t < 1) {
             shrinkAnimId = requestAnimationFrame(animateShrink);
           } else {
             shrinkAnimId = null;
+            shrinkTargetBounds = null;
             selectionBounds = { x: sMinX, y: sMinY, width: sMaxX - sMinX, height: sMaxY - sMinY };
-            createSelectionHandles(true);
+            updateSelectionUI();
+            if (!toolbarStarted) buildToolbarElements(true);
           }
         };
 
-        // Set temporary bounds so toolbar delay knows where to position
-        selectionBounds = { x: lMinX, y: lMinY, width: lMaxX - lMinX, height: lMaxY - lMinY };
         shrinkAnimId = requestAnimationFrame(animateShrink);
       } else {
         selectionBounds = null;
@@ -1360,6 +1411,8 @@
         hideColorModal();
       }
 
+      if (tool === 'lasso' && shrinkAnimId) { finishShrinkAnimation(); }
+
       if (tool === 'lasso' && isOnRotationHandle(d.x, d.y)) {
         isRotatingSelection = true;
         originalBounds = { ...selectionBounds };
@@ -1376,7 +1429,7 @@
       if (tool === 'lasso' && isOnDuplicateHandle(d.x, d.y)) { duplicateSelectedStrokes(); drawing = false; return; }
       if (tool === 'lasso' && isOnLockHandle(d.x, d.y)) { toggleLockSelectedStrokes(); drawing = false; return; }
       if (tool === 'lasso' && isOnColorHandle(d.x, d.y)) { showColorModal(); drawing = false; return; }
-      if (tool === 'lasso' && isOnTrashHandle(d.x, d.y)) { deleteSelectedStrokes(); drawing = false; return; }
+      if (tool === 'lasso' && isOnTrashHandle(d.x, d.y)) { deleteSelectedStrokes(); setTool('pen'); drawing = false; return; }
 
       if (tool === 'lasso') {
         const handle = getHandleAtPoint(d.x, d.y);
@@ -1482,7 +1535,7 @@
       if (tool === 'lasso' && lassoPath && lassoPoints.length >= 3) { lassoPath.remove(); lassoPath = null; selectStrokesInLasso(); }
       else if (tool === 'lasso') clearSelection();
       points = [];
-      if (eraserEnd) { eraserEnd = false; resetBig(); if (prevTool !== 'eraser') setTool(prevTool); }
+      if (eraserEnd) { eraserEnd = false; resetBig(); if (prevTool !== 'eraser') setTool(prevTool === 'lasso' ? 'pen' : prevTool); }
       if (lassoEnd) { lassoEnd = false; if (selectedStrokes.length === 0 && prevTool !== 'lasso') setTool(prevTool); }
     }
 
