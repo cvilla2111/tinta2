@@ -50,7 +50,7 @@
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
     .canvas-container.pdf-mode::before, .canvas-container.pdf-mode::after { content: ''; flex: 1; min-height: 0; }
-    .canvas-container.no-pdf { background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 30px 30px; background-attachment: local; overflow-y: auto; overflow-x: hidden; touch-action: none; scrollbar-width: none; -ms-overflow-style: none; }
+    .canvas-container.no-pdf { background-color: var(--bg); overflow-y: auto; overflow-x: hidden; touch-action: none; scrollbar-width: none; -ms-overflow-style: none; }
     .canvas-container.no-pdf::-webkit-scrollbar { width: 0; height: 0; display: none; }
     .canvas-container.pdf-mode .custom-scrollbar { display: none; }
     .custom-scrollbar { position: fixed; top: 0; right: 0; width: 8px; height: 100%; z-index: 50; pointer-events: none; }
@@ -64,7 +64,8 @@
     .pdf-page-container.slide-out-right { transform: translateX(100%); opacity: 0; }
     .pdf-page-container.slide-in-left { transform: translateX(100%); opacity: 0; transition: none; }
     .pdf-page-container.slide-in-right { transform: translateX(-100%); opacity: 0; transition: none; }
-    .canvas-container:not(.pdf-mode) .pdf-page-container { position: relative; width: 100%; }
+    .canvas-container:not(.pdf-mode) .pdf-page-container { position: relative; width: 100%; background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 30px 30px; }
+
     .canvas-container:not(.pdf-mode) #pdf-canvas { display: none; }
     .canvas-container:not(.pdf-mode) #drawing-svg { width: 100%; display: block; position: relative; top: auto; left: auto; }
     #pdf-canvas { display: block; pointer-events: none; }
@@ -1779,31 +1780,62 @@
       }
     };
 
-    const INERTIA_FRICTION = 0.92;
-    const INERTIA_MIN_VELOCITY = 0.3;
-    const INERTIA_MAX_VELOCITY = 18;
+    /* ── Scroll physics: inertia deceleration, no bounce ── */
+    const FRICTION = 0.955;
+    const VELOCITY_WINDOW = 100;
     let penNearScreen = false;
     let touchScrollActive = false;
     let touchScrollLastY = 0;
     let touchScrollLastTime = 0;
-    let touchScrollVelocity = 0;
-    let inertiaAnimId = null;
+    let animFrameId = null;
+    const velocitySamples = [];
 
-    function stopInertia() {
-      if (inertiaAnimId) { cancelAnimationFrame(inertiaAnimId); inertiaAnimId = null; }
+    function trackVelocity(deltaY, now) {
+      const last = velocitySamples.length > 0 ? velocitySamples[velocitySamples.length - 1] : null;
+      const dt = last ? (now - last.t) : 16;
+      const vPxPerSec = dt > 0 ? (deltaY / dt) * 1000 : 0;
+      velocitySamples.push({ v: vPxPerSec, t: now });
+      while (velocitySamples.length > 0 && now - velocitySamples[0].t > VELOCITY_WINDOW) velocitySamples.shift();
     }
 
-    function startInertia() {
-      stopInertia();
-      if (Math.abs(touchScrollVelocity) < INERTIA_MIN_VELOCITY) return;
+    function getSmoothedVelocity() {
+      if (velocitySamples.length < 2) return 0;
+      const now = velocitySamples[velocitySamples.length - 1].t;
+      let wSum = 0, wTotal = 0;
+      for (const s of velocitySamples) {
+        const age = now - s.t;
+        const w = Math.exp(-age / 50);
+        wSum += s.v * w;
+        wTotal += w;
+      }
+      return wTotal > 0 ? wSum / wTotal : 0;
+    }
+
+    function stopAnim() {
+      if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+    }
+
+    function startDeceleration() {
+      stopAnim();
+      let vel = getSmoothedVelocity();
+      if (Math.abs(vel) < 10) return;
+      let lastT = performance.now();
       const step = () => {
-        touchScrollVelocity *= INERTIA_FRICTION;
-        if (Math.abs(touchScrollVelocity) < INERTIA_MIN_VELOCITY) { inertiaAnimId = null; return; }
-        container.scrollTop += touchScrollVelocity;
+        const now = performance.now();
+        const dt = Math.min(now - lastT, 32);
+        lastT = now;
+        vel *= Math.pow(FRICTION, dt / 16);
+        if (Math.abs(vel) < 5) {
+          animFrameId = null;
+          return;
+        }
+        const delta = vel * (dt / 1000);
+        if (delta > 0) extendCanvas();
+        container.scrollTop += delta;
         extendCanvas();
-        inertiaAnimId = requestAnimationFrame(step);
+        animFrameId = requestAnimationFrame(step);
       };
-      inertiaAnimId = requestAnimationFrame(step);
+      animFrameId = requestAnimationFrame(step);
     }
 
     function handleGestureStart(e) {
@@ -1817,11 +1849,11 @@
         }
       } else {
         if (activePointers.size === 1 && !penNearScreen) {
-          stopInertia();
+          stopAnim();
           touchScrollActive = true;
           touchScrollLastY = e.clientY;
           touchScrollLastTime = performance.now();
-          touchScrollVelocity = 0;
+          velocitySamples.length = 0;
         }
       }
     }
@@ -1837,10 +1869,10 @@
       } else {
         if (touchScrollActive && activePointers.size === 1) {
           const now = performance.now();
-          const dt = now - touchScrollLastTime;
           const deltaY = touchScrollLastY - e.clientY;
+          if (deltaY > 0) extendCanvas();
           container.scrollTop += deltaY;
-          if (dt > 0) { const v = deltaY / dt * 8; touchScrollVelocity = Math.sign(v) * Math.min(Math.abs(v), INERTIA_MAX_VELOCITY); }
+          trackVelocity(deltaY, now);
           touchScrollLastY = e.clientY;
           touchScrollLastTime = now;
           extendCanvas();
@@ -1859,7 +1891,7 @@
       activePointers.delete(e.pointerId);
       if (touchScrollActive && activePointers.size === 0) {
         touchScrollActive = false;
-        startInertia();
+        startDeceleration();
       }
     }
 
