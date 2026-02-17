@@ -1776,6 +1776,7 @@
 
     const INERTIA_FRICTION = 0.90;
     const INERTIA_MIN_VELOCITY = 0.3;
+    let penNearScreen = false;
     let touchScrollActive = false;
     let touchScrollLastY = 0;
     let touchScrollLastTime = 0;
@@ -1809,7 +1810,7 @@
           gestureStartDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
         }
       } else {
-        if (activePointers.size === 1) {
+        if (activePointers.size === 1 && !penNearScreen) {
           stopInertia();
           touchScrollActive = true;
           touchScrollLastY = e.clientY;
@@ -1886,10 +1887,14 @@
     container.addEventListener('scroll', extendCanvas, { passive: true });
     container.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; });
 
+    container.addEventListener('pointerenter', e => { if (e.pointerType === 'pen' && !pdfDoc) penNearScreen = true; });
     container.addEventListener('pointerdown', e => { e.preventDefault(); e.pointerType === 'touch' ? handleGestureStart(e) : start(e); });
     container.addEventListener('pointermove', e => { e.preventDefault(); e.pointerType === 'touch' ? handleGestureMove(e) : move(e); });
     container.addEventListener('pointerup', e => { e.pointerType === 'touch' ? handleGestureEnd(e) : stop(e); });
-    container.addEventListener('pointerleave', e => { e.pointerType === 'touch' ? activePointers.delete(e.pointerId) : stop(e); });
+    container.addEventListener('pointerleave', e => {
+      if (e.pointerType === 'pen') penNearScreen = false;
+      e.pointerType === 'touch' ? activePointers.delete(e.pointerId) : stop(e);
+    });
     container.addEventListener('pointercancel', e => { e.pointerType === 'touch' ? activePointers.delete(e.pointerId) : stop(e); });
     window.addEventListener('resize', resize);
 
