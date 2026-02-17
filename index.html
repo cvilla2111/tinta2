@@ -1775,8 +1775,8 @@
     };
 
     const SIDE_EDGE_THRESHOLD = 80;
-    const INERTIA_FRICTION = 0.95;
-    const INERTIA_MIN_VELOCITY = 0.5;
+    const INERTIA_FRICTION = 0.90;
+    const INERTIA_MIN_VELOCITY = 0.3;
     let sideScrollActive = false;
     let sideScrollLastY = 0;
     let sideScrollLastTime = 0;
@@ -1847,7 +1847,7 @@
           const dt = now - sideScrollLastTime;
           const deltaY = sideScrollLastY - avgY;
           container.scrollTop += deltaY;
-          if (dt > 0) sideScrollVelocity = deltaY / dt * 16;
+          if (dt > 0) sideScrollVelocity = deltaY / dt * 8;
           sideScrollLastY = avgY;
           sideScrollLastTime = now;
           extendCanvas();
