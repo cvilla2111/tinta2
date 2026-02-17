@@ -1775,8 +1775,30 @@
     };
 
     const SIDE_EDGE_THRESHOLD = 80;
+    const INERTIA_FRICTION = 0.95;
+    const INERTIA_MIN_VELOCITY = 0.5;
     let sideScrollActive = false;
     let sideScrollLastY = 0;
+    let sideScrollLastTime = 0;
+    let sideScrollVelocity = 0;
+    let inertiaAnimId = null;
+
+    function stopInertia() {
+      if (inertiaAnimId) { cancelAnimationFrame(inertiaAnimId); inertiaAnimId = null; }
+    }
+
+    function startInertia() {
+      stopInertia();
+      if (Math.abs(sideScrollVelocity) < INERTIA_MIN_VELOCITY) return;
+      const step = () => {
+        sideScrollVelocity *= INERTIA_FRICTION;
+        if (Math.abs(sideScrollVelocity) < INERTIA_MIN_VELOCITY) { inertiaAnimId = null; return; }
+        container.scrollTop += sideScrollVelocity;
+        extendCanvas();
+        inertiaAnimId = requestAnimationFrame(step);
+      };
+      inertiaAnimId = requestAnimationFrame(step);
+    }
 
     function areFingersOnSides(pts) {
       const cRect = container.getBoundingClientRect();
@@ -1797,10 +1819,13 @@
         }
       } else {
         if (activePointers.size === 2) {
+          stopInertia();
           const pts = Array.from(activePointers.values());
           if (areFingersOnSides(pts)) {
             sideScrollActive = true;
             sideScrollLastY = (pts[0].y + pts[1].y) / 2;
+            sideScrollLastTime = performance.now();
+            sideScrollVelocity = 0;
           }
         }
       }
@@ -1818,9 +1843,13 @@
         if (sideScrollActive && activePointers.size === 2) {
           const pts = Array.from(activePointers.values());
           const avgY = (pts[0].y + pts[1].y) / 2;
+          const now = performance.now();
+          const dt = now - sideScrollLastTime;
           const deltaY = sideScrollLastY - avgY;
           container.scrollTop += deltaY;
+          if (dt > 0) sideScrollVelocity = deltaY / dt * 16;
           sideScrollLastY = avgY;
+          sideScrollLastTime = now;
           extendCanvas();
         }
       }
@@ -1835,7 +1864,10 @@
         }
       }
       activePointers.delete(e.pointerId);
-      if (activePointers.size < 2) { sideScrollActive = false; }
+      if (activePointers.size < 2 && sideScrollActive) {
+        sideScrollActive = false;
+        startInertia();
+      }
     }
 
     menuBtn.onclick = e => { e.stopPropagation(); toggleToolbar(); };
