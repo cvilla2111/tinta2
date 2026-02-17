@@ -50,7 +50,11 @@
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
     .canvas-container.pdf-mode::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
     .canvas-container.pdf-mode::before, .canvas-container.pdf-mode::after { content: ''; flex: 1; min-height: 0; }
-    .canvas-container.no-pdf { background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 30px 30px; background-attachment: local; overflow-y: auto; overflow-x: hidden; touch-action: none; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.15) transparent; }
+    .canvas-container.no-pdf { background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 30px 30px; background-attachment: local; overflow-y: auto; overflow-x: hidden; touch-action: none; scrollbar-width: none; -ms-overflow-style: none; }
+    .canvas-container.no-pdf::-webkit-scrollbar { width: 0; height: 0; display: none; }
+    .canvas-container.pdf-mode .custom-scrollbar { display: none; }
+    .custom-scrollbar { position: fixed; top: 0; right: 0; width: 8px; height: 100%; z-index: 50; pointer-events: none; }
+    .custom-scrollbar-thumb { position: absolute; right: 1px; width: 6px; min-height: 30px; border-radius: 3px; background: rgba(0,0,0,0.15); pointer-events: auto; touch-action: none; -webkit-tap-highlight-color: transparent; }
 
     .canvas-container.lasso-mode { cursor: crosshair; }
     .canvas-container.eraser-mode { cursor: none; }
@@ -190,6 +194,7 @@
       <svg id="drawing-svg" xmlns="http://www.w3.org/2000/svg"><g id="strokes-group"></g></svg>
     </div>
     <div class="eraser-cursor" id="eraserCursor"></div>
+    <div class="custom-scrollbar" id="customScrollbar"><div class="custom-scrollbar-thumb" id="customScrollbarThumb"></div></div>
   </div>
   <script type="module">
     const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');
@@ -1774,8 +1779,9 @@
       }
     };
 
-    const INERTIA_FRICTION = 0.90;
+    const INERTIA_FRICTION = 0.92;
     const INERTIA_MIN_VELOCITY = 0.3;
+    const INERTIA_MAX_VELOCITY = 18;
     let penNearScreen = false;
     let touchScrollActive = false;
     let touchScrollLastY = 0;
@@ -1834,7 +1840,7 @@
           const dt = now - touchScrollLastTime;
           const deltaY = touchScrollLastY - e.clientY;
           container.scrollTop += deltaY;
-          if (dt > 0) touchScrollVelocity = deltaY / dt * 8;
+          if (dt > 0) { const v = deltaY / dt * 8; touchScrollVelocity = Math.sign(v) * Math.min(Math.abs(v), INERTIA_MAX_VELOCITY); }
           touchScrollLastY = e.clientY;
           touchScrollLastTime = now;
           extendCanvas();
@@ -1920,9 +1926,79 @@
     }
     renderLoop();
 
+    /* Custom scrollbar for no-pdf mode */
+    const scrollbar = $('customScrollbar');
+    const scrollThumb = $('customScrollbarThumb');
+    let sbDragging = false, sbDragStartY = 0, sbDragStartScroll = 0;
+
+    function updateScrollbar() {
+      if (pdfDoc) { scrollbar.style.display = 'none'; return; }
+      const contentH = container.scrollHeight;
+      const viewH = container.clientHeight;
+      if (contentH <= viewH) { scrollbar.style.display = 'none'; return; }
+      scrollbar.style.display = '';
+      const ratio = viewH / contentH;
+      const trackH = viewH;
+      const thumbH = Math.max(30, trackH * ratio);
+      const scrollRange = contentH - viewH;
+      const thumbRange = trackH - thumbH;
+      const thumbTop = scrollRange > 0 ? (container.scrollTop / scrollRange) * thumbRange : 0;
+      scrollThumb.style.height = thumbH + 'px';
+      scrollThumb.style.top = thumbTop + 'px';
+    }
+
+    function setThumbActive(active) {
+      scrollThumb.style.background = active ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.15)';
+    }
+
+    scrollThumb.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      sbDragging = true;
+      sbDragStartY = e.clientY;
+      sbDragStartScroll = container.scrollTop;
+      setThumbActive(true);
+      scrollThumb.setPointerCapture(e.pointerId);
+    });
+    scrollThumb.addEventListener('pointermove', e => {
+      if (!sbDragging) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const contentH = container.scrollHeight;
+      const viewH = container.clientHeight;
+      const scrollRange = contentH - viewH;
+      const ratio = viewH / contentH;
+      const thumbH = Math.max(30, viewH * ratio);
+      const thumbRange = viewH - thumbH;
+      if (thumbRange <= 0) return;
+      const dy = e.clientY - sbDragStartY;
+      const scrollDelta = (dy / thumbRange) * scrollRange;
+      container.scrollTop = sbDragStartScroll + scrollDelta;
+      extendCanvas();
+    });
+    scrollThumb.addEventListener('pointerup', e => {
+      if (!sbDragging) return;
+      sbDragging = false;
+      setThumbActive(false);
+      scrollThumb.releasePointerCapture(e.pointerId);
+    });
+    scrollThumb.addEventListener('pointercancel', () => {
+      if (!sbDragging) return;
+      sbDragging = false;
+      setThumbActive(false);
+    });
+    scrollThumb.addEventListener('lostpointercapture', () => {
+      sbDragging = false;
+      setThumbActive(false);
+    });
+
+    container.addEventListener('scroll', updateScrollbar, { passive: true });
+    window.addEventListener('resize', updateScrollbar);
+
     sizeVal.style.color = color;
     updateCursor();
     resize();
+    updateScrollbar();
   </script>
 </body>
 </html>
