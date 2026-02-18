@@ -1145,7 +1145,7 @@
         let lMinX = Infinity, lMinY = Infinity, lMaxX = -Infinity, lMaxY = -Infinity;
         lassoPoints.forEach(p => { lMinX = Math.min(lMinX, p.x); lMinY = Math.min(lMinY, p.y); lMaxX = Math.max(lMaxX, p.x); lMaxY = Math.max(lMaxY, p.y); });
         const lassoSpan = Math.max(lMaxX - lMinX, lMaxY - lMinY);
-        if (lassoSpan > 0 && lassoCloseDist < lassoSpan * 0.4) {
+        if (lassoSpan > 0 && lassoCloseDist < lassoSpan * 0.7) {
           let lcx = 0, lcy = 0;
           lassoPoints.forEach(p => { lcx += p.x; lcy += p.y; });
           lcx /= lassoPoints.length; lcy /= lassoPoints.length;
