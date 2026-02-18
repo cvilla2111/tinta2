@@ -1838,6 +1838,14 @@
       animFrameId = requestAnimationFrame(step);
     }
 
+    function areFingersOnSides(pts) {
+      const w = container.getBoundingClientRect().width;
+      const edge = w * 0.3;
+      const left = Math.min(pts[0].x, pts[1].x);
+      const right = Math.max(pts[0].x, pts[1].x);
+      return left < edge && right > w - edge;
+    }
+
     function handleGestureStart(e) {
       if (e.pointerType !== 'touch') return;
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1848,12 +1856,15 @@
           gestureStartDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
         }
       } else {
-        if (activePointers.size === 1 && !penNearScreen) {
-          stopAnim();
-          touchScrollActive = true;
-          touchScrollLastY = e.clientY;
-          touchScrollLastTime = performance.now();
-          velocitySamples.length = 0;
+        if (activePointers.size === 2 && !penNearScreen) {
+          const pts = Array.from(activePointers.values());
+          if (areFingersOnSides(pts)) {
+            stopAnim();
+            touchScrollActive = true;
+            touchScrollLastY = (pts[0].y + pts[1].y) / 2;
+            touchScrollLastTime = performance.now();
+            velocitySamples.length = 0;
+          }
         }
       }
     }
@@ -1867,13 +1878,15 @@
           if (gestureStartDistance - Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) > 150) { activePointers.clear(); showFilmstrip(); }
         }
       } else {
-        if (touchScrollActive && activePointers.size === 1) {
+        if (touchScrollActive && activePointers.size === 2) {
+          const pts = Array.from(activePointers.values());
+          const avgY = (pts[0].y + pts[1].y) / 2;
           const now = performance.now();
-          const deltaY = touchScrollLastY - e.clientY;
+          const deltaY = touchScrollLastY - avgY;
           if (deltaY > 0) extendCanvas();
           container.scrollTop += deltaY;
           trackVelocity(deltaY, now);
-          touchScrollLastY = e.clientY;
+          touchScrollLastY = avgY;
           touchScrollLastTime = now;
           extendCanvas();
         }
@@ -1889,7 +1902,7 @@
         }
       }
       activePointers.delete(e.pointerId);
-      if (touchScrollActive && activePointers.size === 0) {
+      if (touchScrollActive && activePointers.size < 2) {
         touchScrollActive = false;
         startDeceleration();
       }
