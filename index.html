@@ -42,6 +42,16 @@
     .color-modal-btn.selected { border-color: var(--active); }
     .color-modal-btn.white-color { border-color: #d1d5db; }
     .color-modal-btn.white-color.selected { border-color: var(--active); }
+    .sticker-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: opacity 0.2s, visibility 0.2s; }
+    .sticker-modal-overlay.visible { opacity: 1; visibility: visible; }
+    .sticker-modal { background: var(--bg); border-radius: 18px; padding: 20px 18px 16px; box-shadow: 0 12px 48px rgba(0,0,0,0.2); transform: scale(0.85); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); max-width: 320px; width: 90vw; max-height: 80vh; overflow-y: auto; }
+    .sticker-modal-overlay.visible .sticker-modal { transform: scale(1); }
+    .sticker-modal-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 14px; text-align: center; text-transform: uppercase; letter-spacing: 0.8px; }
+    .sticker-modal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .sticker-modal-btn { aspect-ratio: 1; border: 2px solid var(--border); border-radius: 12px; background: var(--btn); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 10px; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, background 0.15s; }
+    .sticker-modal-btn:hover { transform: scale(1.08); border-color: var(--active); box-shadow: 0 4px 16px rgba(59,130,246,0.2); }
+    .sticker-modal-btn:active { transform: scale(0.95); }
+    .sticker-modal-btn svg { width: 100%; height: 100%; }
     .canvas-container { width: 100%; height: 100%; overflow: hidden; cursor: crosshair; position: relative; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
     .canvas-container.pdf-mode { overflow-y: auto; overflow-x: hidden; background: #fff; display: flex; flex-direction: column; align-items: center; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.2) transparent; touch-action: none; }
 
@@ -182,6 +192,12 @@
     <div class="color-modal">
       <div class="color-modal-title">Choose Color</div>
       <div class="color-modal-grid" id="colorModalGrid"></div>
+    </div>
+  </div>
+  <div class="sticker-modal-overlay" id="stickerModalOverlay">
+    <div class="sticker-modal">
+      <div class="sticker-modal-title">Stickers</div>
+      <div class="sticker-modal-grid" id="stickerModalGrid"></div>
     </div>
   </div>
   <div class="filmstrip-overlay" id="filmstripOverlay">
@@ -401,6 +417,87 @@
 
     sizeVal.onclick = () => modal.classList.add('visible');
     modal.onclick = e => { if (e.target === modal) modal.classList.remove('visible'); };
+
+    /* ── Sticker Modal ── */
+    const stickerOverlay = $('stickerModalOverlay');
+    const stickerGrid = $('stickerModalGrid');
+    let stickerInsertPos = null;
+
+    const STICKERS = [
+      { name: 'Treble Clef', svg: '<svg viewBox="0 0 64 64"><path d="M32 58c0 0-1.5-3-1.5-6c0-4 2-6.5 2-11c0-3-1.2-5-3.5-5c-3 0-5.5 3-5.5 7.5c0 6 4.5 10 9.5 10c7 0 12-5.5 12-13c0-9-6-14-6-23c0-5 2-10 2-10s-3 4-3 10c0 7 6 13 6 22c0 6-4 11-10 11c-3.5 0-6.5-3-6.5-8c0-3.5 1.8-5.5 3.5-5.5c1.5 0 2 1.2 2 3c0 4-1.5 6-1.5 9c0 1.5 0.5 2.5 0.5 2.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>' },
+      { name: 'Eighth Note', svg: '<svg viewBox="0 0 64 64"><circle cx="22" cy="46" r="8" fill="currentColor"/><line x1="30" y1="46" x2="30" y2="12" stroke="currentColor" stroke-width="3"/><path d="M30 12 Q38 14 42 22 Q38 18 30 20" fill="currentColor"/></svg>' },
+      { name: 'Double Note', svg: '<svg viewBox="0 0 64 64"><circle cx="16" cy="46" r="7" fill="currentColor"/><circle cx="42" cy="42" r="7" fill="currentColor"/><line x1="23" y1="46" x2="23" y2="14" stroke="currentColor" stroke-width="3"/><line x1="49" y1="42" x2="49" y2="10" stroke="currentColor" stroke-width="3"/><line x1="23" y1="14" x2="49" y2="10" stroke="currentColor" stroke-width="3.5"/></svg>' },
+      { name: 'Headphones', svg: '<svg viewBox="0 0 64 64"><path d="M12 36 C12 22 20 12 32 12 C44 12 52 22 52 36" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="8" y="34" width="10" height="16" rx="4" fill="currentColor"/><rect x="46" y="34" width="10" height="16" rx="4" fill="currentColor"/></svg>' },
+      { name: 'Guitar', svg: '<svg viewBox="0 0 64 64"><ellipse cx="26" cy="44" rx="12" ry="14" fill="none" stroke="currentColor" stroke-width="2.5"/><ellipse cx="26" cy="44" rx="4" ry="5" fill="currentColor" opacity="0.3"/><line x1="37" y1="36" x2="54" y2="8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="50" y1="6" x2="58" y2="10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="52" y1="4" x2="56" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' },
+      { name: 'Microphone', svg: '<svg viewBox="0 0 64 64"><rect x="24" y="8" width="16" height="28" rx="8" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M16 28 C16 42 23 48 32 48 C41 48 48 42 48 28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="48" x2="32" y2="58" stroke="currentColor" stroke-width="2.5"/><line x1="24" y1="58" x2="40" y2="58" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>' },
+      { name: 'Piano Keys', svg: '<svg viewBox="0 0 64 64"><rect x="8" y="14" width="48" height="36" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="16" y1="14" x2="16" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="24" y1="14" x2="24" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="32" y1="14" x2="32" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="40" y1="14" x2="40" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="48" y1="14" x2="48" y2="50" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="21" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="37" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="45" y="14" width="6" height="22" rx="1" fill="currentColor"/></svg>' },
+      { name: 'Vinyl Record', svg: '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="32" cy="32" r="18" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="32" cy="32" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="32" cy="32" r="3" fill="currentColor"/></svg>' },
+      { name: 'Speaker', svg: '<svg viewBox="0 0 64 64"><rect x="12" y="10" width="24" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="24" cy="36" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="36" r="4" fill="currentColor"/><circle cx="24" cy="18" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M42 20 Q50 26 50 32 Q50 38 42 44" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M46 14 Q58 24 58 32 Q58 40 46 50" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5"/></svg>' },
+      { name: 'Music Heart', svg: '<svg viewBox="0 0 64 64"><path d="M32 56 C20 46 6 38 6 24 C6 16 12 10 20 10 C26 10 30 14 32 18 C34 14 38 10 44 10 C52 10 58 16 58 24 C58 38 44 46 32 56Z" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="26" cy="36" r="4" fill="currentColor"/><line x1="30" y1="36" x2="30" y2="22" stroke="currentColor" stroke-width="2"/><path d="M30 22 Q35 23 37 28" fill="none" stroke="currentColor" stroke-width="2"/></svg>' },
+      { name: 'Star', svg: '<svg viewBox="0 0 64 64"><path d="M32 6 L38 24 L58 24 L42 36 L48 54 L32 44 L16 54 L22 36 L6 24 L26 24 Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>' },
+      { name: 'Lightning Bolt', svg: '<svg viewBox="0 0 64 64"><path d="M36 4 L16 32 L28 32 L24 60 L48 28 L34 28 Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/></svg>' },
+    ];
+
+    const showStickerModal = (cx, cy) => {
+      stickerInsertPos = { x: cx, y: cy };
+      stickerGrid.innerHTML = '';
+      STICKERS.forEach((sticker, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'sticker-modal-btn';
+        btn.innerHTML = sticker.svg;
+        btn.title = sticker.name;
+        btn.style.animationDelay = (i * 30) + 'ms';
+        btn.onclick = () => placeStickerOnCanvas(i);
+        stickerGrid.appendChild(btn);
+      });
+      stickerOverlay.classList.add('visible');
+    };
+
+    const hideStickerModal = () => {
+      stickerOverlay.classList.remove('visible');
+      stickerInsertPos = null;
+    };
+
+    stickerOverlay.onclick = e => { if (e.target === stickerOverlay) hideStickerModal(); };
+
+    const placeStickerOnCanvas = (idx) => {
+      if (!stickerInsertPos) return;
+      const sticker = STICKERS[idx];
+      const size = 60 * (pdfDoc ? getPdfScale() : dpr);
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.classList.add('sticker-element');
+      g.innerHTML = sticker.svg;
+      const inner = g.querySelector('svg');
+      inner.setAttribute('x', stickerInsertPos.x - size / 2);
+      inner.setAttribute('y', stickerInsertPos.y - size / 2);
+      inner.setAttribute('width', size);
+      inner.setAttribute('height', size);
+      inner.style.color = color;
+      inner.setAttribute('overflow', 'visible');
+      group.appendChild(g);
+      /* Store as a stroke-like object so undo/select/save works */
+      const cx = stickerInsertPos.x, cy = stickerInsertPos.y;
+      const half = size / 2;
+      const fakePoints = [
+        { x: cx - half, y: cy - half }, { x: cx + half, y: cy - half },
+        { x: cx + half, y: cy + half }, { x: cx - half, y: cy + half }, { x: cx, y: cy }
+      ];
+      const stickerStroke = { element: g, points: fakePoints, color, width: 0, isSticker: true, stickerIdx: idx, stickerSize: size };
+      addStroke(stickerStroke);
+      savePageAnnotations();
+      hideStickerModal();
+      /* Auto-select the placed sticker via lasso */
+      setTool('lasso', true);
+      const pad = 2;
+      lassoPoints = [
+        { x: cx - half - pad, y: cy - half - pad },
+        { x: cx + half + pad, y: cy - half - pad },
+        { x: cx + half + pad, y: cy + half + pad },
+        { x: cx - half - pad, y: cy + half + pad }
+      ];
+      selectStrokesInLasso();
+      lassoPoints = [];
+    };
 
     const setTool = (t, preserveSelection = false) => {
       tool = t;
@@ -1042,6 +1139,11 @@
         shrinkAnimId = requestAnimationFrame(animateShrink);
       } else {
         selectionBounds = null;
+        /* Empty area lasso → open sticker modal at lasso center */
+        let lcx = 0, lcy = 0;
+        lassoPoints.forEach(p => { lcx += p.x; lcy += p.y; });
+        lcx /= lassoPoints.length; lcy /= lassoPoints.length;
+        showStickerModal(lcx, lcy);
       }
     };
 
@@ -1076,13 +1178,26 @@
       const newStrokes = [];
 
       selectedStrokes.forEach(s => {
-        const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        el.classList.add('stroke-path');
-        el.setAttribute('fill', s.color);
         const newPoints = s.points.map(p => ({ ...p, x: p.x + offset, y: p.y + offset }));
-        el.setAttribute('d', buildPath(newPoints, s.width));
+        let el, newStroke;
+        if (s.isSticker && STICKERS[s.stickerIdx]) {
+          el = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          el.classList.add('sticker-element');
+          el.innerHTML = STICKERS[s.stickerIdx].svg;
+          const inner = el.querySelector('svg');
+          const cx = newPoints[4].x, cy = newPoints[4].y, half = s.stickerSize / 2;
+          inner.setAttribute('x', cx - half); inner.setAttribute('y', cy - half);
+          inner.setAttribute('width', s.stickerSize); inner.setAttribute('height', s.stickerSize);
+          inner.style.color = s.color; inner.setAttribute('overflow', 'visible');
+          newStroke = { element: el, points: newPoints, color: s.color, width: 0, isSticker: true, stickerIdx: s.stickerIdx, stickerSize: s.stickerSize };
+        } else {
+          el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          el.classList.add('stroke-path');
+          el.setAttribute('fill', s.color);
+          el.setAttribute('d', buildPath(newPoints, s.width));
+          newStroke = { element: el, points: newPoints, color: s.color, width: s.width };
+        }
         group.appendChild(el);
-        const newStroke = { element: el, points: newPoints, color: s.color, width: s.width };
         addStroke(newStroke);
         newStrokes.push(newStroke);
       });
@@ -1148,10 +1263,25 @@
       return null;
     };
 
+    const updateStrokeElement = (s) => {
+      if (s.isSticker) {
+        const inner = s.element.querySelector('svg');
+        if (!inner) return;
+        const cx = s.points[4].x, cy = s.points[4].y;
+        const dx = s.points[1].x - s.points[0].x;
+        const dy = s.points[2].y - s.points[0].y;
+        const sz = Math.max(dx, dy, 1);
+        inner.setAttribute('x', cx - sz / 2); inner.setAttribute('y', cy - sz / 2);
+        inner.setAttribute('width', sz); inner.setAttribute('height', sz);
+        s.stickerSize = sz;
+      } else {
+        s.element.setAttribute('d', buildPath(s.points, s.width));
+      }
+    };
     const moveSelection = (dx, dy) => {
       selectedStrokes.forEach(s => {
         s.points = s.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy }));
-        s.element.setAttribute('d', buildPath(s.points, s.width));
+        updateStrokeElement(s);
       });
       if (selectionBounds) {
         selectionBounds.x += dx;
@@ -1181,7 +1311,7 @@
       selectedStrokes.forEach((s, i) => {
         const origPoints = originalStrokePoints[i];
         s.points = origPoints.map(pt => ({ ...pt, x: scaleAnchorWorldX + (pt.x - scaleAnchorWorldX) * scale, y: scaleAnchorWorldY + (pt.y - scaleAnchorWorldY) * scale }));
-        s.element.setAttribute('d', buildPath(s.points, s.width));
+        updateStrokeElement(s);
       });
 
       const scaledWidth = originalBounds.width * scale, scaledHeight = originalBounds.height * scale;
@@ -1229,7 +1359,12 @@
       const c = newColor || color;
       selectedStrokes.forEach(s => {
         s.color = c;
-        s.element.setAttribute('fill', c);
+        if (s.isSticker) {
+          const inner = s.element.querySelector('svg');
+          if (inner) inner.style.color = c;
+        } else {
+          s.element.setAttribute('fill', c);
+        }
       });
       createSelectionHandles();
       savePageAnnotations();
@@ -1248,7 +1383,7 @@
           const dx = p.x - rotationCenterX, dy = p.y - rotationCenterY;
           return { ...p, x: rotationCenterX + dx * cos - dy * sin, y: rotationCenterY + dx * sin + dy * cos };
         });
-        s.element.setAttribute('d', buildPath(s.points, s.width));
+        updateStrokeElement(s);
       });
 
       const rotateTransform = `rotate(${totalRotation * (180 / Math.PI)}, ${rotationCenterX}, ${rotationCenterY})`;
@@ -1267,21 +1402,28 @@
       group.innerHTML = '';
       const data = pageAnnotations[currentPage];
       if (data) {
-        strokes = data.strokes.map(s => {
+        const rebuildElement = (s, appendToGroup) => {
+          if (s.isSticker && STICKERS[s.stickerIdx]) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.classList.add('sticker-element');
+            g.innerHTML = STICKERS[s.stickerIdx].svg;
+            const inner = g.querySelector('svg');
+            const cx = s.points[4].x, cy = s.points[4].y, half = s.stickerSize / 2;
+            inner.setAttribute('x', cx - half); inner.setAttribute('y', cy - half);
+            inner.setAttribute('width', s.stickerSize); inner.setAttribute('height', s.stickerSize);
+            inner.style.color = s.color; inner.setAttribute('overflow', 'visible');
+            if (appendToGroup) group.appendChild(g);
+            return { ...s, element: g };
+          }
           const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           el.classList.add('stroke-path');
           el.setAttribute('fill', s.color);
           el.setAttribute('d', buildPath(s.points, s.width));
-          group.appendChild(el);
+          if (appendToGroup) group.appendChild(el);
           return { ...s, element: el };
-        });
-        undoStack = data.undoStack.map(s => {
-          const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          el.classList.add('stroke-path');
-          el.setAttribute('fill', s.color);
-          el.setAttribute('d', buildPath(s.points, s.width));
-          return { ...s, element: el };
-        });
+        };
+        strokes = data.strokes.map(s => rebuildElement(s, true));
+        undoStack = data.undoStack.map(s => rebuildElement(s, false));
         undoableCount = Math.min(strokes.length, MAX_UNDO_STROKES);
       } else {
         strokes = [];
