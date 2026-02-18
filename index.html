@@ -482,7 +482,7 @@
         { x: cx - half, y: cy - half }, { x: cx + half, y: cy - half },
         { x: cx + half, y: cy + half }, { x: cx - half, y: cy + half }, { x: cx, y: cy }
       ];
-      const stickerStroke = { element: g, points: fakePoints, color, width: 0, isSticker: true, stickerIdx: idx, stickerSize: size };
+      const stickerStroke = { element: g, points: fakePoints, color, width: 0, isSticker: true, stickerIdx: idx, stickerSize: size, locked: true };
       addStroke(stickerStroke);
       savePageAnnotations();
       hideStickerModal();
@@ -1139,11 +1139,16 @@
         shrinkAnimId = requestAnimationFrame(animateShrink);
       } else {
         selectionBounds = null;
-        /* Empty area lasso → open sticker modal at lasso center */
-        let lcx = 0, lcy = 0;
-        lassoPoints.forEach(p => { lcx += p.x; lcy += p.y; });
-        lcx /= lassoPoints.length; lcy /= lassoPoints.length;
-        showStickerModal(lcx, lcy);
+        /* Empty area lasso → open sticker modal only if lasso is >= 5px */
+        let lMinX = Infinity, lMinY = Infinity, lMaxX = -Infinity, lMaxY = -Infinity;
+        lassoPoints.forEach(p => { lMinX = Math.min(lMinX, p.x); lMinY = Math.min(lMinY, p.y); lMaxX = Math.max(lMaxX, p.x); lMaxY = Math.max(lMaxY, p.y); });
+        const lassoW = lMaxX - lMinX, lassoH = lMaxY - lMinY;
+        if (Math.max(lassoW, lassoH) >= 10) {
+          let lcx = 0, lcy = 0;
+          lassoPoints.forEach(p => { lcx += p.x; lcy += p.y; });
+          lcx /= lassoPoints.length; lcy /= lassoPoints.length;
+          showStickerModal(lcx, lcy);
+        }
       }
     };
 
@@ -1268,12 +1273,19 @@
         const inner = s.element.querySelector('svg');
         if (!inner) return;
         const cx = s.points[4].x, cy = s.points[4].y;
-        const dx = s.points[1].x - s.points[0].x;
-        const dy = s.points[2].y - s.points[0].y;
-        const sz = Math.max(dx, dy, 1);
+        /* Size = distance between adjacent corners (stays constant during rotation) */
+        const sz = Math.max(Math.hypot(s.points[1].x - s.points[0].x, s.points[1].y - s.points[0].y), 1);
+        /* Rotation angle from top edge direction */
+        const angle = Math.atan2(s.points[1].y - s.points[0].y, s.points[1].x - s.points[0].x) * (180 / Math.PI);
         inner.setAttribute('x', cx - sz / 2); inner.setAttribute('y', cy - sz / 2);
         inner.setAttribute('width', sz); inner.setAttribute('height', sz);
         s.stickerSize = sz;
+        /* Apply rotation transform around center */
+        if (Math.abs(angle) > 0.01) {
+          s.element.setAttribute('transform', `rotate(${angle}, ${cx}, ${cy})`);
+        } else {
+          s.element.removeAttribute('transform');
+        }
       } else {
         s.element.setAttribute('d', buildPath(s.points, s.width));
       }
@@ -1689,7 +1701,50 @@
         path = null;
       }
       if (tool === 'lasso' && lassoPath && lassoPoints.length >= 3) { lassoPath.remove(); lassoPath = null; selectStrokesInLasso(); }
-      else if (tool === 'lasso') clearSelection();
+      else if (tool === 'lasso') {
+        /* Tap-to-select: if lasso was just a tap/short gesture, select stroke under point */
+        if (lassoPath) { lassoPath.remove(); lassoPath = null; }
+        const tapPt = lassoPoints.length > 0 ? lassoPoints[0] : (points.length > 0 ? points[0] : null);
+        let tapped = false;
+        if (tapPt) {
+          const hitR = 15 * (pdfDoc ? getPdfScale() : dpr);
+          for (let i = strokes.length - 1; i >= 0; i--) {
+            const s = strokes[i];
+            let hit = false;
+            if (s.isSticker) {
+              /* For stickers, check if tap is inside the bounding box + margin */
+              const margin = hitR;
+              let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
+              s.points.forEach(pt => { bMinX = Math.min(bMinX, pt.x); bMinY = Math.min(bMinY, pt.y); bMaxX = Math.max(bMaxX, pt.x); bMaxY = Math.max(bMaxY, pt.y); });
+              hit = tapPt.x >= bMinX - margin && tapPt.x <= bMaxX + margin && tapPt.y >= bMinY - margin && tapPt.y <= bMaxY + margin;
+            } else {
+              for (const p of s.points) {
+                if (Math.hypot(tapPt.x - p.x, tapPt.y - p.y) < hitR + (s.width || 0)) { hit = true; break; }
+              }
+            }
+            if (hit) {
+              clearSelection();
+              selectedStrokes = [s];
+              const selPad = getEffectiveHandleSize(10);
+              let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
+              s.points.forEach(pt => { sMinX = Math.min(sMinX, pt.x); sMinY = Math.min(sMinY, pt.y); sMaxX = Math.max(sMaxX, pt.x); sMaxY = Math.max(sMaxY, pt.y); });
+              sMinX -= selPad; sMinY -= selPad; sMaxX += selPad; sMaxY += selPad;
+              selectionBounds = { x: sMinX, y: sMinY, width: sMaxX - sMinX, height: sMaxY - sMinY };
+              const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+              rect.classList.add('selection-box');
+              rect.setAttribute('x', sMinX); rect.setAttribute('y', sMinY);
+              rect.setAttribute('width', sMaxX - sMinX); rect.setAttribute('height', sMaxY - sMinY);
+              rect.setAttribute('rx', 3);
+              group.appendChild(rect);
+              selectionBoxes.push(rect);
+              createSelectionHandles(true);
+              tapped = true;
+              break;
+            }
+          }
+        }
+        if (!tapped) clearSelection();
+      }
       points = [];
       if (eraserEnd) { eraserEnd = false; resetBig(); if (prevTool !== 'eraser') setTool(prevTool === 'lasso' ? 'pen' : prevTool); }
       if (lassoEnd) { lassoEnd = false; if (selectedStrokes.length === 0 && prevTool !== 'lasso') setTool(prevTool); }
