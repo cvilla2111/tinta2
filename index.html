@@ -1139,11 +1139,14 @@
         shrinkAnimId = requestAnimationFrame(animateShrink);
       } else {
         selectionBounds = null;
-        /* Empty area lasso → open sticker modal only if lasso is >= 5px */
+        /* Empty area lasso → open sticker modal only if closed circle >= 10px */
+        const lFirst = lassoPoints[0], lLast = lassoPoints[lassoPoints.length - 1];
+        const lassoCloseDist = Math.hypot(lLast.x - lFirst.x, lLast.y - lFirst.y);
         let lMinX = Infinity, lMinY = Infinity, lMaxX = -Infinity, lMaxY = -Infinity;
         lassoPoints.forEach(p => { lMinX = Math.min(lMinX, p.x); lMinY = Math.min(lMinY, p.y); lMaxX = Math.max(lMaxX, p.x); lMaxY = Math.max(lMaxY, p.y); });
         const lassoW = lMaxX - lMinX, lassoH = lMaxY - lMinY;
-        if (Math.max(lassoW, lassoH) >= 10) {
+        const lassoSpan = Math.max(lassoW, lassoH);
+        if (lassoSpan >= 10 && lassoCloseDist < lassoSpan * 0.4) {
           let lcx = 0, lcy = 0;
           lassoPoints.forEach(p => { lcx += p.x; lcy += p.y; });
           lcx /= lassoPoints.length; lcy /= lassoPoints.length;
