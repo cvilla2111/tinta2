@@ -1780,35 +1780,27 @@
       }
     };
 
-    /* ── Scroll physics: inertia deceleration, no bounce ── */
-    const FRICTION = 0.955;
-    const VELOCITY_WINDOW = 100;
+    /* ── Scroll physics: simple pixel-based inertia, no bounce ── */
+    const FRICTION = 0.92;
     let penNearScreen = false;
     let touchScrollActive = false;
     let touchScrollLastY = 0;
     let touchScrollLastTime = 0;
     let animFrameId = null;
-    const velocitySamples = [];
+    /* Track last few deltas in pixels-per-frame directly */
+    let lastDeltas = [];
 
-    function trackVelocity(deltaY, now) {
-      const last = velocitySamples.length > 0 ? velocitySamples[velocitySamples.length - 1] : null;
-      const dt = last ? (now - last.t) : 16;
-      const vPxPerSec = dt > 0 ? (deltaY / dt) * 1000 : 0;
-      velocitySamples.push({ v: vPxPerSec, t: now });
-      while (velocitySamples.length > 0 && now - velocitySamples[0].t > VELOCITY_WINDOW) velocitySamples.shift();
+    function trackDelta(deltaY) {
+      lastDeltas.push(deltaY);
+      if (lastDeltas.length > 4) lastDeltas.shift();
     }
 
-    function getSmoothedVelocity() {
-      if (velocitySamples.length < 2) return 0;
-      const now = velocitySamples[velocitySamples.length - 1].t;
-      let wSum = 0, wTotal = 0;
-      for (const s of velocitySamples) {
-        const age = now - s.t;
-        const w = Math.exp(-age / 50);
-        wSum += s.v * w;
-        wTotal += w;
-      }
-      return wTotal > 0 ? wSum / wTotal : 0;
+    function getInertiaVelocity() {
+      if (lastDeltas.length === 0) return 0;
+      /* Use the average of the last few frame deltas */
+      let sum = 0;
+      for (const d of lastDeltas) sum += d;
+      return sum / lastDeltas.length;
     }
 
     function stopAnim() {
@@ -1817,21 +1809,23 @@
 
     function startDeceleration() {
       stopAnim();
-      let vel = getSmoothedVelocity();
-      if (Math.abs(vel) < 10) return;
-      let lastT = performance.now();
+      let vel = getInertiaVelocity();
+      /* Dead-zone: ignore tiny per-frame deltas (slow scrolls) */
+      if (Math.abs(vel) < 2) return;
+      /* Boost high-speed flicks: above 10px/frame, amplify progressively */
+      const absV = Math.abs(vel);
+      if (absV > 10) {
+        const boost = 1 + (absV - 10) * 0.06;
+        vel *= boost;
+      }
       const step = () => {
-        const now = performance.now();
-        const dt = Math.min(now - lastT, 32);
-        lastT = now;
-        vel *= Math.pow(FRICTION, dt / 16);
-        if (Math.abs(vel) < 5) {
+        vel *= FRICTION;
+        if (Math.abs(vel) < 0.5) {
           animFrameId = null;
           return;
         }
-        const delta = vel * (dt / 1000);
-        if (delta > 0) extendCanvas();
-        container.scrollTop += delta;
+        if (vel > 0) extendCanvas();
+        container.scrollTop += vel;
         extendCanvas();
         animFrameId = requestAnimationFrame(step);
       };
@@ -1863,7 +1857,7 @@
             touchScrollActive = true;
             touchScrollLastY = (pts[0].y + pts[1].y) / 2;
             touchScrollLastTime = performance.now();
-            velocitySamples.length = 0;
+            lastDeltas.length = 0;
           }
         }
       }
@@ -1882,10 +1876,10 @@
           const pts = Array.from(activePointers.values());
           const avgY = (pts[0].y + pts[1].y) / 2;
           const now = performance.now();
-          const deltaY = touchScrollLastY - avgY;
+          const deltaY = (touchScrollLastY - avgY) * 0.88;
           if (deltaY > 0) extendCanvas();
           container.scrollTop += deltaY;
-          trackVelocity(deltaY, now);
+          trackDelta(deltaY);
           touchScrollLastY = avgY;
           touchScrollLastTime = now;
           extendCanvas();
