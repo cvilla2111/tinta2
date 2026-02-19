@@ -424,7 +424,7 @@
     let stickerInsertPos = null;
 
     const STICKERS = [
-      { name: 'Treble Clef', svg: '<svg viewBox="0 0 64 64"><path d="M32 58c0 0-1.5-3-1.5-6c0-4 2-6.5 2-11c0-3-1.2-5-3.5-5c-3 0-5.5 3-5.5 7.5c0 6 4.5 10 9.5 10c7 0 12-5.5 12-13c0-9-6-14-6-23c0-5 2-10 2-10s-3 4-3 10c0 7 6 13 6 22c0 6-4 11-10 11c-3.5 0-6.5-3-6.5-8c0-3.5 1.8-5.5 3.5-5.5c1.5 0 2 1.2 2 3c0 4-1.5 6-1.5 9c0 1.5 0.5 2.5 0.5 2.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>' },
+      { name: 'Staff', svg: '<svg viewBox="0 0 128 40"><line x1="2" y1="4" x2="126" y2="4" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="12" x2="126" y2="12" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="20" x2="126" y2="20" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="28" x2="126" y2="28" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="36" x2="126" y2="36" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="4" x2="2" y2="36" stroke="currentColor" stroke-width="1.8"/><line x1="126" y1="4" x2="126" y2="36" stroke="currentColor" stroke-width="1.8"/></svg>' },
       { name: 'Eighth Note', svg: '<svg viewBox="0 0 64 64"><circle cx="22" cy="46" r="8" fill="currentColor"/><line x1="30" y1="46" x2="30" y2="12" stroke="currentColor" stroke-width="3"/><path d="M30 12 Q38 14 42 22 Q38 18 30 20" fill="currentColor"/></svg>' },
       { name: 'Double Note', svg: '<svg viewBox="0 0 64 64"><circle cx="16" cy="46" r="7" fill="currentColor"/><circle cx="42" cy="42" r="7" fill="currentColor"/><line x1="23" y1="46" x2="23" y2="14" stroke="currentColor" stroke-width="3"/><line x1="49" y1="42" x2="49" y2="10" stroke="currentColor" stroke-width="3"/><line x1="23" y1="14" x2="49" y2="10" stroke="currentColor" stroke-width="3.5"/></svg>' },
       { name: 'Headphones', svg: '<svg viewBox="0 0 64 64"><path d="M12 36 C12 22 20 12 32 12 C44 12 52 22 52 36" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="8" y="34" width="10" height="16" rx="4" fill="currentColor"/><rect x="46" y="34" width="10" height="16" rx="4" fill="currentColor"/></svg>' },
@@ -460,29 +460,39 @@
 
     stickerOverlay.onclick = e => { if (e.target === stickerOverlay) hideStickerModal(); };
 
+    const getStickerAspect = (idx) => {
+      const m = STICKERS[idx].svg.match(/viewBox="[\d.\-]+\s+[\d.\-]+\s+([\d.]+)\s+([\d.]+)"/);
+      if (m) return { vw: parseFloat(m[1]), vh: parseFloat(m[2]) };
+      return { vw: 64, vh: 64 };
+    };
+
     const placeStickerOnCanvas = (idx) => {
       if (!stickerInsertPos) return;
       const sticker = STICKERS[idx];
-      const size = 60 * (pdfDoc ? getPdfScale() : dpr);
+      const baseSize = 120 * (pdfDoc ? getPdfScale() : dpr);
+      const { vw, vh } = getStickerAspect(idx);
+      const aspect = vw / vh;
+      const sw = aspect >= 1 ? baseSize * aspect : baseSize;
+      const sh = aspect >= 1 ? baseSize : baseSize / aspect;
       const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       g.classList.add('sticker-element');
       g.innerHTML = sticker.svg;
       const inner = g.querySelector('svg');
-      inner.setAttribute('x', stickerInsertPos.x - size / 2);
-      inner.setAttribute('y', stickerInsertPos.y - size / 2);
-      inner.setAttribute('width', size);
-      inner.setAttribute('height', size);
+      const cx = stickerInsertPos.x, cy = stickerInsertPos.y;
+      inner.setAttribute('x', cx - sw / 2);
+      inner.setAttribute('y', cy - sh / 2);
+      inner.setAttribute('width', sw);
+      inner.setAttribute('height', sh);
       inner.style.color = color;
       inner.setAttribute('overflow', 'visible');
       group.appendChild(g);
-      /* Store as a stroke-like object so undo/select/save works */
-      const cx = stickerInsertPos.x, cy = stickerInsertPos.y;
-      const half = size / 2;
+      /* Fake points: 4 corners + center, matching actual dimensions */
+      const hw = sw / 2, hh = sh / 2;
       const fakePoints = [
-        { x: cx - half, y: cy - half }, { x: cx + half, y: cy - half },
-        { x: cx + half, y: cy + half }, { x: cx - half, y: cy + half }, { x: cx, y: cy }
+        { x: cx - hw, y: cy - hh }, { x: cx + hw, y: cy - hh },
+        { x: cx + hw, y: cy + hh }, { x: cx - hw, y: cy + hh }, { x: cx, y: cy }
       ];
-      const stickerStroke = { element: g, points: fakePoints, color, width: 0, isSticker: true, stickerIdx: idx, stickerSize: size, locked: true };
+      const stickerStroke = { element: g, points: fakePoints, color, width: 0, isSticker: true, stickerIdx: idx, stickerW: sw, stickerH: sh, locked: true };
       addStroke(stickerStroke);
       savePageAnnotations();
       hideStickerModal();
@@ -490,10 +500,10 @@
       setTool('lasso', true);
       const pad = 2;
       lassoPoints = [
-        { x: cx - half - pad, y: cy - half - pad },
-        { x: cx + half + pad, y: cy - half - pad },
-        { x: cx + half + pad, y: cy + half + pad },
-        { x: cx - half - pad, y: cy + half + pad }
+        { x: cx - hw - pad, y: cy - hh - pad },
+        { x: cx + hw + pad, y: cy - hh - pad },
+        { x: cx + hw + pad, y: cy + hh + pad },
+        { x: cx - hw - pad, y: cy + hh + pad }
       ];
       selectStrokesInLasso();
       lassoPoints = [];
@@ -1192,11 +1202,12 @@
           el.classList.add('sticker-element');
           el.innerHTML = STICKERS[s.stickerIdx].svg;
           const inner = el.querySelector('svg');
-          const cx = newPoints[4].x, cy = newPoints[4].y, half = s.stickerSize / 2;
-          inner.setAttribute('x', cx - half); inner.setAttribute('y', cy - half);
-          inner.setAttribute('width', s.stickerSize); inner.setAttribute('height', s.stickerSize);
+          const cx = newPoints[4].x, cy = newPoints[4].y;
+          const dupW = s.stickerW || s.stickerSize || 60, dupH = s.stickerH || s.stickerSize || 60;
+          inner.setAttribute('x', cx - dupW / 2); inner.setAttribute('y', cy - dupH / 2);
+          inner.setAttribute('width', dupW); inner.setAttribute('height', dupH);
           inner.style.color = s.color; inner.setAttribute('overflow', 'visible');
-          newStroke = { element: el, points: newPoints, color: s.color, width: 0, isSticker: true, stickerIdx: s.stickerIdx, stickerSize: s.stickerSize };
+          newStroke = { element: el, points: newPoints, color: s.color, width: 0, isSticker: true, stickerIdx: s.stickerIdx, stickerW: dupW, stickerH: dupH };
         } else {
           el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           el.classList.add('stroke-path');
@@ -1275,13 +1286,14 @@
         const inner = s.element.querySelector('svg');
         if (!inner) return;
         const cx = s.points[4].x, cy = s.points[4].y;
-        /* Size = distance between adjacent corners (stays constant during rotation) */
-        const sz = Math.max(Math.hypot(s.points[1].x - s.points[0].x, s.points[1].y - s.points[0].y), 1);
+        /* Width = top edge distance, Height = left edge distance */
+        const sw = Math.max(Math.hypot(s.points[1].x - s.points[0].x, s.points[1].y - s.points[0].y), 1);
+        const sh = Math.max(Math.hypot(s.points[3].x - s.points[0].x, s.points[3].y - s.points[0].y), 1);
         /* Rotation angle from top edge direction */
         const angle = Math.atan2(s.points[1].y - s.points[0].y, s.points[1].x - s.points[0].x) * (180 / Math.PI);
-        inner.setAttribute('x', cx - sz / 2); inner.setAttribute('y', cy - sz / 2);
-        inner.setAttribute('width', sz); inner.setAttribute('height', sz);
-        s.stickerSize = sz;
+        inner.setAttribute('x', cx - sw / 2); inner.setAttribute('y', cy - sh / 2);
+        inner.setAttribute('width', sw); inner.setAttribute('height', sh);
+        s.stickerW = sw; s.stickerH = sh;
         /* Apply rotation transform around center */
         if (Math.abs(angle) > 0.01) {
           s.element.setAttribute('transform', `rotate(${angle}, ${cx}, ${cy})`);
@@ -1422,9 +1434,10 @@
             g.classList.add('sticker-element');
             g.innerHTML = STICKERS[s.stickerIdx].svg;
             const inner = g.querySelector('svg');
-            const cx = s.points[4].x, cy = s.points[4].y, half = s.stickerSize / 2;
-            inner.setAttribute('x', cx - half); inner.setAttribute('y', cy - half);
-            inner.setAttribute('width', s.stickerSize); inner.setAttribute('height', s.stickerSize);
+            const cx = s.points[4].x, cy = s.points[4].y;
+            const rW = s.stickerW || s.stickerSize || 60, rH = s.stickerH || s.stickerSize || 60;
+            inner.setAttribute('x', cx - rW / 2); inner.setAttribute('y', cy - rH / 2);
+            inner.setAttribute('width', rW); inner.setAttribute('height', rH);
             inner.style.color = s.color; inner.setAttribute('overflow', 'visible');
             if (appendToGroup) group.appendChild(g);
             return { ...s, element: g };
