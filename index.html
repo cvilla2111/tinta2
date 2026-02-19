@@ -424,10 +424,10 @@
     let stickerInsertPos = null;
 
     const STICKERS = [
-      { name: 'Staff', svg: '<svg viewBox="0 0 128 40"><line x1="2" y1="4" x2="126" y2="4" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="12" x2="126" y2="12" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="20" x2="126" y2="20" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="28" x2="126" y2="28" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="36" x2="126" y2="36" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="4" x2="2" y2="36" stroke="currentColor" stroke-width="1.8"/><line x1="126" y1="4" x2="126" y2="36" stroke="currentColor" stroke-width="1.8"/></svg>' },
+      { name: 'Staff', svg: '<svg viewBox="0 0 128 40"><line x1="2" y1="4" x2="126" y2="4" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="12" x2="126" y2="12" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="20" x2="126" y2="20" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="28" x2="126" y2="28" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="36" x2="126" y2="36" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="4" x2="2" y2="36" stroke="currentColor" stroke-width="1.2"/><line x1="126" y1="4" x2="126" y2="36" stroke="currentColor" stroke-width="1.2"/></svg>' },
       { name: 'Eighth Note', svg: '<svg viewBox="0 0 64 64"><circle cx="22" cy="46" r="8" fill="currentColor"/><line x1="30" y1="46" x2="30" y2="12" stroke="currentColor" stroke-width="3"/><path d="M30 12 Q38 14 42 22 Q38 18 30 20" fill="currentColor"/></svg>' },
-      { name: 'Double Note', svg: '<svg viewBox="0 0 64 64"><circle cx="16" cy="46" r="7" fill="currentColor"/><circle cx="42" cy="42" r="7" fill="currentColor"/><line x1="23" y1="46" x2="23" y2="14" stroke="currentColor" stroke-width="3"/><line x1="49" y1="42" x2="49" y2="10" stroke="currentColor" stroke-width="3"/><line x1="23" y1="14" x2="49" y2="10" stroke="currentColor" stroke-width="3.5"/></svg>' },
-      { name: 'Headphones', svg: '<svg viewBox="0 0 64 64"><path d="M12 36 C12 22 20 12 32 12 C44 12 52 22 52 36" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="8" y="34" width="10" height="16" rx="4" fill="currentColor"/><rect x="46" y="34" width="10" height="16" rx="4" fill="currentColor"/></svg>' },
+      { name: 'Half Note', svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
+      { name: 'Quarter Note', svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="currentColor"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
       { name: 'Guitar', svg: '<svg viewBox="0 0 64 64"><ellipse cx="26" cy="44" rx="12" ry="14" fill="none" stroke="currentColor" stroke-width="2.5"/><ellipse cx="26" cy="44" rx="4" ry="5" fill="currentColor" opacity="0.3"/><line x1="37" y1="36" x2="54" y2="8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="50" y1="6" x2="58" y2="10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="52" y1="4" x2="56" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' },
       { name: 'Microphone', svg: '<svg viewBox="0 0 64 64"><rect x="24" y="8" width="16" height="28" rx="8" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M16 28 C16 42 23 48 32 48 C41 48 48 42 48 28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="48" x2="32" y2="58" stroke="currentColor" stroke-width="2.5"/><line x1="24" y1="58" x2="40" y2="58" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>' },
       { name: 'Piano Keys', svg: '<svg viewBox="0 0 64 64"><rect x="8" y="14" width="48" height="36" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="16" y1="14" x2="16" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="24" y1="14" x2="24" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="32" y1="14" x2="32" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="40" y1="14" x2="40" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="48" y1="14" x2="48" y2="50" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="21" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="37" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="45" y="14" width="6" height="22" rx="1" fill="currentColor"/></svg>' },
@@ -466,10 +466,41 @@
       return { vw: 64, vh: 64 };
     };
 
+    /* Visual content corners for tighter selection bounds (handles rotation via bilinear interp) */
+    const getStickerVisualCorners = (s) => {
+      if (!s.isSticker || !STICKERS[s.stickerIdx]) return null;
+      let cb = STICKERS[s.stickerIdx]._cb;
+      if (!cb) {
+        const inner = s.element?.querySelector('svg');
+        if (inner) {
+          try {
+            const bbox = inner.getBBox();
+            if (bbox.width > 0 && bbox.height > 0) {
+              cb = { x: bbox.x, y: bbox.y, w: bbox.width, h: bbox.height };
+              STICKERS[s.stickerIdx]._cb = cb;
+            }
+          } catch (e) { /* getBBox unavailable */ }
+        }
+        if (!cb) return null;
+      }
+      const { vw, vh } = getStickerAspect(s.stickerIdx);
+      const u0 = cb.x / vw, u1 = (cb.x + cb.w) / vw;
+      const v0 = cb.y / vh, v1 = (cb.y + cb.h) / vh;
+      const tl = s.points[0], tr = s.points[1], br = s.points[2], bl = s.points[3];
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const q = (u, v) => ({
+        x: lerp(lerp(tl.x, tr.x, u), lerp(bl.x, br.x, u), v),
+        y: lerp(lerp(tl.y, tr.y, u), lerp(bl.y, br.y, u), v)
+      });
+      return [q(u0, v0), q(u1, v0), q(u1, v1), q(u0, v1)];
+    };
+    const getBoundsPoints = (s) => getStickerVisualCorners(s) || s.points;
+
     const placeStickerOnCanvas = (idx) => {
       if (!stickerInsertPos) return;
       const sticker = STICKERS[idx];
-      const baseSize = 120 * (pdfDoc ? getPdfScale() : dpr);
+      const scale = sticker.stickerScale || 1;
+      const baseSize = 120 * (pdfDoc ? getPdfScale() : dpr) * scale;
       const { vw, vh } = getStickerAspect(idx);
       const aspect = vw / vh;
       const sw = aspect >= 1 ? baseSize * aspect : baseSize;
@@ -492,7 +523,7 @@
         { x: cx - hw, y: cy - hh }, { x: cx + hw, y: cy - hh },
         { x: cx + hw, y: cy + hh }, { x: cx - hw, y: cy + hh }, { x: cx, y: cy }
       ];
-      const stickerStroke = { element: g, points: fakePoints, color, width: 0, isSticker: true, stickerIdx: idx, stickerW: sw, stickerH: sh, locked: true };
+      const stickerStroke = { element: g, points: fakePoints, color, width: 0, isSticker: true, stickerIdx: idx, stickerW: sw, stickerH: sh, locked: true, scaleWidthOnly: !!sticker.scaleWidthOnly };
       addStroke(stickerStroke);
       savePageAnnotations();
       hideStickerModal();
@@ -870,6 +901,8 @@
       selToolbarGroup.appendChild(trashIcon);
     };
 
+    const isWidthOnlySelection = () => selectedStrokes.length > 0 && selectedStrokes.every(s => s.scaleWidthOnly);
+
     const createSelectionHandles = (animateToolbar = false) => {
       selectionHandles.forEach(h => h.remove());
       selectionHandles = [];
@@ -882,23 +915,42 @@
       if (!selectionBounds) return;
 
       const handleSize = getEffectiveHandleSize(30), rotationOffset = getEffectiveHandleSize(50);
-      const corners = [
-        { x: selectionBounds.x, y: selectionBounds.y },
-        { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
-        { x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
-        { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
-      ];
+      const widthOnly = isWidthOnlySelection();
 
-      corners.forEach(corner => {
-        const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        handle.classList.add('selection-handle');
-        handle.setAttribute('x', corner.x - handleSize / 2);
-        handle.setAttribute('y', corner.y - handleSize / 2);
-        handle.setAttribute('width', handleSize);
-        handle.setAttribute('height', handleSize);
-        group.appendChild(handle);
-        selectionHandles.push(handle);
-      });
+      if (widthOnly) {
+        const midY = selectionBounds.y + selectionBounds.height / 2;
+        const sides = [
+          { x: selectionBounds.x, y: midY },
+          { x: selectionBounds.x + selectionBounds.width, y: midY }
+        ];
+        sides.forEach(pos => {
+          const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          handle.classList.add('selection-handle');
+          handle.setAttribute('x', pos.x - handleSize / 2);
+          handle.setAttribute('y', pos.y - handleSize / 2);
+          handle.setAttribute('width', handleSize);
+          handle.setAttribute('height', handleSize);
+          group.appendChild(handle);
+          selectionHandles.push(handle);
+        });
+      } else {
+        const corners = [
+          { x: selectionBounds.x, y: selectionBounds.y },
+          { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
+          { x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
+          { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
+        ];
+        corners.forEach(corner => {
+          const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          handle.classList.add('selection-handle');
+          handle.setAttribute('x', corner.x - handleSize / 2);
+          handle.setAttribute('y', corner.y - handleSize / 2);
+          handle.setAttribute('width', handleSize);
+          handle.setAttribute('height', handleSize);
+          group.appendChild(handle);
+          selectionHandles.push(handle);
+        });
+      }
 
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const bottomY = selectionBounds.y + selectionBounds.height;
@@ -937,19 +989,34 @@
       selectionBoxes[0].setAttribute('height', selectionBounds.height);
 
       const handleSize = getEffectiveHandleSize(30), rotationOffset = getEffectiveHandleSize(50);
-      const corners = [
-        { x: selectionBounds.x, y: selectionBounds.y },
-        { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
-        { x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
-        { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
-      ];
+      const widthOnly = isWidthOnlySelection();
 
-      selectionHandles.forEach((handle, i) => {
-        handle.setAttribute('x', corners[i].x - handleSize / 2);
-        handle.setAttribute('y', corners[i].y - handleSize / 2);
-        handle.setAttribute('width', handleSize);
-        handle.setAttribute('height', handleSize);
-      });
+      if (widthOnly && selectionHandles.length === 2) {
+        const midY = selectionBounds.y + selectionBounds.height / 2;
+        const sides = [
+          { x: selectionBounds.x, y: midY },
+          { x: selectionBounds.x + selectionBounds.width, y: midY }
+        ];
+        selectionHandles.forEach((handle, i) => {
+          handle.setAttribute('x', sides[i].x - handleSize / 2);
+          handle.setAttribute('y', sides[i].y - handleSize / 2);
+          handle.setAttribute('width', handleSize);
+          handle.setAttribute('height', handleSize);
+        });
+      } else {
+        const corners = [
+          { x: selectionBounds.x, y: selectionBounds.y },
+          { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
+          { x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
+          { x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
+        ];
+        selectionHandles.forEach((handle, i) => {
+          handle.setAttribute('x', corners[i].x - handleSize / 2);
+          handle.setAttribute('y', corners[i].y - handleSize / 2);
+          handle.setAttribute('width', handleSize);
+          handle.setAttribute('height', handleSize);
+        });
+      }
 
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const topY = selectionBounds.y, bottomY = selectionBounds.y + selectionBounds.height;
@@ -1064,7 +1131,7 @@
 
         // Stroke bounds + padding (target)
         let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
-        selectedStrokes.forEach(s => s.points.forEach(p => { sMinX = Math.min(sMinX, p.x); sMinY = Math.min(sMinY, p.y); sMaxX = Math.max(sMaxX, p.x); sMaxY = Math.max(sMaxY, p.y); }));
+        selectedStrokes.forEach(s => getBoundsPoints(s).forEach(p => { sMinX = Math.min(sMinX, p.x); sMinY = Math.min(sMinY, p.y); sMaxX = Math.max(sMaxX, p.x); sMaxY = Math.max(sMaxY, p.y); }));
         const selPad = getEffectiveHandleSize(10);
         sMinX -= selPad; sMinY -= selPad; sMaxX += selPad; sMaxY += selPad;
 
@@ -1083,15 +1150,19 @@
         selectionBounds = { x: lMinX, y: lMinY, width: lMaxX - lMinX, height: lMaxY - lMinY };
 
         const handleSize = getEffectiveHandleSize(30), rotationOffset = getEffectiveHandleSize(50);
-        const initCorners = [
+        const widthOnlySel = isWidthOnlySelection();
+        const initHandlePositions = widthOnlySel ? [
+          { x: lMinX, y: (lMinY + lMaxY) / 2 },
+          { x: lMaxX, y: (lMinY + lMaxY) / 2 }
+        ] : [
           { x: lMinX, y: lMinY }, { x: lMaxX, y: lMinY },
           { x: lMinX, y: lMaxY }, { x: lMaxX, y: lMaxY }
         ];
-        initCorners.forEach(corner => {
+        initHandlePositions.forEach(pos => {
           const h = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
           h.classList.add('selection-handle');
-          h.setAttribute('x', corner.x - handleSize / 2);
-          h.setAttribute('y', corner.y - handleSize / 2);
+          h.setAttribute('x', pos.x - handleSize / 2);
+          h.setAttribute('y', pos.y - handleSize / 2);
           h.setAttribute('width', handleSize);
           h.setAttribute('height', handleSize);
           group.appendChild(h);
@@ -1207,7 +1278,7 @@
           inner.setAttribute('x', cx - dupW / 2); inner.setAttribute('y', cy - dupH / 2);
           inner.setAttribute('width', dupW); inner.setAttribute('height', dupH);
           inner.style.color = s.color; inner.setAttribute('overflow', 'visible');
-          newStroke = { element: el, points: newPoints, color: s.color, width: 0, isSticker: true, stickerIdx: s.stickerIdx, stickerW: dupW, stickerH: dupH };
+          newStroke = { element: el, points: newPoints, color: s.color, width: 0, isSticker: true, stickerIdx: s.stickerIdx, stickerW: dupW, stickerH: dupH, scaleWidthOnly: !!s.scaleWidthOnly };
         } else {
           el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           el.classList.add('stroke-path');
@@ -1230,7 +1301,6 @@
       removeTrashUI();
       removeColorUI();
       removeSelToolbar();
-
       selectedStrokes = newStrokes;
       currentRotation = previousRotation = 0;
 
@@ -1269,14 +1339,25 @@
       if (!selectionBounds || selectedStrokes.length === 0) return null;
       const p = transformPointForHitTest(x, y);
       const handleHitSize = getEffectiveHandleSize(20);
-      const corners = [
-        { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
-        { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
-        { id: 'bl', x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
-        { id: 'br', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
-      ];
-      for (const corner of corners) {
-        if (Math.abs(p.x - corner.x) <= handleHitSize && Math.abs(p.y - corner.y) <= handleHitSize) return corner.id;
+      if (isWidthOnlySelection()) {
+        const midY = selectionBounds.y + selectionBounds.height / 2;
+        const sides = [
+          { id: 'ml', x: selectionBounds.x, y: midY },
+          { id: 'mr', x: selectionBounds.x + selectionBounds.width, y: midY }
+        ];
+        for (const s of sides) {
+          if (Math.abs(p.x - s.x) <= handleHitSize && Math.abs(p.y - s.y) <= handleHitSize) return s.id;
+        }
+      } else {
+        const corners = [
+          { id: 'tl', x: selectionBounds.x, y: selectionBounds.y },
+          { id: 'tr', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y },
+          { id: 'bl', x: selectionBounds.x, y: selectionBounds.y + selectionBounds.height },
+          { id: 'br', x: selectionBounds.x + selectionBounds.width, y: selectionBounds.y + selectionBounds.height }
+        ];
+        for (const corner of corners) {
+          if (Math.abs(p.x - corner.x) <= handleHitSize && Math.abs(p.y - corner.y) <= handleHitSize) return corner.id;
+        }
       }
       return null;
     };
@@ -1322,26 +1403,39 @@
       const cos = Math.cos(currentRotation), sin = Math.sin(currentRotation);
 
       let handleLocalX, handleLocalY;
-      if (activeHandle === 'tl') { handleLocalX = originalBounds.x; handleLocalY = originalBounds.y; }
+      const midY = originalBounds.y + originalBounds.height / 2;
+      if (activeHandle === 'ml') { handleLocalX = originalBounds.x; handleLocalY = midY; }
+      else if (activeHandle === 'mr') { handleLocalX = originalBounds.x + originalBounds.width; handleLocalY = midY; }
+      else if (activeHandle === 'tl') { handleLocalX = originalBounds.x; handleLocalY = originalBounds.y; }
       else if (activeHandle === 'tr') { handleLocalX = originalBounds.x + originalBounds.width; handleLocalY = originalBounds.y; }
       else if (activeHandle === 'bl') { handleLocalX = originalBounds.x; handleLocalY = originalBounds.y + originalBounds.height; }
       else { handleLocalX = originalBounds.x + originalBounds.width; handleLocalY = originalBounds.y + originalBounds.height; }
 
       const dxH = handleLocalX - origCx, dyH = handleLocalY - origCy;
       const handleWorldX = origCx + dxH * cos - dyH * sin, handleWorldY = origCy + dxH * sin + dyH * cos;
-      const origDist = Math.hypot(handleWorldX - scaleAnchorWorldX, handleWorldY - scaleAnchorWorldY);
-      const newDist = Math.hypot(newX - scaleAnchorWorldX, newY - scaleAnchorWorldY);
+      const isSideHandle = activeHandle === 'ml' || activeHandle === 'mr';
+      const origDist = isSideHandle ? Math.abs(handleWorldX - scaleAnchorWorldX) : Math.hypot(handleWorldX - scaleAnchorWorldX, handleWorldY - scaleAnchorWorldY);
+      const newDist = isSideHandle ? Math.abs(newX - scaleAnchorWorldX) : Math.hypot(newX - scaleAnchorWorldX, newY - scaleAnchorWorldY);
       const minScale = 20 / Math.max(originalBounds.width, originalBounds.height);
       const scale = Math.max(minScale, origDist > 0 ? newDist / origDist : 1);
 
+      const allWidthOnly = selectedStrokes.every(s => s.scaleWidthOnly);
+
       selectedStrokes.forEach((s, i) => {
         const origPoints = originalStrokePoints[i];
-        s.points = origPoints.map(pt => ({ ...pt, x: scaleAnchorWorldX + (pt.x - scaleAnchorWorldX) * scale, y: scaleAnchorWorldY + (pt.y - scaleAnchorWorldY) * scale }));
+        if (s.scaleWidthOnly) {
+          /* Only scale X, keep Y unchanged */
+          s.points = origPoints.map(pt => ({ ...pt, x: scaleAnchorWorldX + (pt.x - scaleAnchorWorldX) * scale, y: pt.y }));
+        } else {
+          s.points = origPoints.map(pt => ({ ...pt, x: scaleAnchorWorldX + (pt.x - scaleAnchorWorldX) * scale, y: scaleAnchorWorldY + (pt.y - scaleAnchorWorldY) * scale }));
+        }
         updateStrokeElement(s);
       });
 
-      const scaledWidth = originalBounds.width * scale, scaledHeight = originalBounds.height * scale;
-      const newCx = scaleAnchorWorldX + (origCx - scaleAnchorWorldX) * scale, newCy = scaleAnchorWorldY + (origCy - scaleAnchorWorldY) * scale;
+      const scaledWidth = originalBounds.width * scale;
+      const scaledHeight = allWidthOnly ? originalBounds.height : originalBounds.height * scale;
+      const newCx = scaleAnchorWorldX + (origCx - scaleAnchorWorldX) * scale;
+      const newCy = allWidthOnly ? origCy : scaleAnchorWorldY + (origCy - scaleAnchorWorldY) * scale;
       selectionBounds.x = newCx - scaledWidth / 2;
       selectionBounds.y = newCy - scaledHeight / 2;
       selectionBounds.width = scaledWidth;
@@ -1621,7 +1715,10 @@
           originalStrokePoints = selectedStrokes.map(s => s.points.map(p => ({ ...p })));
           const cx = selectionBounds.x + selectionBounds.width / 2, cy = selectionBounds.y + selectionBounds.height / 2;
           let anchorLocalX, anchorLocalY;
-          if (handle === 'tl') { anchorLocalX = selectionBounds.x + selectionBounds.width; anchorLocalY = selectionBounds.y + selectionBounds.height; }
+          const midY = selectionBounds.y + selectionBounds.height / 2;
+          if (handle === 'ml') { anchorLocalX = selectionBounds.x + selectionBounds.width; anchorLocalY = midY; }
+          else if (handle === 'mr') { anchorLocalX = selectionBounds.x; anchorLocalY = midY; }
+          else if (handle === 'tl') { anchorLocalX = selectionBounds.x + selectionBounds.width; anchorLocalY = selectionBounds.y + selectionBounds.height; }
           else if (handle === 'tr') { anchorLocalX = selectionBounds.x; anchorLocalY = selectionBounds.y + selectionBounds.height; }
           else if (handle === 'bl') { anchorLocalX = selectionBounds.x + selectionBounds.width; anchorLocalY = selectionBounds.y; }
           else { anchorLocalX = selectionBounds.x; anchorLocalY = selectionBounds.y; }
@@ -1727,11 +1824,17 @@
             const s = strokes[i];
             let hit = false;
             if (s.isSticker) {
-              /* For stickers, check if tap is inside the bounding box + margin */
-              const margin = hitR;
-              let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
-              s.points.forEach(pt => { bMinX = Math.min(bMinX, pt.x); bMinY = Math.min(bMinY, pt.y); bMaxX = Math.max(bMaxX, pt.x); bMaxY = Math.max(bMaxY, pt.y); });
-              hit = tapPt.x >= bMinX - margin && tapPt.x <= bMaxX + margin && tapPt.y >= bMinY - margin && tapPt.y <= bMaxY + margin;
+              /* Area test: tap inside the visual content quad (tighter than viewBox) */
+              const vc = getStickerVisualCorners(s) || s.points.slice(0, 4);
+              /* Expand polygon outward by hitR for comfortable tap tolerance */
+              let ecx = 0, ecy = 0;
+              vc.forEach(p => { ecx += p.x; ecy += p.y; });
+              ecx /= vc.length; ecy /= vc.length;
+              const expanded = vc.map(p => {
+                const dx = p.x - ecx, dy = p.y - ecy, d = Math.hypot(dx, dy);
+                return d > 0 ? { x: p.x + (dx / d) * hitR, y: p.y + (dy / d) * hitR } : p;
+              });
+              hit = pointInPolygon(tapPt.x, tapPt.y, expanded);
             } else {
               for (const p of s.points) {
                 if (Math.hypot(tapPt.x - p.x, tapPt.y - p.y) < hitR + (s.width || 0)) { hit = true; break; }
@@ -1742,7 +1845,7 @@
               selectedStrokes = [s];
               const selPad = getEffectiveHandleSize(10);
               let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
-              s.points.forEach(pt => { sMinX = Math.min(sMinX, pt.x); sMinY = Math.min(sMinY, pt.y); sMaxX = Math.max(sMaxX, pt.x); sMaxY = Math.max(sMaxY, pt.y); });
+              getBoundsPoints(s).forEach(pt => { sMinX = Math.min(sMinX, pt.x); sMinY = Math.min(sMinY, pt.y); sMaxX = Math.max(sMaxX, pt.x); sMaxY = Math.max(sMaxY, pt.y); });
               sMinX -= selPad; sMinY -= selPad; sMaxX += selPad; sMaxY += selPad;
               selectionBounds = { x: sMinX, y: sMinY, width: sMaxX - sMinX, height: sMaxY - sMinY };
               const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
