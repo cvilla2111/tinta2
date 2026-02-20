@@ -690,28 +690,59 @@
 
     const showColorModal = () => {
       hideColorModal();
-      if (!selectionBounds || currentRotation !== 0) return;
+      if (!selectionBounds || currentRotation !== 0 || !cachedToolbarLayout) return;
 
-      const btnSize = getEffectiveHandleSize(72);
-      const rotationOffset = getEffectiveHandleSize(50);
-      const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const toolbarY = selectionBounds.y - rotationOffset - btnSize;
-
-      // Layout: 2 rows x 9 columns of color swatches
-      const cols = 9, rows = 2;
+      const L = cachedToolbarLayout;
+      const gap = getEffectiveHandleSize(8);
       const pad = getEffectiveHandleSize(14);
       const swatchGap = getEffectiveHandleSize(8);
       const swatchR = getEffectiveHandleSize(16);
       const swatchDiameter = swatchR * 2;
-      const modalW = pad * 2 + cols * swatchDiameter + (cols - 1) * swatchGap;
-      const modalH = pad * 2 + rows * swatchDiameter + (rows - 1) * swatchGap;
-      const modalX = centerX - modalW / 2;
-      const modalY = toolbarY - modalH - getEffectiveHandleSize(8);
       const modalR = getEffectiveHandleSize(12);
+
+      let cols, rows, modalW, modalH, modalX, modalY, originX, originY;
+
+      if (L.horiz) {
+        /* Horizontal toolbar: color modal as 2 rows x 9 cols */
+        cols = 9; rows = 2;
+        modalW = pad * 2 + cols * swatchDiameter + (cols - 1) * swatchGap;
+        modalH = pad * 2 + rows * swatchDiameter + (rows - 1) * swatchGap;
+        modalX = L.x + L.w / 2 - modalW / 2;
+        /* Place above toolbar by default; if toolbar is at bottom, place below it */
+        const tbMidY = L.y + L.h / 2;
+        const selMidY = selectionBounds.y + selectionBounds.height / 2;
+        if (tbMidY > selMidY) {
+          /* Toolbar is below selection */
+          modalY = L.y + L.h + gap;
+          originX = modalX + modalW / 2; originY = modalY;
+        } else {
+          /* Toolbar is above selection */
+          modalY = L.y - modalH - gap;
+          originX = modalX + modalW / 2; originY = modalY + modalH;
+        }
+      } else {
+        /* Vertical (portrait) toolbar: color modal as 9 rows x 2 cols */
+        cols = 2; rows = 9;
+        modalW = pad * 2 + cols * swatchDiameter + (cols - 1) * swatchGap;
+        modalH = pad * 2 + rows * swatchDiameter + (rows - 1) * swatchGap;
+        modalY = L.y + L.h / 2 - modalH / 2;
+        /* Place on same side as toolbar */
+        const tbMidX = L.x + L.w / 2;
+        const selMidX = selectionBounds.x + selectionBounds.width / 2;
+        if (tbMidX > selMidX) {
+          /* Toolbar is to the right */
+          modalX = L.x + L.w + gap;
+          originX = modalX; originY = modalY + modalH / 2;
+        } else {
+          /* Toolbar is to the left */
+          modalX = L.x - modalW - gap;
+          originX = modalX + modalW; originY = modalY + modalH / 2;
+        }
+      }
 
       colorModalGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       colorModalGroup.classList.add('color-modal-group', 'animate-in');
-      colorModalGroup.style.transformOrigin = `${centerX}px ${modalY + modalH}px`;
+      colorModalGroup.style.transformOrigin = `${originX}px ${originY}px`;
       group.appendChild(colorModalGroup);
 
       const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
