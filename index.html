@@ -1777,19 +1777,19 @@
       e.preventDefault();
       const d = getData(e);
 
-      /* Pen mode with active selection: interact with selection elements or dismiss */
+      /* Selection interactions work in both pen and lasso modes */
+      const selActive = (tool === 'lasso' || tool === 'pen') && selectedStrokes.length > 0;
+
+      /* Pen mode with active selection: dismiss if tapping outside selection elements */
       if (tool === 'pen' && selectedStrokes.length > 0) {
-        if (isInsideSelectionBox(d.x, d.y) || isOnToolbarArea(d.x, d.y) || getHandleAtPoint(d.x, d.y) || isOnRotationHandle(d.x, d.y)) {
-          /* Switch to lasso so the checks below handle drag/scale/toolbar */
-          tool = 'lasso';
-        } else {
+        if (!isInsideSelectionBox(d.x, d.y) && !isOnToolbarArea(d.x, d.y) && !getHandleAtPoint(d.x, d.y) && !isOnRotationHandle(d.x, d.y)) {
           clearSelection();
           drawing = false;
           return;
         }
       }
 
-      if (tool === 'lasso' && colorModalOpen) {
+      if (selActive && colorModalOpen) {
         const swatchColor = isOnColorSwatch(d.x, d.y);
         if (swatchColor) {
           recolorSelectedStrokes(swatchColor);
@@ -1804,9 +1804,9 @@
         hideColorModal();
       }
 
-      if (tool === 'lasso' && shrinkAnimId) { finishShrinkAnimation(); }
+      if (selActive && shrinkAnimId) { finishShrinkAnimation(); }
 
-      if (tool === 'lasso' && isOnRotationHandle(d.x, d.y)) {
+      if (selActive && isOnRotationHandle(d.x, d.y)) {
         isRotatingSelection = true;
         originalBounds = { ...selectionBounds };
         originalStrokePoints = selectedStrokes.map(s => s.points.map(p => ({ ...p })));
@@ -1820,7 +1820,7 @@
       }
 
       /* Toolbar: detect tap on buttons but defer action so drag can be distinguished */
-      if (tool === 'lasso' && isOnToolbarArea(d.x, d.y)) {
+      if (selActive && isOnToolbarArea(d.x, d.y)) {
         toolbarDragPending = true;
         toolbarDragStartX = d.x; toolbarDragStartY = d.y;
         toolbarDragBaseOfsX = toolbarDragOfsX; toolbarDragBaseOfsY = toolbarDragOfsY;
@@ -1833,7 +1833,7 @@
         return;
       }
 
-      if (tool === 'lasso') {
+      if (selActive) {
         const handle = getHandleAtPoint(d.x, d.y);
         if (handle) {
           isScalingSelection = true;
@@ -1860,7 +1860,7 @@
         }
       }
 
-      if (tool === 'lasso' && isInsideSelectionBox(d.x, d.y)) {
+      if (selActive && isInsideSelectionBox(d.x, d.y)) {
         isDraggingSelection = true;
         toolbarDragOfsX = toolbarDragOfsY = 0;
         dragStartX = d.x; dragStartY = d.y;
@@ -2017,7 +2017,7 @@
             }
           }
         }
-        if (!tapped) { clearSelection(); setTool('pen'); }
+        if (!tapped) clearSelection();
       }
       points = [];
       if (eraserEnd) { eraserEnd = false; resetBig(); if (prevTool !== 'eraser') setTool(prevTool === 'lasso' ? 'pen' : prevTool); }
@@ -2216,12 +2216,36 @@
       if (annotations && annotations.strokes.length > 0) {
         ctx.save();
         ctx.scale(thumbScale, thumbScale);
+        /* Draw regular strokes */
         annotations.strokes.forEach(s => {
+          if (s.isSticker) return;
           const path2d = new Path2D(buildPath(s.points, s.width));
           ctx.fillStyle = s.color;
           ctx.fill(path2d);
         });
         ctx.restore();
+        /* Draw stickers via temporary Image from SVG data */
+        const stickerPromises = [];
+        annotations.strokes.forEach(s => {
+          if (!s.isSticker || !STICKERS[s.stickerIdx]) return;
+          const cx = s.points[4].x, cy = s.points[4].y;
+          const w = s.stickerW || 60, h = s.stickerH || 60;
+          const svgStr = STICKERS[s.stickerIdx].svg.replace('currentColor', s.color || '#000');
+          const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          const p = new Promise(resolve => {
+            img.onload = () => {
+              ctx.drawImage(img, (cx - w / 2) * thumbScale, (cy - h / 2) * thumbScale, w * thumbScale, h * thumbScale);
+              URL.revokeObjectURL(url);
+              resolve();
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+          });
+          img.src = url;
+          stickerPromises.push(p);
+        });
+        await Promise.all(stickerPromises);
       }
     }
 
