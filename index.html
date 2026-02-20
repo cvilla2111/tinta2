@@ -442,7 +442,7 @@
     let stickerInsertPos = null;
 
     const STICKERS = [
-      { name: 'Staff', svg: '<svg viewBox="0 0 128 40"><line x1="2" y1="4" x2="126" y2="4" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="12" x2="126" y2="12" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="20" x2="126" y2="20" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="28" x2="126" y2="28" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="36" x2="126" y2="36" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="4" x2="2" y2="36" stroke="currentColor" stroke-width="1.2"/><line x1="126" y1="4" x2="126" y2="36" stroke="currentColor" stroke-width="1.2"/></svg>' },
+      { name: 'Staff', svg: '<svg viewBox="0 0 200 40"><line x1="2" y1="4" x2="198" y2="4" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="12" x2="198" y2="12" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="20" x2="198" y2="20" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="28" x2="198" y2="28" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="36" x2="198" y2="36" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="4" x2="2" y2="36" stroke="currentColor" stroke-width="1.2"/><line x1="198" y1="4" x2="198" y2="36" stroke="currentColor" stroke-width="1.2"/></svg>' },
       { name: 'Eighth Note', svg: '<svg viewBox="0 0 64 64"><circle cx="22" cy="46" r="8" fill="currentColor"/><line x1="30" y1="46" x2="30" y2="12" stroke="currentColor" stroke-width="3"/><path d="M30 12 Q38 14 42 22 Q38 18 30 20" fill="currentColor"/></svg>' },
       { name: 'Half Note', svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
       { name: 'Quarter Note', stickerScale: 0.9, svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="currentColor"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
@@ -1530,7 +1530,7 @@
 
     const gridAnimStep = () => {
       gridAnimId = null;
-      const ease = 0.55;
+      const ease = 0.7;
       const diffX = gridTargetX - gridAnimX, diffY = gridTargetY - gridAnimY;
       const moveX = diffX * ease, moveY = diffY * ease;
       /* Snap to target when close enough to avoid endless micro-frames */
