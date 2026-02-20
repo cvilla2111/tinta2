@@ -87,7 +87,7 @@
     .selection-handle { fill: var(--bg); stroke: var(--active); stroke-width: 1.5; cursor: nwse-resize; }
     .rotation-handle { fill: var(--bg); stroke: var(--active); stroke-width: 1.5; cursor: grab; }
     .rotation-line { stroke: var(--active); stroke-width: 1.5; }
-    .sel-toolbar-bg { fill: #1f2937; stroke: none; cursor: grab; }
+    .sel-toolbar-bg { fill: #1f2937; stroke: none; }
     .sel-toolbar-div { stroke: rgba(255,255,255,0.2); stroke-width: 1; }
     .duplicate-handle { fill: transparent; stroke: none; cursor: pointer; }
     .duplicate-handle:hover { fill: rgba(255,255,255,0.15); }
@@ -240,9 +240,7 @@
     let rotationCenterX = 0, rotationCenterY = 0, startAngle = 0, currentRotation = 0, previousRotation = 0;
     let scaleAnchorWorldX = 0, scaleAnchorWorldY = 0;
     let staffUnsnappedCenter = null, staffSnapRef = null, staffDragAccum = 0;
-    let toolbarDragOfsX = 0, toolbarDragOfsY = 0;
-    let isDraggingToolbar = false, toolbarDragPending = false, toolbarPendingAction = null;
-    let toolbarDragStartX = 0, toolbarDragStartY = 0, toolbarDragBaseOfsX = 0, toolbarDragBaseOfsY = 0;
+    let cachedToolbarLayout = null;
 
     let needsRender = false;
     let cachedSvgRect = null;
@@ -626,7 +624,7 @@
       selectionBounds = originalBounds = null;
       originalStrokePoints = [];
       currentRotation = previousRotation = 0;
-      toolbarDragOfsX = toolbarDragOfsY = 0;
+      cachedToolbarLayout = null;
     };
 
     const pointInPolygon = (x, y, polygon) => {
@@ -793,6 +791,50 @@
       colorIcon = null;
     };
 
+    /* Compute best toolbar placement: top/bottom (horizontal) or right/left (vertical) */
+    const computeToolbarLayout = () => {
+      if (!selectionBounds) return null;
+      const btnSize = getEffectiveHandleSize(72);
+      const rotOfs = getEffectiveHandleSize(50);
+      const cx = selectionBounds.x + selectionBounds.width / 2;
+      const cy = selectionBounds.y + selectionBounds.height / 2;
+      const topY = selectionBounds.y, bottomY = selectionBounds.y + selectionBounds.height;
+      const leftX = selectionBounds.x, rightX = selectionBounds.x + selectionBounds.width;
+      const hW = btnSize * 4, hH = btnSize;
+      const vW = btnSize, vH = btnSize * 4;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return { x: cx - hW / 2, y: topY - rotOfs - hH, w: hW, h: hH, horiz: true, btnSize };
+      const toScr = (sx, sy) => ({ x: ctm.a * sx + ctm.c * sy + ctm.e, y: ctm.b * sx + ctm.d * sy + ctm.f });
+      const fits = (sx, sy, sw, sh) => {
+        const tl = toScr(sx, sy), br = toScr(sx + sw, sy + sh);
+        return tl.x >= 0 && tl.y >= 0 && br.x <= window.innerWidth && br.y <= window.innerHeight;
+      };
+      /* Try top (default, horizontal) */
+      const tX = cx - hW / 2, tY = topY - rotOfs - hH;
+      if (fits(tX, tY, hW, hH)) return { x: tX, y: tY, w: hW, h: hH, horiz: true, btnSize };
+      /* Try bottom (horizontal) */
+      const bY = bottomY + rotOfs;
+      if (fits(tX, bY, hW, hH)) return { x: tX, y: bY, w: hW, h: hH, horiz: true, btnSize };
+      /* Try right (vertical) */
+      const rX = rightX + rotOfs, rY = cy - vH / 2;
+      if (fits(rX, rY, vW, vH)) return { x: rX, y: rY, w: vW, h: vH, horiz: false, btnSize };
+      /* Try left (vertical) */
+      const lX = leftX - rotOfs - vW, lY = cy - vH / 2;
+      if (fits(lX, lY, vW, vH)) return { x: lX, y: lY, w: vW, h: vH, horiz: false, btnSize };
+      /* Fallback: top */
+      return { x: tX, y: tY, w: hW, h: hH, horiz: true, btnSize };
+    };
+
+    /* Get button rect position for index i within a layout */
+    const tbBtnRect = (L, i) => {
+      if (L.horiz) return { x: L.x + L.btnSize * i, y: L.y, w: L.btnSize, h: L.h };
+      return { x: L.x, y: L.y + L.btnSize * i, w: L.w, h: L.btnSize };
+    };
+    const tbBtnCenter = (L, i) => {
+      const r = tbBtnRect(L, i);
+      return { cx: r.x + r.w / 2, cy: r.y + r.h / 2 };
+    };
+
     const buildToolbarElements = (animate) => {
       if (currentRotation !== 0 || !selectionBounds) return;
       removeDuplicateUI();
@@ -801,31 +843,23 @@
       removeColorUI();
       removeSelToolbar();
 
-      const rotationOffset = getEffectiveHandleSize(50);
-      const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const topY = selectionBounds.y;
-      const btnSize = getEffectiveHandleSize(72);
-      const toolbarW = btnSize * 4, toolbarH = btnSize;
-      const toolbarX = centerX - toolbarW / 2 + toolbarDragOfsX;
-      const toolbarY = topY - rotationOffset - toolbarH + toolbarDragOfsY;
+      const L = computeToolbarLayout();
+      if (!L) return;
+      cachedToolbarLayout = L;
+      const { btnSize } = L;
       const toolbarR = getEffectiveHandleSize(12);
-      const toolbarCX = toolbarX + toolbarW / 2;
-      const toolbarCY = toolbarY + toolbarH;
+      const toolbarCX = L.x + L.w / 2, toolbarCY = L.y + L.h / 2;
 
       selToolbarGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       selToolbarGroup.classList.add('sel-toolbar-group');
       selToolbarGroup.style.transformOrigin = `${toolbarCX}px ${toolbarCY}px`;
-      if (animate) {
-        selToolbarGroup.classList.add('animate-in');
-      }
+      if (animate) selToolbarGroup.classList.add('animate-in');
       group.appendChild(selToolbarGroup);
 
       selToolbar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       selToolbar.classList.add('sel-toolbar-bg');
-      selToolbar.setAttribute('x', toolbarX);
-      selToolbar.setAttribute('y', toolbarY);
-      selToolbar.setAttribute('width', toolbarW);
-      selToolbar.setAttribute('height', toolbarH);
+      selToolbar.setAttribute('x', L.x); selToolbar.setAttribute('y', L.y);
+      selToolbar.setAttribute('width', L.w); selToolbar.setAttribute('height', L.h);
       selToolbar.setAttribute('rx', toolbarR);
       selToolbarGroup.appendChild(selToolbar);
 
@@ -833,78 +867,46 @@
       for (let di = 1; di <= 3; di++) {
         const div = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         div.classList.add('sel-toolbar-div');
-        div.setAttribute('x1', toolbarX + btnSize * di);
-        div.setAttribute('y1', toolbarY + divPad);
-        div.setAttribute('x2', toolbarX + btnSize * di);
-        div.setAttribute('y2', toolbarY + toolbarH - divPad);
+        if (L.horiz) {
+          div.setAttribute('x1', L.x + btnSize * di); div.setAttribute('y1', L.y + divPad);
+          div.setAttribute('x2', L.x + btnSize * di); div.setAttribute('y2', L.y + L.h - divPad);
+        } else {
+          div.setAttribute('x1', L.x + divPad); div.setAttribute('y1', L.y + btnSize * di);
+          div.setAttribute('x2', L.x + L.w - divPad); div.setAttribute('y2', L.y + btnSize * di);
+        }
         selToolbarGroup.appendChild(div);
         if (di === 1) selToolbarDiv = div;
         else if (di === 2) selToolbarDiv2 = div;
         else selToolbarDiv3 = div;
       }
 
-      const btnCY = toolbarY + btnSize / 2;
+      const buildBtn = (i, cls, iconFn) => {
+        const r = tbBtnRect(L, i), c = tbBtnCenter(L, i);
+        const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        handle.classList.add(cls);
+        handle.setAttribute('x', r.x); handle.setAttribute('y', r.y);
+        handle.setAttribute('width', r.w); handle.setAttribute('height', r.h);
+        selToolbarGroup.appendChild(handle);
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        icon.classList.add(cls.replace('-handle', '-icon'));
+        icon.setAttribute('pointer-events', 'none');
+        icon.innerHTML = iconFn(c.cx, c.cy);
+        selToolbarGroup.appendChild(icon);
+        return { handle, icon };
+      };
 
-      // Button 0: Duplicate
-      const dupCX = toolbarX + btnSize / 2;
-      duplicateHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      duplicateHandle.classList.add('duplicate-handle');
-      duplicateHandle.setAttribute('x', toolbarX);
-      duplicateHandle.setAttribute('y', toolbarY);
-      duplicateHandle.setAttribute('width', btnSize);
-      duplicateHandle.setAttribute('height', toolbarH);
-      selToolbarGroup.appendChild(duplicateHandle);
-      duplicateIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      duplicateIcon.classList.add('duplicate-icon');
-      duplicateIcon.setAttribute('pointer-events', 'none');
-      duplicateIcon.innerHTML = buildDupIconSVG(dupCX, btnCY);
-      selToolbarGroup.appendChild(duplicateIcon);
+      const dup = buildBtn(0, 'duplicate-handle', buildDupIconSVG);
+      duplicateHandle = dup.handle; duplicateIcon = dup.icon;
 
-      // Button 1: Lock
-      const lockCX = toolbarX + btnSize + btnSize / 2;
-      lockHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      lockHandle.classList.add('lock-handle');
-      lockHandle.setAttribute('x', toolbarX + btnSize);
-      lockHandle.setAttribute('y', toolbarY);
-      lockHandle.setAttribute('width', btnSize);
-      lockHandle.setAttribute('height', toolbarH);
-      selToolbarGroup.appendChild(lockHandle);
       const anyLocked = selectedStrokes.some(s => s.locked);
-      lockIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      lockIcon.classList.add('lock-icon');
-      lockIcon.setAttribute('pointer-events', 'none');
-      lockIcon.innerHTML = buildLockIconSVG(lockCX, btnCY, anyLocked);
-      selToolbarGroup.appendChild(lockIcon);
+      const lck = buildBtn(1, 'lock-handle', (cx, cy) => buildLockIconSVG(cx, cy, anyLocked));
+      lockHandle = lck.handle; lockIcon = lck.icon;
 
-      // Button 2: Color
-      const colorCX = toolbarX + btnSize * 2 + btnSize / 2;
-      colorHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      colorHandle.classList.add('color-handle');
-      colorHandle.setAttribute('x', toolbarX + btnSize * 2);
-      colorHandle.setAttribute('y', toolbarY);
-      colorHandle.setAttribute('width', btnSize);
-      colorHandle.setAttribute('height', toolbarH);
-      selToolbarGroup.appendChild(colorHandle);
-      colorIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      colorIcon.classList.add('color-icon');
-      colorIcon.setAttribute('pointer-events', 'none');
-      colorIcon.innerHTML = buildColorIconSVG(colorCX, btnCY);
-      selToolbarGroup.appendChild(colorIcon);
+      const clr = buildBtn(2, 'color-handle', buildColorIconSVG);
+      colorHandle = clr.handle; colorIcon = clr.icon;
 
-      // Button 3: Trash
-      const trashCX = toolbarX + btnSize * 3 + btnSize / 2;
-      trashHandle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      trashHandle.classList.add('trash-handle');
-      trashHandle.setAttribute('x', toolbarX + btnSize * 3);
-      trashHandle.setAttribute('y', toolbarY);
-      trashHandle.setAttribute('width', btnSize);
-      trashHandle.setAttribute('height', toolbarH);
-      selToolbarGroup.appendChild(trashHandle);
-      trashIcon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      trashIcon.classList.add('trash-icon');
-      trashIcon.setAttribute('pointer-events', 'none');
-      trashIcon.innerHTML = buildTrashIconSVG(trashCX, btnCY);
-      selToolbarGroup.appendChild(trashIcon);
+      const trh = buildBtn(3, 'trash-handle', buildTrashIconSVG);
+      trashHandle = trh.handle; trashIcon = trh.icon;
     };
 
     const isWidthOnlySelection = () => selectedStrokes.length > 0 && selectedStrokes.every(s => s.scaleWidthOnly);
@@ -1037,60 +1039,41 @@
         rotationHandle.setAttribute('r', getEffectiveHandleSize(20));
       }
 
-      if (duplicateHandle && duplicateIcon) {
-        const btnSize = getEffectiveHandleSize(72);
-        const toolbarW = btnSize * 4, toolbarH = btnSize;
-        const toolbarX = centerX - toolbarW / 2 + toolbarDragOfsX;
-        const toolbarY = topY - rotationOffset - toolbarH + toolbarDragOfsY;
+      if (duplicateHandle && duplicateIcon && cachedToolbarLayout) {
+        const L = computeToolbarLayout();
+        if (!L) return;
+        cachedToolbarLayout = L;
         const divPad = getEffectiveHandleSize(12);
-        const btnCY = toolbarY + btnSize / 2;
 
         if (selToolbar) {
-          selToolbar.setAttribute('x', toolbarX);
-          selToolbar.setAttribute('y', toolbarY);
-          selToolbar.setAttribute('width', toolbarW);
-          selToolbar.setAttribute('height', toolbarH);
+          selToolbar.setAttribute('x', L.x); selToolbar.setAttribute('y', L.y);
+          selToolbar.setAttribute('width', L.w); selToolbar.setAttribute('height', L.h);
           selToolbar.setAttribute('rx', getEffectiveHandleSize(12));
         }
-        [selToolbarDiv, selToolbarDiv2, selToolbarDiv3].forEach((div, i) => {
-          if (div) {
-            div.setAttribute('x1', toolbarX + btnSize * (i + 1));
-            div.setAttribute('y1', toolbarY + divPad);
-            div.setAttribute('x2', toolbarX + btnSize * (i + 1));
-            div.setAttribute('y2', toolbarY + toolbarH - divPad);
+        [selToolbarDiv, selToolbarDiv2, selToolbarDiv3].forEach((div, di) => {
+          if (!div) return;
+          const idx = di + 1;
+          if (L.horiz) {
+            div.setAttribute('x1', L.x + L.btnSize * idx); div.setAttribute('y1', L.y + divPad);
+            div.setAttribute('x2', L.x + L.btnSize * idx); div.setAttribute('y2', L.y + L.h - divPad);
+          } else {
+            div.setAttribute('x1', L.x + divPad); div.setAttribute('y1', L.y + L.btnSize * idx);
+            div.setAttribute('x2', L.x + L.w - divPad); div.setAttribute('y2', L.y + L.btnSize * idx);
           }
         });
 
-        duplicateHandle.setAttribute('x', toolbarX);
-        duplicateHandle.setAttribute('y', toolbarY);
-        duplicateHandle.setAttribute('width', btnSize);
-        duplicateHandle.setAttribute('height', toolbarH);
-        duplicateIcon.innerHTML = buildDupIconSVG(toolbarX + btnSize / 2, btnCY);
-
-        if (lockHandle && lockIcon) {
-          lockHandle.setAttribute('x', toolbarX + btnSize);
-          lockHandle.setAttribute('y', toolbarY);
-          lockHandle.setAttribute('width', btnSize);
-          lockHandle.setAttribute('height', toolbarH);
-          const anyLocked = selectedStrokes.some(s => s.locked);
-          lockIcon.innerHTML = buildLockIconSVG(toolbarX + btnSize + btnSize / 2, btnCY, anyLocked);
-        }
-
-        if (colorHandle && colorIcon) {
-          colorHandle.setAttribute('x', toolbarX + btnSize * 2);
-          colorHandle.setAttribute('y', toolbarY);
-          colorHandle.setAttribute('width', btnSize);
-          colorHandle.setAttribute('height', toolbarH);
-          colorIcon.innerHTML = buildColorIconSVG(toolbarX + btnSize * 2 + btnSize / 2, btnCY);
-        }
-
-        if (trashHandle && trashIcon) {
-          trashHandle.setAttribute('x', toolbarX + btnSize * 3);
-          trashHandle.setAttribute('y', toolbarY);
-          trashHandle.setAttribute('width', btnSize);
-          trashHandle.setAttribute('height', toolbarH);
-          trashIcon.innerHTML = buildTrashIconSVG(toolbarX + btnSize * 3 + btnSize / 2, btnCY);
-        }
+        const updateBtn = (handle, icon, i, iconFn) => {
+          if (!handle || !icon) return;
+          const r = tbBtnRect(L, i), c = tbBtnCenter(L, i);
+          handle.setAttribute('x', r.x); handle.setAttribute('y', r.y);
+          handle.setAttribute('width', r.w); handle.setAttribute('height', r.h);
+          icon.innerHTML = iconFn(c.cx, c.cy);
+        };
+        updateBtn(duplicateHandle, duplicateIcon, 0, buildDupIconSVG);
+        const anyLocked = selectedStrokes.some(s => s.locked);
+        updateBtn(lockHandle, lockIcon, 1, (cx, cy) => buildLockIconSVG(cx, cy, anyLocked));
+        updateBtn(colorHandle, colorIcon, 2, buildColorIconSVG);
+        updateBtn(trashHandle, trashIcon, 3, buildTrashIconSVG);
       }
 
       if (preserveRotation && currentRotation !== 0) {
@@ -1146,7 +1129,7 @@
       selectionHandles = [];
       removeRotationUI(); removeDuplicateUI(); removeLockUI(); removeTrashUI(); removeColorUI(); removeSelToolbar();
       selectedStrokes = [];
-      toolbarDragOfsX = toolbarDragOfsY = 0;
+      cachedToolbarLayout = null;
       if (lassoPoints.length < 3) return;
 
       strokes.forEach(s => {
@@ -1547,24 +1530,17 @@
     };
 
     const isOnToolbarBtn = (x, y, btnIndex, handle) => {
-      if (!selectionBounds || selectedStrokes.length === 0 || !handle) return false;
+      if (!cachedToolbarLayout || !handle) return false;
       const p = transformPointForHitTest(x, y);
-      const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const btnSize = getEffectiveHandleSize(72);
-      const toolbarX = centerX - btnSize * 2 + btnSize * btnIndex + toolbarDragOfsX;
-      const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize + toolbarDragOfsY;
-      return p.x >= toolbarX && p.x <= toolbarX + btnSize && p.y >= toolbarY && p.y <= toolbarY + btnSize;
+      const r = tbBtnRect(cachedToolbarLayout, btnIndex);
+      return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
     };
 
-    /* Hit test: is point anywhere on toolbar area (any button)? */
     const isOnToolbarArea = (x, y) => {
-      if (!selectionBounds || selectedStrokes.length === 0 || !selToolbarGroup) return false;
+      if (!cachedToolbarLayout || !selToolbarGroup) return false;
       const p = transformPointForHitTest(x, y);
-      const centerX = selectionBounds.x + selectionBounds.width / 2;
-      const btnSize = getEffectiveHandleSize(72);
-      const tbX = centerX - btnSize * 2 + toolbarDragOfsX;
-      const tbY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize + toolbarDragOfsY;
-      return p.x >= tbX && p.x <= tbX + btnSize * 4 && p.y >= tbY && p.y <= tbY + btnSize;
+      const L = cachedToolbarLayout;
+      return p.x >= L.x && p.x <= L.x + L.w && p.y >= L.y && p.y <= L.y + L.h;
     };
 
     const isOnDuplicateHandle = (x, y) => isOnToolbarBtn(x, y, 0, duplicateHandle);
@@ -1819,19 +1795,10 @@
         return;
       }
 
-      /* Toolbar: detect tap on buttons but defer action so drag can be distinguished */
-      if (selActive && isOnToolbarArea(d.x, d.y)) {
-        toolbarDragPending = true;
-        toolbarDragStartX = d.x; toolbarDragStartY = d.y;
-        toolbarDragBaseOfsX = toolbarDragOfsX; toolbarDragBaseOfsY = toolbarDragOfsY;
-        if (isOnDuplicateHandle(d.x, d.y)) toolbarPendingAction = () => duplicateSelectedStrokes();
-        else if (isOnLockHandle(d.x, d.y)) toolbarPendingAction = () => toggleLockSelectedStrokes();
-        else if (isOnColorHandle(d.x, d.y)) toolbarPendingAction = () => showColorModal();
-        else if (isOnTrashHandle(d.x, d.y)) toolbarPendingAction = () => { deleteSelectedStrokes(); setTool('pen'); };
-        else toolbarPendingAction = null;
-        drawing = false;
-        return;
-      }
+      if (selActive && isOnDuplicateHandle(d.x, d.y)) { duplicateSelectedStrokes(); drawing = false; return; }
+      if (selActive && isOnLockHandle(d.x, d.y)) { toggleLockSelectedStrokes(); drawing = false; return; }
+      if (selActive && isOnColorHandle(d.x, d.y)) { showColorModal(); drawing = false; return; }
+      if (selActive && isOnTrashHandle(d.x, d.y)) { deleteSelectedStrokes(); setTool('pen'); drawing = false; return; }
 
       if (selActive) {
         const handle = getHandleAtPoint(d.x, d.y);
@@ -1853,7 +1820,6 @@
           const dxA = anchorLocalX - cx, dyA = anchorLocalY - cy;
           scaleAnchorWorldX = cx + dxA * cos - dyA * sin;
           scaleAnchorWorldY = cy + dxA * sin + dyA * cos;
-          toolbarDragOfsX = toolbarDragOfsY = 0;
           animateToolbarOut();
           drawing = false;
           return;
@@ -1862,7 +1828,6 @@
 
       if (selActive && isInsideSelectionBox(d.x, d.y)) {
         isDraggingSelection = true;
-        toolbarDragOfsX = toolbarDragOfsY = 0;
         dragStartX = d.x; dragStartY = d.y;
         /* Init staff magnet snap tracking */
         staffSnapRef = selectedStrokes.find(s => s.isSticker && STICKERS[s.stickerIdx]?.name === 'Staff') || null;
@@ -1894,25 +1859,6 @@
 
     function move(e) {
       if (e.pointerType === 'touch') return;
-      /* Toolbar drag: pending → check threshold, active → update offset */
-      if (toolbarDragPending || isDraggingToolbar) {
-        e.preventDefault();
-        const d = getData(e);
-        if (toolbarDragPending) {
-          const dist = Math.hypot(d.x - toolbarDragStartX, d.y - toolbarDragStartY);
-          if (dist > getEffectiveHandleSize(8)) {
-            toolbarDragPending = false;
-            isDraggingToolbar = true;
-            toolbarPendingAction = null;
-          } else return;
-        }
-        if (isDraggingToolbar) {
-          toolbarDragOfsX = toolbarDragBaseOfsX + (d.x - toolbarDragStartX);
-          toolbarDragOfsY = toolbarDragBaseOfsY + (d.y - toolbarDragStartY);
-          updateSelectionUI(false);
-        }
-        return;
-      }
       if (isRotatingSelection) { e.preventDefault(); rotateSelection(getData(e).x, getData(e).y); return; }
       if (isScalingSelection) { e.preventDefault(); const d = getData(e); scaleSelection(d.x, d.y); return; }
       if (isDraggingSelection) { e.preventDefault(); const d = getData(e); moveSelection(d.x - dragStartX, d.y - dragStartY); dragStartX = d.x; dragStartY = d.y; return; }
@@ -1950,13 +1896,6 @@
       if (e && e.pointerType === 'touch') return;
       cachedSvgRect = null;
       cachedInverseCTM = null;
-      /* Toolbar drag: if still pending (no drag started), fire the button action */
-      if (toolbarDragPending) {
-        toolbarDragPending = false;
-        if (toolbarPendingAction) { toolbarPendingAction(); toolbarPendingAction = null; }
-        return;
-      }
-      if (isDraggingToolbar) { isDraggingToolbar = false; return; }
       if (isRotatingSelection) { isRotatingSelection = false; originalBounds = null; originalStrokePoints = []; savePageAnnotations(); return; }
       if (isScalingSelection) { isScalingSelection = false; activeHandle = null; originalBounds = null; originalStrokePoints = []; buildToolbarElements(true); savePageAnnotations(); return; }
       if (isDraggingSelection) { isDraggingSelection = false; staffUnsnappedCenter = null; staffSnapRef = null; buildToolbarElements(true); savePageAnnotations(); return; }
@@ -2005,7 +1944,6 @@
                 const idx = selectedStrokes.indexOf(s);
                 if (idx >= 0) selectedStrokes.splice(idx, 1);
                 else selectedStrokes.push(s);
-                toolbarDragOfsX = toolbarDragOfsY = 0;
                 rebuildSelectionFromStrokes();
               } else {
                 /* Fresh single selection */
