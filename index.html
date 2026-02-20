@@ -1777,11 +1777,16 @@
       e.preventDefault();
       const d = getData(e);
 
-      /* Pen mode with active selection: any interaction dismisses selection */
+      /* Pen mode with active selection: interact with selection elements or dismiss */
       if (tool === 'pen' && selectedStrokes.length > 0) {
-        clearSelection();
-        drawing = false;
-        return;
+        if (isInsideSelectionBox(d.x, d.y) || isOnToolbarArea(d.x, d.y) || getHandleAtPoint(d.x, d.y) || isOnRotationHandle(d.x, d.y)) {
+          /* Switch to lasso so the checks below handle drag/scale/toolbar */
+          tool = 'lasso';
+        } else {
+          clearSelection();
+          drawing = false;
+          return;
+        }
       }
 
       if (tool === 'lasso' && colorModalOpen) {
@@ -2012,7 +2017,7 @@
             }
           }
         }
-        if (!tapped) clearSelection();
+        if (!tapped) { clearSelection(); setTool('pen'); }
       }
       points = [];
       if (eraserEnd) { eraserEnd = false; resetBig(); if (prevTool !== 'eraser') setTool(prevTool === 'lasso' ? 'pen' : prevTool); }
