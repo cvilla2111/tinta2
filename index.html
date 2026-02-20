@@ -1777,6 +1777,13 @@
       e.preventDefault();
       const d = getData(e);
 
+      /* Pen mode with active selection: any interaction dismisses selection */
+      if (tool === 'pen' && selectedStrokes.length > 0) {
+        clearSelection();
+        drawing = false;
+        return;
+      }
+
       if (tool === 'lasso' && colorModalOpen) {
         const swatchColor = isOnColorSwatch(d.x, d.y);
         if (swatchColor) {
