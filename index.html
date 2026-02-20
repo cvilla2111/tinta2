@@ -46,8 +46,7 @@
     .sticker-modal-overlay.visible { opacity: 1; visibility: visible; }
     .sticker-modal { background: var(--bg); border-radius: 18px; padding: 20px 18px 16px; box-shadow: 0 12px 48px rgba(0,0,0,0.2); transform: scale(0.85); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); max-width: 320px; width: 90vw; max-height: 80vh; overflow-y: auto; }
     .sticker-modal-overlay.visible .sticker-modal { transform: scale(1); }
-    .sticker-modal-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 14px; text-align: center; text-transform: uppercase; letter-spacing: 0.8px; cursor: grab; user-select: none; -webkit-user-select: none; }
-    .sticker-modal-title:active { cursor: grabbing; }
+    .sticker-modal-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 14px; text-align: center; text-transform: uppercase; letter-spacing: 0.8px; }
     .sticker-modal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
     .sticker-modal-btn { aspect-ratio: 1; border: 2px solid var(--border); border-radius: 12px; background: var(--btn); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 10px; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, background 0.15s; }
     .sticker-modal-btn:hover { transform: scale(1.08); border-color: var(--active); box-shadow: 0 4px 16px rgba(59,130,246,0.2); }
@@ -88,7 +87,7 @@
     .selection-handle { fill: var(--bg); stroke: var(--active); stroke-width: 1.5; cursor: nwse-resize; }
     .rotation-handle { fill: var(--bg); stroke: var(--active); stroke-width: 1.5; cursor: grab; }
     .rotation-line { stroke: var(--active); stroke-width: 1.5; }
-    .sel-toolbar-bg { fill: #1f2937; stroke: none; }
+    .sel-toolbar-bg { fill: #1f2937; stroke: none; cursor: grab; }
     .sel-toolbar-div { stroke: rgba(255,255,255,0.2); stroke-width: 1; }
     .duplicate-handle { fill: transparent; stroke: none; cursor: pointer; }
     .duplicate-handle:hover { fill: rgba(255,255,255,0.15); }
@@ -241,6 +240,9 @@
     let rotationCenterX = 0, rotationCenterY = 0, startAngle = 0, currentRotation = 0, previousRotation = 0;
     let scaleAnchorWorldX = 0, scaleAnchorWorldY = 0;
     let staffUnsnappedCenter = null, staffSnapRef = null, staffDragAccum = 0;
+    let toolbarDragOfsX = 0, toolbarDragOfsY = 0;
+    let isDraggingToolbar = false, toolbarDragPending = false, toolbarPendingAction = null;
+    let toolbarDragStartX = 0, toolbarDragStartY = 0, toolbarDragBaseOfsX = 0, toolbarDragBaseOfsY = 0;
 
     let needsRender = false;
     let cachedSvgRect = null;
@@ -429,7 +431,7 @@
       { name: 'Staff', svg: '<svg viewBox="0 0 128 40"><line x1="2" y1="4" x2="126" y2="4" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="12" x2="126" y2="12" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="20" x2="126" y2="20" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="28" x2="126" y2="28" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="36" x2="126" y2="36" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="4" x2="2" y2="36" stroke="currentColor" stroke-width="1.2"/><line x1="126" y1="4" x2="126" y2="36" stroke="currentColor" stroke-width="1.2"/></svg>' },
       { name: 'Eighth Note', svg: '<svg viewBox="0 0 64 64"><circle cx="22" cy="46" r="8" fill="currentColor"/><line x1="30" y1="46" x2="30" y2="12" stroke="currentColor" stroke-width="3"/><path d="M30 12 Q38 14 42 22 Q38 18 30 20" fill="currentColor"/></svg>' },
       { name: 'Half Note', svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
-      { name: 'Quarter Note', svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="currentColor"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
+      { name: 'Quarter Note', stickerScale: 0.9, svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="currentColor"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
       { name: 'Guitar', svg: '<svg viewBox="0 0 64 64"><ellipse cx="26" cy="44" rx="12" ry="14" fill="none" stroke="currentColor" stroke-width="2.5"/><ellipse cx="26" cy="44" rx="4" ry="5" fill="currentColor" opacity="0.3"/><line x1="37" y1="36" x2="54" y2="8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="50" y1="6" x2="58" y2="10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="52" y1="4" x2="56" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' },
       { name: 'Microphone', svg: '<svg viewBox="0 0 64 64"><rect x="24" y="8" width="16" height="28" rx="8" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M16 28 C16 42 23 48 32 48 C41 48 48 42 48 28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="48" x2="32" y2="58" stroke="currentColor" stroke-width="2.5"/><line x1="24" y1="58" x2="40" y2="58" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>' },
       { name: 'Piano Keys', svg: '<svg viewBox="0 0 64 64"><rect x="8" y="14" width="48" height="36" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="16" y1="14" x2="16" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="24" y1="14" x2="24" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="32" y1="14" x2="32" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="40" y1="14" x2="40" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="48" y1="14" x2="48" y2="50" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="21" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="37" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="45" y="14" width="6" height="22" rx="1" fill="currentColor"/></svg>' },
@@ -442,9 +444,6 @@
 
     const showStickerModal = (cx, cy) => {
       stickerInsertPos = { x: cx, y: cy };
-      /* Reset drag position so modal re-centers via flexbox */
-      const sM = stickerOverlay.querySelector('.sticker-modal');
-      sM.style.position = ''; sM.style.left = ''; sM.style.top = ''; sM.style.margin = '';
       stickerGrid.innerHTML = '';
       STICKERS.forEach((sticker, i) => {
         const btn = document.createElement('button');
@@ -464,44 +463,6 @@
     };
 
     stickerOverlay.onclick = e => { if (e.target === stickerOverlay) hideStickerModal(); };
-
-    /* --- Draggable sticker modal --- */
-    {
-      const sModal = stickerOverlay.querySelector('.sticker-modal');
-      const sTitle = stickerOverlay.querySelector('.sticker-modal-title');
-      let sDragging = false, sOx = 0, sOy = 0;
-      sTitle.addEventListener('pointerdown', e => {
-        if (e.button !== 0) return;
-        sDragging = true;
-        const r = sModal.getBoundingClientRect();
-        sOx = e.clientX - r.left;
-        sOy = e.clientY - r.top;
-        /* Switch from flexbox centering to absolute positioning */
-        sModal.style.position = 'fixed';
-        sModal.style.left = r.left + 'px';
-        sModal.style.top = r.top + 'px';
-        sModal.style.margin = '0';
-        sTitle.setPointerCapture(e.pointerId);
-        e.preventDefault();
-        e.stopPropagation();
-      });
-      sTitle.addEventListener('pointermove', e => {
-        if (!sDragging) return;
-        let nx = e.clientX - sOx, ny = e.clientY - sOy;
-        /* Clamp to viewport */
-        nx = Math.max(0, Math.min(window.innerWidth - sModal.offsetWidth, nx));
-        ny = Math.max(0, Math.min(window.innerHeight - sModal.offsetHeight, ny));
-        sModal.style.left = nx + 'px';
-        sModal.style.top = ny + 'px';
-        e.preventDefault();
-        e.stopPropagation();
-      });
-      sTitle.addEventListener('pointerup', e => {
-        if (!sDragging) return;
-        sDragging = false;
-        sTitle.releasePointerCapture(e.pointerId);
-      });
-    }
 
     const getStickerAspect = (idx) => {
       const m = STICKERS[idx].svg.match(/viewBox="[\d.\-]+\s+[\d.\-]+\s+([\d.]+)\s+([\d.]+)"/);
@@ -664,6 +625,7 @@
       selectionBounds = originalBounds = null;
       originalStrokePoints = [];
       currentRotation = previousRotation = 0;
+      toolbarDragOfsX = toolbarDragOfsY = 0;
     };
 
     const pointInPolygon = (x, y, polygon) => {
@@ -843,8 +805,8 @@
       const topY = selectionBounds.y;
       const btnSize = getEffectiveHandleSize(72);
       const toolbarW = btnSize * 4, toolbarH = btnSize;
-      const toolbarX = centerX - toolbarW / 2;
-      const toolbarY = topY - rotationOffset - toolbarH;
+      const toolbarX = centerX - toolbarW / 2 + toolbarDragOfsX;
+      const toolbarY = topY - rotationOffset - toolbarH + toolbarDragOfsY;
       const toolbarR = getEffectiveHandleSize(12);
       const toolbarCX = toolbarX + toolbarW / 2;
       const toolbarCY = toolbarY + toolbarH;
@@ -1077,8 +1039,8 @@
       if (duplicateHandle && duplicateIcon) {
         const btnSize = getEffectiveHandleSize(72);
         const toolbarW = btnSize * 4, toolbarH = btnSize;
-        const toolbarX = centerX - toolbarW / 2;
-        const toolbarY = topY - rotationOffset - toolbarH;
+        const toolbarX = centerX - toolbarW / 2 + toolbarDragOfsX;
+        const toolbarY = topY - rotationOffset - toolbarH + toolbarDragOfsY;
         const divPad = getEffectiveHandleSize(12);
         const btnCY = toolbarY + btnSize / 2;
 
@@ -1154,13 +1116,36 @@
         shrinkTargetBounds = null;
       }
     };
+    /* Rebuild selection box + handles from current selectedStrokes array */
+    const rebuildSelectionFromStrokes = () => {
+      selectionBoxes.forEach(box => box.remove()); selectionBoxes = [];
+      selectionHandles.forEach(h => h.remove()); selectionHandles = [];
+      removeRotationUI(); removeDuplicateUI(); removeLockUI(); removeTrashUI(); removeColorUI(); removeSelToolbar();
+      if (selectedStrokes.length === 0) { selectionBounds = null; return; }
+      const selPad = getEffectiveHandleSize(10);
+      let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
+      selectedStrokes.forEach(s => getBoundsPoints(s).forEach(p => { sMinX = Math.min(sMinX, p.x); sMinY = Math.min(sMinY, p.y); sMaxX = Math.max(sMaxX, p.x); sMaxY = Math.max(sMaxY, p.y); }));
+      sMinX -= selPad; sMinY -= selPad; sMaxX += selPad; sMaxY += selPad;
+      selectionBounds = { x: sMinX, y: sMinY, width: sMaxX - sMinX, height: sMaxY - sMinY };
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.classList.add('selection-box');
+      rect.setAttribute('x', sMinX); rect.setAttribute('y', sMinY);
+      rect.setAttribute('width', sMaxX - sMinX); rect.setAttribute('height', sMaxY - sMinY);
+      rect.setAttribute('rx', 3);
+      group.appendChild(rect);
+      selectionBoxes.push(rect);
+      createSelectionHandles(true);
+    };
+
     const selectStrokesInLasso = () => {
       if (shrinkAnimId) { cancelAnimationFrame(shrinkAnimId); shrinkAnimId = null; }
       selectionBoxes.forEach(box => box.remove());
       selectionBoxes = [];
       selectionHandles.forEach(h => h.remove());
       selectionHandles = [];
+      removeRotationUI(); removeDuplicateUI(); removeLockUI(); removeTrashUI(); removeColorUI(); removeSelToolbar();
       selectedStrokes = [];
+      toolbarDragOfsX = toolbarDragOfsY = 0;
       if (lassoPoints.length < 3) return;
 
       strokes.forEach(s => {
@@ -1565,9 +1550,20 @@
       const p = transformPointForHitTest(x, y);
       const centerX = selectionBounds.x + selectionBounds.width / 2;
       const btnSize = getEffectiveHandleSize(72);
-      const toolbarX = centerX - btnSize * 2 + btnSize * btnIndex;
-      const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize;
+      const toolbarX = centerX - btnSize * 2 + btnSize * btnIndex + toolbarDragOfsX;
+      const toolbarY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize + toolbarDragOfsY;
       return p.x >= toolbarX && p.x <= toolbarX + btnSize && p.y >= toolbarY && p.y <= toolbarY + btnSize;
+    };
+
+    /* Hit test: is point anywhere on toolbar area (any button)? */
+    const isOnToolbarArea = (x, y) => {
+      if (!selectionBounds || selectedStrokes.length === 0 || !selToolbarGroup) return false;
+      const p = transformPointForHitTest(x, y);
+      const centerX = selectionBounds.x + selectionBounds.width / 2;
+      const btnSize = getEffectiveHandleSize(72);
+      const tbX = centerX - btnSize * 2 + toolbarDragOfsX;
+      const tbY = selectionBounds.y - getEffectiveHandleSize(50) - btnSize + toolbarDragOfsY;
+      return p.x >= tbX && p.x <= tbX + btnSize * 4 && p.y >= tbY && p.y <= tbY + btnSize;
     };
 
     const isOnDuplicateHandle = (x, y) => isOnToolbarBtn(x, y, 0, duplicateHandle);
@@ -1810,10 +1806,19 @@
         return;
       }
 
-      if (tool === 'lasso' && isOnDuplicateHandle(d.x, d.y)) { duplicateSelectedStrokes(); drawing = false; return; }
-      if (tool === 'lasso' && isOnLockHandle(d.x, d.y)) { toggleLockSelectedStrokes(); drawing = false; return; }
-      if (tool === 'lasso' && isOnColorHandle(d.x, d.y)) { showColorModal(); drawing = false; return; }
-      if (tool === 'lasso' && isOnTrashHandle(d.x, d.y)) { deleteSelectedStrokes(); setTool('pen'); drawing = false; return; }
+      /* Toolbar: detect tap on buttons but defer action so drag can be distinguished */
+      if (tool === 'lasso' && isOnToolbarArea(d.x, d.y)) {
+        toolbarDragPending = true;
+        toolbarDragStartX = d.x; toolbarDragStartY = d.y;
+        toolbarDragBaseOfsX = toolbarDragOfsX; toolbarDragBaseOfsY = toolbarDragOfsY;
+        if (isOnDuplicateHandle(d.x, d.y)) toolbarPendingAction = () => duplicateSelectedStrokes();
+        else if (isOnLockHandle(d.x, d.y)) toolbarPendingAction = () => toggleLockSelectedStrokes();
+        else if (isOnColorHandle(d.x, d.y)) toolbarPendingAction = () => showColorModal();
+        else if (isOnTrashHandle(d.x, d.y)) toolbarPendingAction = () => { deleteSelectedStrokes(); setTool('pen'); };
+        else toolbarPendingAction = null;
+        drawing = false;
+        return;
+      }
 
       if (tool === 'lasso') {
         const handle = getHandleAtPoint(d.x, d.y);
@@ -1835,6 +1840,7 @@
           const dxA = anchorLocalX - cx, dyA = anchorLocalY - cy;
           scaleAnchorWorldX = cx + dxA * cos - dyA * sin;
           scaleAnchorWorldY = cy + dxA * sin + dyA * cos;
+          toolbarDragOfsX = toolbarDragOfsY = 0;
           animateToolbarOut();
           drawing = false;
           return;
@@ -1843,6 +1849,7 @@
 
       if (tool === 'lasso' && isInsideSelectionBox(d.x, d.y)) {
         isDraggingSelection = true;
+        toolbarDragOfsX = toolbarDragOfsY = 0;
         dragStartX = d.x; dragStartY = d.y;
         /* Init staff magnet snap tracking */
         staffSnapRef = selectedStrokes.find(s => s.isSticker && STICKERS[s.stickerIdx]?.name === 'Staff') || null;
@@ -1862,8 +1869,8 @@
       if (tool === 'pen') newPath();
       if (tool === 'eraser') setCursor(e);
       if (tool === 'lasso') {
-        if (selectedStrokes.length > 0) { clearSelection(); setTool('pen'); drawing = false; return; }
-        clearSelection();
+        if (selectedStrokes.length === 0) clearSelection();
+        /* Keep existing selection alive for potential additive tap-to-select */
         lassoPoints = [{ x: d.x, y: d.y }];
         lassoPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         lassoPath.classList.add('lasso-path');
@@ -1874,6 +1881,25 @@
 
     function move(e) {
       if (e.pointerType === 'touch') return;
+      /* Toolbar drag: pending → check threshold, active → update offset */
+      if (toolbarDragPending || isDraggingToolbar) {
+        e.preventDefault();
+        const d = getData(e);
+        if (toolbarDragPending) {
+          const dist = Math.hypot(d.x - toolbarDragStartX, d.y - toolbarDragStartY);
+          if (dist > getEffectiveHandleSize(8)) {
+            toolbarDragPending = false;
+            isDraggingToolbar = true;
+            toolbarPendingAction = null;
+          } else return;
+        }
+        if (isDraggingToolbar) {
+          toolbarDragOfsX = toolbarDragBaseOfsX + (d.x - toolbarDragStartX);
+          toolbarDragOfsY = toolbarDragBaseOfsY + (d.y - toolbarDragStartY);
+          updateSelectionUI(false);
+        }
+        return;
+      }
       if (isRotatingSelection) { e.preventDefault(); rotateSelection(getData(e).x, getData(e).y); return; }
       if (isScalingSelection) { e.preventDefault(); const d = getData(e); scaleSelection(d.x, d.y); return; }
       if (isDraggingSelection) { e.preventDefault(); const d = getData(e); moveSelection(d.x - dragStartX, d.y - dragStartY); dragStartX = d.x; dragStartY = d.y; return; }
@@ -1911,6 +1937,13 @@
       if (e && e.pointerType === 'touch') return;
       cachedSvgRect = null;
       cachedInverseCTM = null;
+      /* Toolbar drag: if still pending (no drag started), fire the button action */
+      if (toolbarDragPending) {
+        toolbarDragPending = false;
+        if (toolbarPendingAction) { toolbarPendingAction(); toolbarPendingAction = null; }
+        return;
+      }
+      if (isDraggingToolbar) { isDraggingToolbar = false; return; }
       if (isRotatingSelection) { isRotatingSelection = false; originalBounds = null; originalStrokePoints = []; savePageAnnotations(); return; }
       if (isScalingSelection) { isScalingSelection = false; activeHandle = null; originalBounds = null; originalStrokePoints = []; buildToolbarElements(true); savePageAnnotations(); return; }
       if (isDraggingSelection) { isDraggingSelection = false; staffUnsnappedCenter = null; staffSnapRef = null; buildToolbarElements(true); savePageAnnotations(); return; }
@@ -1954,21 +1987,18 @@
               }
             }
             if (hit) {
-              clearSelection();
-              selectedStrokes = [s];
-              const selPad = getEffectiveHandleSize(10);
-              let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
-              getBoundsPoints(s).forEach(pt => { sMinX = Math.min(sMinX, pt.x); sMinY = Math.min(sMinY, pt.y); sMaxX = Math.max(sMaxX, pt.x); sMaxY = Math.max(sMaxY, pt.y); });
-              sMinX -= selPad; sMinY -= selPad; sMaxX += selPad; sMaxY += selPad;
-              selectionBounds = { x: sMinX, y: sMinY, width: sMaxX - sMinX, height: sMaxY - sMinY };
-              const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-              rect.classList.add('selection-box');
-              rect.setAttribute('x', sMinX); rect.setAttribute('y', sMinY);
-              rect.setAttribute('width', sMaxX - sMinX); rect.setAttribute('height', sMaxY - sMinY);
-              rect.setAttribute('rx', 3);
-              group.appendChild(rect);
-              selectionBoxes.push(rect);
-              createSelectionHandles(true);
+              if (selectedStrokes.length > 0) {
+                /* Additive: toggle stroke in/out of existing selection */
+                const idx = selectedStrokes.indexOf(s);
+                if (idx >= 0) selectedStrokes.splice(idx, 1);
+                else selectedStrokes.push(s);
+                toolbarDragOfsX = toolbarDragOfsY = 0;
+                rebuildSelectionFromStrokes();
+              } else {
+                /* Fresh single selection */
+                selectedStrokes = [s];
+                rebuildSelectionFromStrokes();
+              }
               tapped = true;
               break;
             }
