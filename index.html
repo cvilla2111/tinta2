@@ -268,7 +268,8 @@
     const pdfInput = $('pdfInput'), pdfControls = $('pdfControls'), pdfDivider = $('pdfDivider');
     const menuBtn = $('menuBtn'), filmstripOverlay = $('filmstripOverlay'), filmstripContainer = $('filmstripContainer');
     const activePointers = new Map();
-    let gestureStartDistance = 0, swipeStartX = 0, swipeStartY = 0;
+    let gestureStartDistance = 0;
+    let lastTapTime = 0, lastTapX = 0;
 
     const getPdfScale = () => pdfDoc && pdfPageWidth > 0 ? pdfPageWidth / (container.getBoundingClientRect().width * dpr) : 1;
     const getEffectiveWidth = () => width * getPdfScale();
@@ -2374,8 +2375,7 @@
       if (e.pointerType !== 'touch') return;
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pdfDoc) {
-        if (activePointers.size === 1) { swipeStartX = e.clientX; swipeStartY = e.clientY; }
-        else if (activePointers.size === 2) {
+        if (activePointers.size === 2) {
           const pts = Array.from(activePointers.values());
           gestureStartDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
         }
@@ -2421,9 +2421,17 @@
       if (e.pointerType !== 'touch') return;
       if (pdfDoc) {
         if (activePointers.size === 1 && activePointers.has(e.pointerId)) {
-          const deltaX = e.clientX - swipeStartX, deltaY = e.clientY - swipeStartY;
-          const minSwipe = Math.max(225, window.innerWidth * 0.25);
-          if (Math.abs(deltaX) > minSwipe && Math.abs(deltaY) < Math.abs(deltaX) * 0.5) goToPage(deltaX > 0 ? currentPage - 1 : currentPage + 1);
+          const now = Date.now();
+          const edgeW = Math.max(60, window.innerWidth * 0.12);
+          const isLeftEdge = e.clientX < edgeW;
+          const isRightEdge = e.clientX > window.innerWidth - edgeW;
+          if ((isLeftEdge || isRightEdge) && now - lastTapTime < 400 && Math.abs(e.clientX - lastTapX) < edgeW) {
+            goToPage(isLeftEdge ? currentPage - 1 : currentPage + 1);
+            lastTapTime = 0;
+          } else {
+            lastTapTime = now;
+            lastTapX = e.clientX;
+          }
         }
       }
       activePointers.delete(e.pointerId);
