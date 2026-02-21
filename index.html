@@ -2422,7 +2422,8 @@
       if (pdfDoc) {
         if (activePointers.size === 1 && activePointers.has(e.pointerId)) {
           const deltaX = e.clientX - swipeStartX, deltaY = e.clientY - swipeStartY;
-          if (Math.abs(deltaX) > 225 && Math.abs(deltaY) < Math.abs(deltaX) * 0.5) goToPage(deltaX > 0 ? currentPage - 1 : currentPage + 1);
+          const minSwipe = Math.max(225, window.innerWidth * 0.25);
+          if (Math.abs(deltaX) > minSwipe && Math.abs(deltaY) < Math.abs(deltaX) * 0.5) goToPage(deltaX > 0 ? currentPage - 1 : currentPage + 1);
         }
       }
       activePointers.delete(e.pointerId);
