@@ -244,11 +244,13 @@
     let toolbarAnimTimer = null;
     let colorModalGroup = null, colorModalOpen = false, colorSwatchRects = [];
     const blinkingStrokes = new Set();
-    let isDraggingSelection = false, isScalingSelection = false, isRotatingSelection = false;
+    let isDraggingSelection = false, isScalingSelection = false, isRotatingSelection = false, isDraggingBeamEndpoint = false, beamDragIdx = -1;
     let activeHandle = null, dragStartX = 0, dragStartY = 0, selectionBounds = null, originalBounds = null, originalStrokePoints = [];
     let rotationCenterX = 0, rotationCenterY = 0, startAngle = 0, currentRotation = 0, previousRotation = 0;
     let scaleAnchorWorldX = 0, scaleAnchorWorldY = 0;
-    let staffUnsnappedCenter = null, staffSnapRef = null, staffDragAccum = 0;
+    let staffUnsnappedCenter = null, staffSnapRef = null, staffDragAccum = 0, staffBiasX = 0, staffBiasY = 0;
+    let beamDrawing = false, beamLine = null, beamStartPt = null, beamEndPt = null;
+    let stemDot = null;
     let gridSnapOriginX = 0, gridSnapOriginY = 0, gridSnapAccumX = 0, gridSnapAccumY = 0;
     let gridAnimX = 0, gridAnimY = 0, gridTargetX = 0, gridTargetY = 0, gridAnimId = null;
     let cachedToolbarLayout = null;
@@ -446,6 +448,7 @@
 
     const STICKERS = [
       { name: 'Staff', svg: '<svg viewBox="0 0 200 40"><line x1="2" y1="4" x2="198" y2="4" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="12" x2="198" y2="12" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="20" x2="198" y2="20" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="28" x2="198" y2="28" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="36" x2="198" y2="36" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="4" x2="2" y2="36" stroke="currentColor" stroke-width="1.2"/><line x1="198" y1="4" x2="198" y2="36" stroke="currentColor" stroke-width="1.2"/></svg>' },
+      { name: 'Beam', isConnector: true, svg: '<svg viewBox="0 0 64 8"><line x1="4" y1="4" x2="60" y2="4" stroke="currentColor" stroke-width="5" stroke-linecap="round"/></svg>' },
       { name: 'Eighth Note', svg: '<svg viewBox="0 0 64 64"><circle cx="22" cy="46" r="8" fill="currentColor"/><line x1="30" y1="46" x2="30" y2="12" stroke="currentColor" stroke-width="3"/><path d="M30 12 Q38 14 42 22 Q38 18 30 20" fill="currentColor"/></svg>' },
       { name: 'Half Note', svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
       { name: 'Quarter Note', stickerScale: 0.9, svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="currentColor"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
@@ -520,6 +523,14 @@
     const placeStickerOnCanvas = (idx) => {
       if (!stickerInsertPos) return;
       const sticker = STICKERS[idx];
+      /* Connector stickers (Beam) enter drawing mode instead of placing */
+      if (sticker.isConnector) {
+        hideStickerModal();
+        beamDrawing = true;
+        beamLine = null; beamStartPt = null; beamEndPt = null;
+        container.style.cursor = 'crosshair';
+        return;
+      }
       const scale = sticker.stickerScale || 1;
       const baseSize = 120 * (pdfDoc ? getPdfScale() : dpr) * scale;
       const { vw, vh } = getStickerAspect(idx);
@@ -639,6 +650,7 @@
       removeTrashUI();
       removeColorUI();
       removeSelToolbar();
+      hideStemDot();
       if (lassoPath) { lassoPath.remove(); lassoPath = null; }
       lassoPoints = [];
       selectionBounds = originalBounds = null;
@@ -961,6 +973,7 @@
     };
 
     const isWidthOnlySelection = () => selectedStrokes.length > 0 && selectedStrokes.every(s => s.scaleWidthOnly);
+    const isBeamOnlySelection = () => selectedStrokes.length === 1 && selectedStrokes[0].isBeam;
 
     const createSelectionHandles = (animateToolbar = false) => {
       selectionHandles.forEach(h => h.remove());
@@ -974,7 +987,26 @@
       if (!selectionBounds) return;
 
       const handleSize = getEffectiveHandleSize(30), rotationOffset = getEffectiveHandleSize(50);
+      const beamOnly = isBeamOnlySelection();
       const widthOnly = isWidthOnlySelection();
+
+      /* Beam: show circle endpoint handles at each end of the line */
+      if (beamOnly) {
+        const s = selectedStrokes[0];
+        const r = getEffectiveHandleSize(14);
+        [s.points[0], s.points[1]].forEach(pt => {
+          const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          handle.classList.add('selection-handle');
+          handle.setAttribute('cx', pt.x); handle.setAttribute('cy', pt.y);
+          handle.setAttribute('r', r);
+          group.appendChild(handle);
+          selectionHandles.push(handle);
+        });
+        if (animateToolbar) {
+          toolbarAnimTimer = setTimeout(() => { toolbarAnimTimer = null; buildToolbarElements(true); }, 180);
+        } else { buildToolbarElements(false); }
+        return;
+      }
 
       if (widthOnly) {
         const midY = selectionBounds.y + selectionBounds.height / 2;
@@ -1048,7 +1080,18 @@
       selectionBoxes[0].setAttribute('height', selectionBounds.height);
 
       const handleSize = getEffectiveHandleSize(30), rotationOffset = getEffectiveHandleSize(50);
+      const beamOnly = isBeamOnlySelection();
       const widthOnly = isWidthOnlySelection();
+
+      /* Beam: update endpoint circles */
+      if (beamOnly && selectionHandles.length === 2) {
+        const s = selectedStrokes[0];
+        selectionHandles[0].setAttribute('cx', s.points[0].x); selectionHandles[0].setAttribute('cy', s.points[0].y);
+        selectionHandles[1].setAttribute('cx', s.points[1].x); selectionHandles[1].setAttribute('cy', s.points[1].y);
+        buildToolbarElements(false);
+        if (_t0) __pl('updateSelectionUI', performance.now() - _t0);
+        return;
+      }
 
       if (widthOnly && selectionHandles.length === 2) {
         const midY = selectionBounds.y + selectionBounds.height / 2;
@@ -1345,6 +1388,14 @@
           inner.setAttribute('width', dupW); inner.setAttribute('height', dupH);
           inner.style.color = s.color; inner.setAttribute('overflow', 'visible');
           newStroke = { element: el, points: newPoints, color: s.color, width: 0, isSticker: true, stickerIdx: s.stickerIdx, stickerW: dupW, stickerH: dupH, scaleWidthOnly: !!s.scaleWidthOnly };
+        } else if (s.isBeam) {
+          el = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          el.setAttribute('x1', newPoints[0].x); el.setAttribute('y1', newPoints[0].y);
+          el.setAttribute('x2', newPoints[1].x); el.setAttribute('y2', newPoints[1].y);
+          el.setAttribute('stroke', s.color);
+          el.setAttribute('stroke-width', s.width);
+          el.setAttribute('stroke-linecap', 'round');
+          newStroke = { element: el, points: newPoints, color: s.color, width: s.width, isBeam: true };
         } else {
           el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           el.classList.add('stroke-path');
@@ -1407,6 +1458,13 @@
       if (!selectionBounds || selectedStrokes.length === 0) return null;
       const p = transformPointForHitTest(x, y);
       const handleHitSize = getEffectiveHandleSize(20);
+      /* Beam endpoint handles */
+      if (isBeamOnlySelection()) {
+        const s = selectedStrokes[0];
+        if (Math.hypot(p.x - s.points[0].x, p.y - s.points[0].y) <= handleHitSize) return 'bp0';
+        if (Math.hypot(p.x - s.points[1].x, p.y - s.points[1].y) <= handleHitSize) return 'bp1';
+        return null;
+      }
       if (isWidthOnlySelection()) {
         const midY = selectionBounds.y + selectionBounds.height / 2;
         const sides = [
@@ -1432,6 +1490,12 @@
 
     const updateStrokeElement = (s) => {
       const _t0 = window.__perfActive ? performance.now() : 0;
+      if (s.isBeam) {
+        s.element.setAttribute('x1', s.points[0].x); s.element.setAttribute('y1', s.points[0].y);
+        s.element.setAttribute('x2', s.points[1].x); s.element.setAttribute('y2', s.points[1].y);
+        if (_t0) __pl('updateStrokeElement', performance.now() - _t0);
+        return;
+      }
       if (s.isSticker) {
         const inner = s.element.querySelector('svg');
         if (!inner) { if (_t0) __pl('updateStrokeElement', performance.now() - _t0); return; }
@@ -1490,6 +1554,49 @@
       return best;
     };
 
+    /* Beam connector: stem-top positions in viewBox-relative coords for note stickers */
+    const NOTE_STEM_TOPS = {
+      'Quarter Note': { rx: 31 / 64, ry: 10 / 64 },
+      'Half Note':    { rx: 31 / 64, ry: 10 / 64 },
+      'Eighth Note':  { rx: 30 / 64, ry: 12 / 64 },
+    };
+    const getNoteStemWorld = (s) => {
+      const name = STICKERS[s.stickerIdx]?.name;
+      const st = NOTE_STEM_TOPS[name];
+      if (!st) return null;
+      const cx = s.points[4].x, cy = s.points[4].y;
+      return { x: cx + (st.rx - 0.5) * s.stickerW, y: cy + (st.ry - 0.5) * s.stickerH };
+    };
+    const findNearestStem = (wx, wy, maxRange) => {
+      let best = null, bestD = Infinity;
+      strokes.forEach(s => {
+        if (!s.isSticker) return;
+        const stem = getNoteStemWorld(s);
+        if (!stem) return;
+        const d = Math.hypot(wx - stem.x, wy - stem.y);
+        if (d < maxRange && d < bestD) { best = stem; bestD = d; }
+      });
+      return best;
+    };
+    const beamSnapRange = () => 50 * (pdfDoc ? getPdfScale() : dpr);
+
+    const showStemDot = (x, y) => {
+      if (!stemDot) {
+        stemDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        stemDot.setAttribute('fill', '#8b5cf6');
+        stemDot.setAttribute('opacity', '0.85');
+        stemDot.style.pointerEvents = 'none';
+      }
+      const r = getEffectiveHandleSize(8);
+      stemDot.setAttribute('cx', x);
+      stemDot.setAttribute('cy', y);
+      stemDot.setAttribute('r', r);
+      if (!stemDot.parentNode) group.appendChild(stemDot);
+    };
+    const hideStemDot = () => {
+      if (stemDot && stemDot.parentNode) stemDot.remove();
+    };
+
     const moveSelection = (dx, dy) => { const _t0 = window.__perfActive ? performance.now() : 0;
       /* Grid snap: snap sticker movement to invisible grid with elastic ease */
       const hasSticker = selectedStrokes.some(s => s.isSticker);
@@ -1501,18 +1608,20 @@
           staffUnsnappedCenter.x += dx;
           staffUnsnappedCenter.y += dy;
           staffDragAccum += Math.hypot(dx, dy);
+          /* Remove previous bias before computing new one */
+          gridSnapAccumX -= staffBiasX;
+          gridSnapAccumY -= staffBiasY;
+          staffBiasX = 0; staffBiasY = 0;
           const snap = computeStaffSnap(staffUnsnappedCenter, staffSnapRef);
           if (snap) {
             const ramp = Math.min(1, staffDragAccum / 40);
             const t = Math.max(0, 1 - snap.dist / snap.range);
-            const strength = Math.min(1, t * t * 3) * ramp;
-            /* Offset from current center to snap center, applied to accumulators */
-            const curCx = staffSnapRef.points[4].x, curCy = staffSnapRef.points[4].y;
-            const pullX = (snap.cx - (curCx + gridSnapAccumX)) * strength;
-            const pullY = (snap.cy - (curCy + gridSnapAccumY)) * strength;
-            gridSnapAccumX += pullX;
-            gridSnapAccumY += pullY;
+            const strength = t * t * 1.2 * ramp;
+            staffBiasX = (snap.cx - staffUnsnappedCenter.x) * strength;
+            staffBiasY = (snap.cy - staffUnsnappedCenter.y) * strength;
           }
+          gridSnapAccumX += staffBiasX;
+          gridSnapAccumY += staffBiasY;
         }
         const snappedX = Math.round(gridSnapAccumX / gridSize) * gridSize;
         const snappedY = Math.round(gridSnapAccumY / gridSize) * gridSize;
@@ -1667,6 +1776,8 @@
         if (s.isSticker) {
           const inner = s.element.querySelector('svg');
           if (inner) inner.style.color = c;
+        } else if (s.isBeam) {
+          s.element.setAttribute('stroke', c);
         } else {
           s.element.setAttribute('fill', c);
         }
@@ -1732,6 +1843,16 @@
             inner.style.color = s.color; inner.setAttribute('overflow', 'visible');
             if (appendToGroup) group.appendChild(g);
             return { ...s, element: g };
+          }
+          if (s.isBeam) {
+            const el = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            el.setAttribute('x1', s.points[0].x); el.setAttribute('y1', s.points[0].y);
+            el.setAttribute('x2', s.points[1].x); el.setAttribute('y2', s.points[1].y);
+            el.setAttribute('stroke', s.color);
+            el.setAttribute('stroke-width', s.width);
+            el.setAttribute('stroke-linecap', 'round');
+            if (appendToGroup) group.appendChild(el);
+            return { ...s, element: el };
           }
           const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           el.classList.add('stroke-path');
@@ -1870,6 +1991,27 @@
       e.preventDefault();
       const d = getData(e);
 
+      /* Beam connector drawing mode */
+      if (beamDrawing) {
+        const range = beamSnapRange();
+        const stem = findNearestStem(d.x, d.y, range);
+        if (stem) showStemDot(stem.x, stem.y); else hideStemDot();
+        const sx = stem ? stem.x : d.x, sy = stem ? stem.y : d.y;
+        beamStartPt = { x: sx, y: sy };
+        beamEndPt = { x: sx, y: sy };
+        const bw = 6 * (pdfDoc ? getPdfScale() : dpr);
+        beamLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        beamLine.setAttribute('x1', sx); beamLine.setAttribute('y1', sy);
+        beamLine.setAttribute('x2', sx); beamLine.setAttribute('y2', sy);
+        beamLine.setAttribute('stroke', color);
+        beamLine.setAttribute('stroke-width', bw);
+        beamLine.setAttribute('stroke-linecap', 'round');
+        group.appendChild(beamLine);
+        drawing = true;
+        if (_t0) __pl('start', performance.now() - _t0);
+        return;
+      }
+
       /* Selection interactions work in both pen and lasso modes */
       const selActive = (tool === 'lasso' || tool === 'pen') && selectedStrokes.length > 0;
 
@@ -1919,6 +2061,14 @@
 
       if (selActive) {
         const handle = getHandleAtPoint(d.x, d.y);
+        if (handle && (handle === 'bp0' || handle === 'bp1')) {
+          isDraggingBeamEndpoint = true;
+          beamDragIdx = handle === 'bp0' ? 0 : 1;
+          animateToolbarOut();
+          drawing = false;
+          if (_t0) __pl('start', performance.now() - _t0);
+          return;
+        }
         if (handle) {
           isScalingSelection = true;
           activeHandle = handle;
@@ -1949,7 +2099,7 @@
         /* Init staff magnet snap tracking */
         staffSnapRef = selectedStrokes.find(s => s.isSticker && STICKERS[s.stickerIdx]?.name === 'Staff') || null;
         staffUnsnappedCenter = staffSnapRef ? { x: staffSnapRef.points[4].x, y: staffSnapRef.points[4].y } : null;
-        staffDragAccum = 0;
+        staffDragAccum = 0; staffBiasX = 0; staffBiasY = 0;
         /* Init grid snap tracking */
         if (selectionBounds) { gridSnapOriginX = selectionBounds.x; gridSnapOriginY = selectionBounds.y; gridSnapAccumX = 0; gridSnapAccumY = 0; gridAnimX = selectionBounds.x; gridAnimY = selectionBounds.y; gridTargetX = selectionBounds.x; gridTargetY = selectionBounds.y; }
         animateToolbarOut();
@@ -1982,10 +2132,50 @@
       if (isRotatingSelection) { e.preventDefault(); rotateSelection(getData(e).x, getData(e).y); return; }
       if (isScalingSelection) { e.preventDefault(); const d = getData(e); scaleSelection(d.x, d.y); return; }
       if (isDraggingSelection) { e.preventDefault(); const d = getData(e); moveSelection(d.x - dragStartX, d.y - dragStartY); dragStartX = d.x; dragStartY = d.y; return; }
-      if (!drawing) return;
+      if (isDraggingBeamEndpoint) {
+        e.preventDefault();
+        const d = getData(e);
+        const s = selectedStrokes[0];
+        const range = beamSnapRange();
+        const stem = findNearestStem(d.x, d.y, range);
+        if (stem) showStemDot(stem.x, stem.y); else hideStemDot();
+        s.points[beamDragIdx].x = stem ? stem.x : d.x;
+        s.points[beamDragIdx].y = stem ? stem.y : d.y;
+        updateStrokeElement(s);
+        /* Update selection bounds & handles */
+        const selPad = getEffectiveHandleSize(10);
+        const p0 = s.points[0], p1 = s.points[1];
+        const minX = Math.min(p0.x, p1.x) - selPad, minY = Math.min(p0.y, p1.y) - selPad;
+        const maxX = Math.max(p0.x, p1.x) + selPad, maxY = Math.max(p0.y, p1.y) + selPad;
+        selectionBounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        updateSelectionUI(true);
+        if (_t0) __pl('move', performance.now() - _t0);
+        return;
+      }
+      if (!drawing) {
+        /* Beam hover: show stem dot when stylus hovers near a note stem */
+        if ((isBeamOnlySelection() || beamDrawing) && e.pointerType === 'pen') {
+          const d = getData(e);
+          const range = beamSnapRange();
+          const stem = findNearestStem(d.x, d.y, range);
+          if (stem) showStemDot(stem.x, stem.y); else hideStemDot();
+        }
+        return;
+      }
       e.preventDefault();
       extendCanvas();
       const d = getData(e);
+      /* Beam connector: update end point, snapping to stems */
+      if (beamDrawing && beamLine) {
+        const range = beamSnapRange();
+        const stem = findNearestStem(d.x, d.y, range);
+        if (stem) showStemDot(stem.x, stem.y); else hideStemDot();
+        const ex = stem ? stem.x : d.x, ey = stem ? stem.y : d.y;
+        beamEndPt = { x: ex, y: ey };
+        beamLine.setAttribute('x2', ex); beamLine.setAttribute('y2', ey);
+        if (_t0) __pl('move', performance.now() - _t0);
+        return;
+      }
       if (tool === 'eraser') { setCursor(e); erase(d.x, d.y); return; }
       if (tool === 'lasso') {
         const last = lassoPoints[lassoPoints.length - 1];
@@ -2020,11 +2210,56 @@
       cachedInverseCTM = null;
       if (isRotatingSelection) { isRotatingSelection = false; originalBounds = null; originalStrokePoints = []; savePageAnnotations(); return; }
       if (isScalingSelection) { isScalingSelection = false; activeHandle = null; originalBounds = null; originalStrokePoints = []; buildToolbarElements(true); savePageAnnotations(); return; }
-      if (isDraggingSelection) { isDraggingSelection = false; staffUnsnappedCenter = null; staffSnapRef = null; stopGridAnim(); buildToolbarElements(true); savePageAnnotations(); return; }
+      if (isDraggingBeamEndpoint) {
+        /* Final snap */
+        if (e) {
+          const d = getData(e);
+          const s = selectedStrokes[0];
+          const range = beamSnapRange();
+          const stem = findNearestStem(d.x, d.y, range);
+          if (stem) { s.points[beamDragIdx].x = stem.x; s.points[beamDragIdx].y = stem.y; }
+          updateStrokeElement(s);
+        }
+        hideStemDot();
+        isDraggingBeamEndpoint = false; beamDragIdx = -1;
+        rebuildSelectionFromStrokes();
+        savePageAnnotations();
+        return;
+      }
+      if (isDraggingSelection) {
+        isDraggingSelection = false;
+        staffUnsnappedCenter = null; staffSnapRef = null; staffBiasX = 0; staffBiasY = 0;
+        stopGridAnim();
+        buildToolbarElements(true); savePageAnnotations(); return;
+      }
       if (!drawing) return;
       drawing = false;
       strokeStarting = false;
       needsRender = false;
+      /* Beam connector: finalize and add as stroke */
+      if (beamDrawing && beamLine) {
+        const range = beamSnapRange();
+        if (e) {
+          const d = getData(e);
+          const stem = findNearestStem(d.x, d.y, range);
+          if (stem) beamEndPt = { x: stem.x, y: stem.y };
+        }
+        /* Only keep beam if endpoints are far enough apart */
+        const beamLen = Math.hypot(beamEndPt.x - beamStartPt.x, beamEndPt.y - beamStartPt.y);
+        if (beamLen > 5) {
+          const bw = parseFloat(beamLine.getAttribute('stroke-width'));
+          addStroke({ element: beamLine, points: [{ ...beamStartPt }, { ...beamEndPt }], color, width: bw, isBeam: true });
+          savePageAnnotations();
+        } else {
+          beamLine.remove();
+        }
+        hideStemDot();
+        beamDrawing = false; beamLine = null; beamStartPt = null; beamEndPt = null;
+        container.style.cursor = '';
+        updateCursor();
+        if (_t0) __pl('stop', performance.now() - _t0);
+        return;
+      }
       if (tool === 'pen' && path) {
         const simplified = simplifyPoints(points, SIMPLIFY_EPSILON);
         path.setAttribute('d', buildPath(simplified, getEffectiveWidth()));
@@ -2055,6 +2290,15 @@
                 return d > 0 ? { x: p.x + (dx / d) * hitR, y: p.y + (dy / d) * hitR } : p;
               });
               hit = pointInPolygon(tapPt.x, tapPt.y, expanded);
+            } else if (s.isBeam) {
+              /* Distance from point to line segment */
+              const p0 = s.points[0], p1 = s.points[1];
+              const lx = p1.x - p0.x, ly = p1.y - p0.y;
+              const len2 = lx * lx + ly * ly;
+              let t = len2 > 0 ? ((tapPt.x - p0.x) * lx + (tapPt.y - p0.y) * ly) / len2 : 0;
+              t = Math.max(0, Math.min(1, t));
+              const cx = p0.x + t * lx, cy = p0.y + t * ly;
+              if (Math.hypot(tapPt.x - cx, tapPt.y - cy) < hitR + s.width) hit = true;
             } else {
               for (const p of s.points) {
                 if (Math.hypot(tapPt.x - p.x, tapPt.y - p.y) < hitR + (s.width || 0)) { hit = true; break; }
@@ -2278,9 +2522,19 @@
       if (annotations && annotations.strokes.length > 0) {
         ctx.save();
         ctx.scale(thumbScale, thumbScale);
-        /* Draw regular strokes */
+        /* Draw regular strokes and beams */
         annotations.strokes.forEach(s => {
           if (s.isSticker) return;
+          if (s.isBeam) {
+            ctx.beginPath();
+            ctx.moveTo(s.points[0].x, s.points[0].y);
+            ctx.lineTo(s.points[1].x, s.points[1].y);
+            ctx.strokeStyle = s.color;
+            ctx.lineWidth = s.width;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            return;
+          }
           const path2d = new Path2D(buildPath(s.points, s.width));
           ctx.fillStyle = s.color;
           ctx.fill(path2d);
