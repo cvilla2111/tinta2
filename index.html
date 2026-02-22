@@ -2337,7 +2337,9 @@
       const r = eraserSize * getPdfScale() * dpr * 0.5;
       let erased = false;
       for (let i = strokes.length - 1; i >= 0; i--) {
-        const s = strokes[i], b = s.element.getBBox();
+        const s = strokes[i];
+        if (s.isSticker || s.isBeam) continue;
+        const b = s.element.getBBox();
         if (x < b.x-r || x > b.x+b.width+r || y < b.y-r || y > b.y+b.height+r) continue;
         for (const p of s.points) {
           if (Math.hypot(x-p.x, y-p.y) < r + s.width) {
