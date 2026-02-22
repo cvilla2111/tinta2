@@ -2404,9 +2404,10 @@
       if (e.pointerType !== 'touch') return;
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pdfDoc) {
-        if (activePointers.size === 2) {
+        if (activePointers.size === 2 && !penNearScreen) {
           const pts = Array.from(activePointers.values());
-          gestureStartDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          gestureStartDistance = d > 100 ? d : 0;
         }
       } else {
         if (activePointers.size === 2 && !penNearScreen) {
@@ -2426,7 +2427,7 @@
       if (e.pointerType !== 'touch' || !activePointers.has(e.pointerId)) return;
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pdfDoc) {
-        if (activePointers.size === 2) {
+        if (activePointers.size === 2 && gestureStartDistance > 0 && !penNearScreen) {
           const pts = Array.from(activePointers.values());
           if (gestureStartDistance - Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) > 150) { activePointers.clear(); showFilmstrip(); }
         }
@@ -2464,6 +2465,7 @@
         }
       }
       activePointers.delete(e.pointerId);
+      if (activePointers.size < 2) gestureStartDistance = 0;
       if (touchScrollActive && activePointers.size < 2) {
         touchScrollActive = false;
         startDeceleration();
@@ -2501,7 +2503,7 @@
     container.addEventListener('scroll', extendCanvas, { passive: true });
     container.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; });
 
-    container.addEventListener('pointerenter', e => { if (e.pointerType === 'pen' && !pdfDoc) penNearScreen = true; });
+    container.addEventListener('pointerenter', e => { if (e.pointerType === 'pen') penNearScreen = true; });
     container.addEventListener('pointerdown', e => { e.preventDefault(); e.pointerType === 'touch' ? handleGestureStart(e) : start(e); });
     container.addEventListener('pointermove', e => { e.preventDefault(); e.pointerType === 'touch' ? handleGestureMove(e) : move(e); });
     container.addEventListener('pointerup', e => { e.pointerType === 'touch' ? handleGestureEnd(e) : stop(e); });
