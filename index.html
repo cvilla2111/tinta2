@@ -272,8 +272,8 @@
     const pdfInput = $('pdfInput'), pdfControls = $('pdfControls'), pdfDivider = $('pdfDivider');
     const menuBtn = $('menuBtn'), filmstripOverlay = $('filmstripOverlay'), filmstripContainer = $('filmstripContainer');
     const activePointers = new Map();
-    let gestureStartDistance = 0;
     let lastTapTime = 0, lastTapX = 0;
+    let filmstripTapCount = 0, filmstripTapTimer = 0;
 
     const getPdfScale = () => pdfDoc && pdfPageWidth > 0 ? pdfPageWidth / (container.getBoundingClientRect().width * dpr) : 1;
     const getEffectiveWidth = () => width * getPdfScale();
@@ -2658,11 +2658,7 @@
       if (e.pointerType !== 'touch') return;
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pdfDoc) {
-        if (activePointers.size === 2 && !penNearScreen) {
-          const pts = Array.from(activePointers.values());
-          const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-          gestureStartDistance = d > 100 ? d : 0;
-        }
+        /* no pinch gesture – filmstrip triggered by triple-tap on bottom */
       } else {
         if (activePointers.size === 2 && !penNearScreen) {
           const pts = Array.from(activePointers.values());
@@ -2681,10 +2677,7 @@
       if (e.pointerType !== 'touch' || !activePointers.has(e.pointerId)) return;
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pdfDoc) {
-        if (activePointers.size === 2 && gestureStartDistance > 0 && !penNearScreen) {
-          const pts = Array.from(activePointers.values());
-          if (gestureStartDistance - Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) > 150) { activePointers.clear(); showFilmstrip(); }
-        }
+        /* no pinch gesture */
       } else {
         if (touchScrollActive && activePointers.size === 2) {
           const pts = Array.from(activePointers.values());
@@ -2706,6 +2699,7 @@
       if (pdfDoc) {
         if (activePointers.size === 1 && activePointers.has(e.pointerId)) {
           const now = Date.now();
+          /* Double-tap on left/right edge: page change */
           const edgeW = Math.max(60, window.innerWidth * 0.12);
           const isLeftEdge = e.clientX < edgeW;
           const isRightEdge = e.clientX > window.innerWidth - edgeW;
@@ -2716,10 +2710,26 @@
             lastTapTime = now;
             lastTapX = e.clientX;
           }
+          /* Triple-tap on bottom edge: filmstrip */
+          const bottomH = Math.max(60, window.innerHeight * 0.15);
+          if (e.clientY > window.innerHeight - bottomH) {
+            if (now - filmstripTapTimer < 500) {
+              filmstripTapCount++;
+              if (filmstripTapCount >= 3) {
+                filmstripTapCount = 0; filmstripTapTimer = 0;
+                activePointers.clear();
+                showFilmstrip();
+              }
+            } else {
+              filmstripTapCount = 1;
+            }
+            filmstripTapTimer = now;
+          } else {
+            filmstripTapCount = 0; filmstripTapTimer = 0;
+          }
         }
       }
       activePointers.delete(e.pointerId);
-      if (activePointers.size < 2) gestureStartDistance = 0;
       if (touchScrollActive && activePointers.size < 2) {
         touchScrollActive = false;
         startDeceleration();
