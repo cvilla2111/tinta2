@@ -2697,7 +2697,7 @@
     function handleGestureEnd(e) {
       if (e.pointerType !== 'touch') return;
       if (pdfDoc) {
-        if (activePointers.size === 1 && activePointers.has(e.pointerId)) {
+        if (activePointers.size === 1 && activePointers.has(e.pointerId) && !penNearScreen) {
           const now = Date.now();
           /* Double-tap on left/right edge: page change */
           const edgeW = Math.max(60, window.innerWidth * 0.12);
