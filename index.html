@@ -1525,7 +1525,7 @@
         return;
       }
       selectedStrokes.forEach(s => {
-        s.points = s.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy }));
+        s.points.forEach(p => { p.x += dx; p.y += dy; });
         updateStrokeElement(s);
       });
       if (selectionBounds) {
@@ -1547,7 +1547,7 @@
       if (Math.abs(finalX) > 0.01 || Math.abs(finalY) > 0.01) {
         gridAnimX += finalX; gridAnimY += finalY;
         selectedStrokes.forEach(s => {
-          s.points = s.points.map(p => ({ ...p, x: p.x + finalX, y: p.y + finalY }));
+          s.points.forEach(p => { p.x += finalX; p.y += finalY; });
           updateStrokeElement(s);
         });
         if (selectionBounds) {
@@ -1566,7 +1566,7 @@
       const remX = gridTargetX - gridAnimX, remY = gridTargetY - gridAnimY;
       if (Math.abs(remX) > 0.01 || Math.abs(remY) > 0.01) {
         selectedStrokes.forEach(s => {
-          s.points = s.points.map(p => ({ ...p, x: p.x + remX, y: p.y + remY }));
+          s.points.forEach(p => { p.x += remX; p.y += remY; });
           updateStrokeElement(s);
         });
         if (selectionBounds) {
@@ -1603,11 +1603,11 @@
 
       selectedStrokes.forEach((s, i) => {
         const origPoints = originalStrokePoints[i];
-        if (s.scaleWidthOnly) {
-          /* Only scale X, keep Y unchanged */
-          s.points = origPoints.map(pt => ({ ...pt, x: scaleAnchorWorldX + (pt.x - scaleAnchorWorldX) * scale, y: pt.y }));
-        } else {
-          s.points = origPoints.map(pt => ({ ...pt, x: scaleAnchorWorldX + (pt.x - scaleAnchorWorldX) * scale, y: scaleAnchorWorldY + (pt.y - scaleAnchorWorldY) * scale }));
+        for (let j = 0; j < s.points.length; j++) {
+          const op = origPoints[j], sp = s.points[j];
+          sp.x = scaleAnchorWorldX + (op.x - scaleAnchorWorldX) * scale;
+          if (!s.scaleWidthOnly) sp.y = scaleAnchorWorldY + (op.y - scaleAnchorWorldY) * scale;
+          else sp.y = op.y;
         }
         updateStrokeElement(s);
       });
@@ -1684,10 +1684,12 @@
 
       selectedStrokes.forEach((s, i) => {
         const origPoints = originalStrokePoints[i];
-        s.points = origPoints.map(p => {
-          const dx = p.x - rotationCenterX, dy = p.y - rotationCenterY;
-          return { ...p, x: rotationCenterX + dx * cos - dy * sin, y: rotationCenterY + dx * sin + dy * cos };
-        });
+        for (let j = 0; j < s.points.length; j++) {
+          const op = origPoints[j], sp = s.points[j];
+          const dx = op.x - rotationCenterX, dy = op.y - rotationCenterY;
+          sp.x = rotationCenterX + dx * cos - dy * sin;
+          sp.y = rotationCenterY + dx * sin + dy * cos;
+        }
         updateStrokeElement(s);
       });
 
@@ -1699,8 +1701,18 @@
       currentRotation = totalRotation;
     };
 
-    const savePageAnnotations = () => {
+    let _saveTimer = null;
+    const _doSave = () => {
+      _saveTimer = null;
       if (pdfDoc) pageAnnotations[currentPage] = { strokes: strokes.map(s => ({ ...s })), undoStack: undoStack.map(s => ({ ...s })) };
+    };
+    const savePageAnnotations = () => {
+      if (_saveTimer) clearTimeout(_saveTimer);
+      _saveTimer = setTimeout(_doSave, 200);
+    };
+    const savePageAnnotationsNow = () => {
+      if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+      _doSave();
     };
 
     const loadPageAnnotations = () => {
@@ -1990,6 +2002,7 @@
       points.push(d);
       if (strokeStarting && points.length > 3) strokeStarting = false;
       needsRender = true;
+      kickRenderLoop();
       if (segLen >= SEGMENT_MAX) {
         path.setAttribute('d', buildPath(points, getEffectiveWidth()));
         finalize();
@@ -2191,7 +2204,7 @@
       if (!pdfDoc || pageNum < 1 || pageNum > totalPages) return;
       const pageContainer = $('pdfPageContainer');
       if (skipAnimation) {
-        savePageAnnotations();
+        savePageAnnotationsNow();
         currentPage = pageNum;
         await renderPage(pageNum);
         loadPageAnnotations();
@@ -2201,7 +2214,7 @@
       const direction = pageNum > currentPage ? 'left' : 'right';
       pageContainer.classList.add(`slide-out-${direction}`);
       await new Promise(resolve => setTimeout(resolve, 50));
-      savePageAnnotations();
+      savePageAnnotationsNow();
       currentPage = pageNum;
       await renderPage(pageNum);
       loadPageAnnotations();
@@ -2303,7 +2316,7 @@
 
     const showFilmstrip = async () => {
       if (!pdfDoc) return;
-      savePageAnnotations();
+      savePageAnnotationsNow();
       filmstripThumbnails.forEach((item, idx) => item.classList.toggle('active', idx + 1 === currentPage));
       filmstripOverlay.classList.add('visible');
       filmstripContainer.querySelector('.active')?.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'center' });
@@ -2513,13 +2526,17 @@
       if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedStrokes.length > 0) { e.preventDefault(); duplicateSelectedStrokes(); }
     });
 
+    let renderLoopId = null;
     function renderLoop() {
+      renderLoopId = null;
       if (needsRender && drawing && tool === 'pen' && path && points.length > 0) {
         path.setAttribute('d', buildPath(points, getEffectiveWidth()));
+        renderLoopId = requestAnimationFrame(renderLoop);
       }
-      requestAnimationFrame(renderLoop);
     }
-    renderLoop();
+    function kickRenderLoop() {
+      if (!renderLoopId) renderLoopId = requestAnimationFrame(renderLoop);
+    }
 
     /* Custom scrollbar for no-pdf mode */
     const scrollbar = $('customScrollbar');
