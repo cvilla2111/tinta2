@@ -2069,7 +2069,7 @@
       if (selActive && isOnDuplicateHandle(d.x, d.y)) { duplicateSelectedStrokes(); drawing = false; return; }
       if (selActive && isOnLockHandle(d.x, d.y)) { toggleLockSelectedStrokes(); drawing = false; return; }
       if (selActive && isOnColorHandle(d.x, d.y)) { showColorModal(); drawing = false; return; }
-      if (selActive && isOnTrashHandle(d.x, d.y)) { deleteSelectedStrokes(); setTool('pen'); drawing = false; return; }
+      if (selActive && isOnTrashHandle(d.x, d.y)) { deleteSelectedStrokes(); drawing = false; return; }
 
       if (selActive) {
         const handle = getHandleAtPoint(d.x, d.y);
@@ -2337,7 +2337,7 @@
       }
       points = [];
       if (eraserEnd) { eraserEnd = false; resetBig(); if (prevTool !== 'eraser') setTool(prevTool === 'lasso' ? 'pen' : prevTool); }
-      if (lassoEnd) { lassoEnd = false; if (selectedStrokes.length === 0 && prevTool !== 'lasso') setTool(prevTool); }
+      if (lassoEnd) { lassoEnd = false; setTool('pen', true); }
     }
 
     function erase(x, y) {
