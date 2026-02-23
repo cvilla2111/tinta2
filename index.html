@@ -2783,8 +2783,8 @@
 
     menuBtn.onclick = e => { e.stopPropagation(); toggleToolbar(); };
     $('paletteBtn').onclick = e => { e.stopPropagation(); toggleCarousel(); };
-    carouselLassoBtn.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); setTool(tool === 'lasso' ? 'pen' : 'lasso'); updateCarouselToolActive(); });
-    carouselPenBtn.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); setTool(tool === 'pen' ? 'lasso' : 'pen'); updateCarouselToolActive(); });
+    carouselLassoBtn.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); setTool('lasso'); updateCarouselToolActive(); });
+    carouselPenBtn.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); setTool('pen'); updateCarouselToolActive(); });
     document.addEventListener('pointerdown', e => {
       if (toolbarVisible && !toolbar.contains(e.target) && e.target !== menuBtn) hideToolbar();
       if (carouselVisible && !carousel.contains(e.target) && e.target !== $('paletteBtn') && e.target !== hitarea && e.target !== carouselLassoBtn && e.target !== carouselPenBtn) hideCarousel();
