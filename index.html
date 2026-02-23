@@ -570,17 +570,22 @@
       addStroke(stickerStroke);
       savePageAnnotations();
       hideStickerModal();
-      /* Auto-select the placed sticker via lasso */
+      /* Auto-select only the newly placed sticker */
       setTool('lasso', true);
-      const pad = 2;
-      lassoPoints = [
-        { x: cx - hw - pad, y: cy - hh - pad },
-        { x: cx + hw + pad, y: cy - hh - pad },
-        { x: cx + hw + pad, y: cy + hh + pad },
-        { x: cx - hw - pad, y: cy + hh + pad }
-      ];
-      selectStrokesInLasso();
-      lassoPoints = [];
+      clearSelection();
+      selectedStrokes = [stickerStroke];
+      const selPad = getEffectiveHandleSize(10);
+      selectionBounds = { x: cx - hw - selPad, y: cy - hh - selPad, width: sw + selPad * 2, height: sh + selPad * 2 };
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.classList.add('selection-box');
+      rect.setAttribute('x', selectionBounds.x);
+      rect.setAttribute('y', selectionBounds.y);
+      rect.setAttribute('width', selectionBounds.width);
+      rect.setAttribute('height', selectionBounds.height);
+      rect.setAttribute('rx', 3);
+      group.appendChild(rect);
+      selectionBoxes.push(rect);
+      createSelectionHandles();
       if (tool === 'lasso') setTool('lasso', true);
       else setTool('pen', true);
     };
@@ -1670,7 +1675,7 @@
 
     const gridAnimStep = () => { const _t0 = window.__perfActive ? performance.now() : 0;
       gridAnimId = null;
-      const ease = 0.7;
+      const ease = 0.85;
       const diffX = gridTargetX - gridAnimX, diffY = gridTargetY - gridAnimY;
       const moveX = diffX * ease, moveY = diffY * ease;
       /* Snap to target when close enough to avoid endless micro-frames */
