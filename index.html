@@ -581,7 +581,8 @@
       ];
       selectStrokesInLasso();
       lassoPoints = [];
-      setTool('pen', true);
+      if (tool === 'lasso') setTool('lasso', true);
+      else setTool('pen', true);
     };
 
     const setTool = (t, preserveSelection = false) => {
