@@ -2002,7 +2002,7 @@
 
     function buildPath(pts, w) { const _t0 = window.__perfActive ? performance.now() : 0;
       if (pts.length < 2) {
-        const p = pts[0], r = (w * p.pressure * 1.5) / 2;
+        const p = pts[0], pr = pressure ? p.pressure : 0.6, r = (w * pr * 1.5) / 2;
         if (_t0) __pl('buildPath', performance.now() - _t0);
         return `M${p.x-r},${p.y}a${r},${r} 0 1,0 ${r*2},0a${r},${r} 0 1,0 ${-r*2},0`;
       }
