@@ -459,10 +459,10 @@
 
     const STICKERS = [
       { name: 'Staff', svg: '<svg viewBox="0 0 200 40"><line x1="2" y1="4" x2="198" y2="4" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="12" x2="198" y2="12" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="20" x2="198" y2="20" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="28" x2="198" y2="28" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="36" x2="198" y2="36" stroke="currentColor" stroke-width="0.7"/><line x1="2" y1="4" x2="2" y2="36" stroke="currentColor" stroke-width="1.2"/><line x1="198" y1="4" x2="198" y2="36" stroke="currentColor" stroke-width="1.2"/></svg>' },
-      { name: 'Beam', isConnector: true, svg: '<svg viewBox="0 0 64 8"><line x1="4" y1="4" x2="60" y2="4" stroke="currentColor" stroke-width="5" stroke-linecap="round"/></svg>' },
-      { name: 'Eighth Note', svg: '<svg viewBox="0 0 64 64"><circle cx="22" cy="46" r="8" fill="currentColor"/><line x1="30" y1="46" x2="30" y2="12" stroke="currentColor" stroke-width="3"/><path d="M30 12 Q38 14 42 22 Q38 18 30 20" fill="currentColor"/></svg>' },
-      { name: 'Half Note', svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
-      { name: 'Quarter Note', stickerScale: 0.9, svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="currentColor"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3"/></svg>' },
+      { name: 'Beam', isConnector: true, svg: '<svg viewBox="0 0 64 8"><line x1="4" y1="4" x2="60" y2="4" stroke="currentColor" stroke-width="5" stroke-linecap="butt"/></svg>' },
+      { name: 'Eighth Note', svg: '<svg viewBox="0 0 64 64"><circle cx="22" cy="46" r="8" fill="currentColor"/><line x1="30" y1="46" x2="30" y2="12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M30 12 Q38 14 42 22 Q38 18 30 20" fill="currentColor"/></svg>' },
+      { name: 'Half Note', svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' },
+      { name: 'Quarter Note', stickerScale: 0.9, svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="currentColor"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' },
       { name: 'Guitar', svg: '<svg viewBox="0 0 64 64"><ellipse cx="26" cy="44" rx="12" ry="14" fill="none" stroke="currentColor" stroke-width="2.5"/><ellipse cx="26" cy="44" rx="4" ry="5" fill="currentColor" opacity="0.3"/><line x1="37" y1="36" x2="54" y2="8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="50" y1="6" x2="58" y2="10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="52" y1="4" x2="56" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' },
       { name: 'Microphone', svg: '<svg viewBox="0 0 64 64"><rect x="24" y="8" width="16" height="28" rx="8" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M16 28 C16 42 23 48 32 48 C41 48 48 42 48 28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="48" x2="32" y2="58" stroke="currentColor" stroke-width="2.5"/><line x1="24" y1="58" x2="40" y2="58" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>' },
       { name: 'Piano Keys', svg: '<svg viewBox="0 0 64 64"><rect x="8" y="14" width="48" height="36" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="16" y1="14" x2="16" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="24" y1="14" x2="24" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="32" y1="14" x2="32" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="40" y1="14" x2="40" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="48" y1="14" x2="48" y2="50" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="21" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="37" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="45" y="14" width="6" height="22" rx="1" fill="currentColor"/></svg>' },
@@ -1407,7 +1407,7 @@
           el.setAttribute('x2', newPoints[1].x); el.setAttribute('y2', newPoints[1].y);
           el.setAttribute('stroke', s.color);
           el.setAttribute('stroke-width', s.width);
-          el.setAttribute('stroke-linecap', 'round');
+          el.setAttribute('stroke-linecap', 'butt');
           newStroke = { element: el, points: newPoints, color: s.color, width: s.width, isBeam: true };
         } else {
           el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1567,27 +1567,37 @@
       return best;
     };
 
-    /* Beam connector: stem-top positions in viewBox-relative coords for note stickers */
-    const NOTE_STEM_TOPS = {
-      'Quarter Note': { rx: 31 / 64, ry: 10 / 64 },
-      'Half Note':    { rx: 31 / 64, ry: 10 / 64 },
-      'Eighth Note':  { rx: 30 / 64, ry: 12 / 64 },
+    /* Beam connector: stem snap positions in viewBox-relative coords for note stickers */
+    /* Quarter Note stem: y=10 (top) to y=44 (bottom). 3 magnets for beam, 1/8, 1/16 */
+    const NOTE_STEM_SNAPS = {
+      'Quarter Note': [
+        { rx: 31 / 64, ry: 10 / 64 },
+        { rx: 31 / 64, ry: 18 / 64 },
+        { rx: 31 / 64, ry: 26 / 64 },
+      ],
+      'Half Note':    [{ rx: 31 / 64, ry: 10 / 64 }],
+      'Eighth Note':  [{ rx: 30 / 64, ry: 12 / 64 }],
     };
-    const getNoteStemWorld = (s) => {
+    const getNoteStemSnaps = (s) => {
       const name = STICKERS[s.stickerIdx]?.name;
-      const st = NOTE_STEM_TOPS[name];
-      if (!st) return null;
+      const snaps = NOTE_STEM_SNAPS[name];
+      if (!snaps) return null;
       const cx = s.points[4].x, cy = s.points[4].y;
-      return { x: cx + (st.rx - 0.5) * s.stickerW, y: cy + (st.ry - 0.5) * s.stickerH };
+      return snaps.map(st => ({
+        x: cx + (st.rx - 0.5) * s.stickerW,
+        y: cy + (st.ry - 0.5) * s.stickerH
+      }));
     };
     const findNearestStem = (wx, wy, maxRange) => {
       let best = null, bestD = Infinity;
       strokes.forEach(s => {
         if (!s.isSticker) return;
-        const stem = getNoteStemWorld(s);
-        if (!stem) return;
-        const d = Math.hypot(wx - stem.x, wy - stem.y);
-        if (d < maxRange && d < bestD) { best = stem; bestD = d; }
+        const pts = getNoteStemSnaps(s);
+        if (!pts) return;
+        pts.forEach(pt => {
+          const d = Math.hypot(wx - pt.x, wy - pt.y);
+          if (d < maxRange && d < bestD) { best = pt; bestD = d; }
+        });
       });
       return best;
     };
@@ -1863,7 +1873,7 @@
             el.setAttribute('x2', s.points[1].x); el.setAttribute('y2', s.points[1].y);
             el.setAttribute('stroke', s.color);
             el.setAttribute('stroke-width', s.width);
-            el.setAttribute('stroke-linecap', 'round');
+            el.setAttribute('stroke-linecap', 'butt');
             if (appendToGroup) group.appendChild(el);
             return { ...s, element: el };
           }
@@ -2012,13 +2022,13 @@
         const sx = stem ? stem.x : d.x, sy = stem ? stem.y : d.y;
         beamStartPt = { x: sx, y: sy };
         beamEndPt = { x: sx, y: sy };
-        const bw = 6 * (pdfDoc ? getPdfScale() : dpr);
+        const bw = 9 * (pdfDoc ? getPdfScale() : dpr);
         beamLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         beamLine.setAttribute('x1', sx); beamLine.setAttribute('y1', sy);
         beamLine.setAttribute('x2', sx); beamLine.setAttribute('y2', sy);
         beamLine.setAttribute('stroke', color);
         beamLine.setAttribute('stroke-width', bw);
-        beamLine.setAttribute('stroke-linecap', 'round');
+        beamLine.setAttribute('stroke-linecap', 'butt');
         group.appendChild(beamLine);
         drawing = true;
         if (_t0) __pl('start', performance.now() - _t0);
