@@ -2701,10 +2701,11 @@
       if (pdfDoc) {
         if (activePointers.size === 1 && activePointers.has(e.pointerId) && !penNearScreen) {
           const now = Date.now();
-          /* Double-tap on left/right edge: page change */
+          /* Double-tap on top-side corners: page change */
           const edgeW = Math.max(60, window.innerWidth * 0.12);
-          const isLeftEdge = e.clientX < edgeW;
-          const isRightEdge = e.clientX > window.innerWidth - edgeW;
+          const topH = window.innerHeight * 0.3;
+          const isLeftEdge = e.clientX < edgeW && e.clientY < topH;
+          const isRightEdge = e.clientX > window.innerWidth - edgeW && e.clientY < topH;
           if ((isLeftEdge || isRightEdge) && now - lastTapTime < 400 && Math.abs(e.clientX - lastTapX) < edgeW) {
             goToPage(isLeftEdge ? currentPage - 1 : currentPage + 1);
             lastTapTime = 0;
