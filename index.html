@@ -1387,7 +1387,7 @@
     const duplicateSelectedStrokes = () => {
       if (selectedStrokes.length === 0) return;
       hideColorModal();
-      const gridSize = getEffectiveHandleSize(12);
+      const gridSize = getEffectiveHandleSize(9);
       const rawOffset = 20 * getPdfScale();
       const offset = Math.max(gridSize, Math.round(rawOffset / gridSize) * gridSize);
       const newStrokes = [];
@@ -1629,7 +1629,7 @@
       /* Grid snap: snap sticker movement to invisible grid with elastic ease */
       const hasSticker = selectedStrokes.some(s => s.isSticker);
       if (hasSticker) {
-        const gridSize = getEffectiveHandleSize(12);
+        const gridSize = getEffectiveHandleSize(9);
         gridSnapAccumX += dx; gridSnapAccumY += dy;
         /* Staff magnet: bias accumulator toward snap target */
         if (staffUnsnappedCenter && staffSnapRef) {
@@ -2128,8 +2128,22 @@
         staffSnapRef = selectedStrokes.find(s => s.isSticker && STICKERS[s.stickerIdx]?.name === 'Staff') || null;
         staffUnsnappedCenter = staffSnapRef ? { x: staffSnapRef.points[4].x, y: staffSnapRef.points[4].y } : null;
         staffDragAccum = 0; staffBiasX = 0; staffBiasY = 0;
-        /* Init grid snap tracking */
-        if (selectionBounds) { gridSnapOriginX = selectionBounds.x; gridSnapOriginY = selectionBounds.y; gridSnapAccumX = 0; gridSnapAccumY = 0; gridAnimX = selectionBounds.x; gridAnimY = selectionBounds.y; gridTargetX = selectionBounds.x; gridTargetY = selectionBounds.y; }
+        /* Init grid snap tracking – use sticker center for grid alignment so
+           different stickers sharing the same grid land on consistent positions */
+        if (selectionBounds) {
+          const gridSize = getEffectiveHandleSize(9);
+          const anchorSticker = selectedStrokes.find(s => s.isSticker);
+          let originX = selectionBounds.x, originY = selectionBounds.y;
+          if (anchorSticker) {
+            const acx = anchorSticker.points[4].x, acy = anchorSticker.points[4].y;
+            const offsetX = acx - selectionBounds.x, offsetY = acy - selectionBounds.y;
+            const alignedCx = Math.round(acx / gridSize) * gridSize;
+            const alignedCy = Math.round(acy / gridSize) * gridSize;
+            originX = alignedCx - offsetX;
+            originY = alignedCy - offsetY;
+          }
+          gridSnapOriginX = originX; gridSnapOriginY = originY; gridSnapAccumX = 0; gridSnapAccumY = 0; gridAnimX = selectionBounds.x; gridAnimY = selectionBounds.y; gridTargetX = selectionBounds.x; gridTargetY = selectionBounds.y;
+        }
         animateToolbarOut();
         drawing = false;
         return;
