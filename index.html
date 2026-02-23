@@ -252,7 +252,7 @@
     let colorModalGroup = null, colorModalOpen = false, colorSwatchRects = [];
     const blinkingStrokes = new Set();
     let isDraggingSelection = false, isScalingSelection = false, isRotatingSelection = false, isDraggingBeamEndpoint = false, beamDragIdx = -1;
-    let activeHandle = null, dragStartX = 0, dragStartY = 0, selectionBounds = null, originalBounds = null, originalStrokePoints = [];
+    let activeHandle = null, dragStartX = 0, dragStartY = 0, selectionBounds = null, originalBounds = null, originalStrokePoints = [], originalStrokeWidths = [];
     let rotationCenterX = 0, rotationCenterY = 0, startAngle = 0, currentRotation = 0, previousRotation = 0;
     let scaleAnchorWorldX = 0, scaleAnchorWorldY = 0;
     let staffUnsnappedCenter = null, staffSnapRef = null, staffDragAccum = 0, staffBiasX = 0, staffBiasY = 0;
@@ -672,7 +672,7 @@
       if (lassoPath) { lassoPath.remove(); lassoPath = null; }
       lassoPoints = [];
       selectionBounds = originalBounds = null;
-      originalStrokePoints = [];
+      originalStrokePoints = []; originalStrokeWidths = [];
       currentRotation = previousRotation = 0;
       cachedToolbarLayout = null;
     };
@@ -1714,6 +1714,42 @@
       }
     };
 
+    /* Merge consecutive split stroke segments in the selection so scaling/rotation
+       doesn't cause visible seams at the split boundaries. Split segments share
+       their last 2 / first 2 points — normals differ at those boundaries because
+       each segment computes them independently, causing deformation when transformed. */
+    const mergeSplitSegments = () => {
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let i = 0; i < selectedStrokes.length && !changed; i++) {
+          const a = selectedStrokes[i];
+          if (a.isSticker || a.isBeam || a.points.length < 2) continue;
+          for (let j = 0; j < selectedStrokes.length; j++) {
+            if (i === j) continue;
+            const b = selectedStrokes[j];
+            if (b.isSticker || b.isBeam || b.points.length < 2) continue;
+            if (a.color !== b.color || Math.abs(a.width - b.width) > 0.1) continue;
+            const aLen = a.points.length;
+            const eps = 1;
+            if (Math.abs(a.points[aLen - 2].x - b.points[0].x) < eps &&
+                Math.abs(a.points[aLen - 2].y - b.points[0].y) < eps &&
+                Math.abs(a.points[aLen - 1].x - b.points[1].x) < eps &&
+                Math.abs(a.points[aLen - 1].y - b.points[1].y) < eps) {
+              a.points = a.points.concat(b.points.slice(2));
+              a.element.setAttribute('d', buildPath(a.points, a.width));
+              b.element.remove();
+              const bIdx = strokes.indexOf(b);
+              if (bIdx >= 0) strokes.splice(bIdx, 1);
+              selectedStrokes.splice(j, 1);
+              changed = true;
+              break;
+            }
+          }
+        }
+      }
+    };
+
     const scaleSelection = (newX, newY) => { const _t0 = window.__perfActive ? performance.now() : 0;
       if (!originalBounds || !activeHandle) { if (_t0) __pl('scaleSelection', performance.now() - _t0); return; }
       const origCx = originalBounds.x + originalBounds.width / 2, origCy = originalBounds.y + originalBounds.height / 2;
@@ -1746,6 +1782,7 @@
           if (!s.scaleWidthOnly) sp.y = scaleAnchorWorldY + (op.y - scaleAnchorWorldY) * scale;
           else sp.y = op.y;
         }
+        if (!s.isSticker && !s.isBeam && originalStrokeWidths[i]) s.width = originalStrokeWidths[i] * scale;
         updateStrokeElement(s);
       });
 
@@ -2070,6 +2107,7 @@
       if (selActive && shrinkAnimId) { finishShrinkAnimation(); }
 
       if (selActive && isOnRotationHandle(d.x, d.y)) {
+        mergeSplitSegments();
         isRotatingSelection = true;
         originalBounds = { ...selectionBounds };
         originalStrokePoints = selectedStrokes.map(s => s.points.map(p => ({ ...p })));
@@ -2098,10 +2136,12 @@
           return;
         }
         if (handle) {
+          mergeSplitSegments();
           isScalingSelection = true;
           activeHandle = handle;
           originalBounds = { ...selectionBounds };
           originalStrokePoints = selectedStrokes.map(s => s.points.map(p => ({ ...p })));
+          originalStrokeWidths = selectedStrokes.map(s => s.width);
           const cx = selectionBounds.x + selectionBounds.width / 2, cy = selectionBounds.y + selectionBounds.height / 2;
           let anchorLocalX, anchorLocalY;
           const midY = selectionBounds.y + selectionBounds.height / 2;
@@ -2122,6 +2162,7 @@
       }
 
       if (selActive && isInsideSelectionBox(d.x, d.y)) {
+        mergeSplitSegments();
         isDraggingSelection = true;
         dragStartX = d.x; dragStartY = d.y;
         /* Init staff magnet snap tracking */
@@ -2251,7 +2292,7 @@
       cachedSvgRect = null;
       cachedInverseCTM = null;
       if (isRotatingSelection) { isRotatingSelection = false; originalBounds = null; originalStrokePoints = []; savePageAnnotations(); return; }
-      if (isScalingSelection) { isScalingSelection = false; activeHandle = null; originalBounds = null; originalStrokePoints = []; buildToolbarElements(true); savePageAnnotations(); return; }
+      if (isScalingSelection) { isScalingSelection = false; activeHandle = null; originalBounds = null; originalStrokePoints = []; originalStrokeWidths = []; buildToolbarElements(true); savePageAnnotations(); return; }
       if (isDraggingBeamEndpoint) {
         /* Final snap */
         if (e) {
