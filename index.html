@@ -423,7 +423,21 @@
       carouselLassoBtn.classList.toggle('active', tool === 'lasso');
       carouselPenBtn.classList.toggle('active', tool === 'pen');
     };
-    const showCarousel = () => {
+    let toolButtonsVisible = false;
+    const showToolButtons = () => {
+      toolButtonsVisible = true;
+      carouselLassoBtn.classList.add('visible');
+      carouselPenBtn.classList.add('visible');
+      updateCarouselToolActive();
+    };
+    const hideToolButtons = () => {
+      toolButtonsVisible = false;
+      carouselLassoBtn.classList.remove('visible');
+      carouselPenBtn.classList.remove('visible');
+      hideColorCarousel();
+    };
+    const toggleToolButtons = () => toolButtonsVisible ? hideToolButtons() : showToolButtons();
+    const showColorCarousel = () => {
       const currentColorIndex = colors.indexOf(color);
       if (currentColorIndex !== -1) {
         const targetAngle = -Math.PI / 4;
@@ -432,20 +446,18 @@
       }
       carouselVisible = true;
       carousel.classList.add('visible');
-      carouselLassoBtn.classList.add('visible');
-      carouselPenBtn.classList.add('visible');
-      updateCarouselToolActive();
       updateCarouselPositions();
     };
-    const hideCarousel = () => {
+    const hideColorCarousel = () => {
       carouselVisible = false;
       carousel.classList.remove('visible');
-      carouselLassoBtn.classList.remove('visible');
-      carouselPenBtn.classList.remove('visible');
       if (spinAnimationId) { cancelAnimationFrame(spinAnimationId); spinAnimationId = null; }
       spinVelocity = 0;
     };
-    const toggleCarousel = () => carouselVisible ? hideCarousel() : showCarousel();
+    const toggleColorCarousel = () => carouselVisible ? hideColorCarousel() : showColorCarousel();
+    /* Legacy aliases used elsewhere */
+    const showCarousel = showToolButtons;
+    const hideCarousel = hideToolButtons;
 
     updateCarouselPositions();
 
@@ -2823,12 +2835,17 @@
     }
 
     menuBtn.onclick = e => { e.stopPropagation(); toggleToolbar(); };
-    $('paletteBtn').onclick = e => { e.stopPropagation(); toggleCarousel(); };
-    carouselLassoBtn.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); setTool('lasso'); updateCarouselToolActive(); });
-    carouselPenBtn.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); setTool('pen'); updateCarouselToolActive(); });
+    $('paletteBtn').onclick = e => { e.stopPropagation(); toggleToolButtons(); };
+    carouselLassoBtn.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); setTool('lasso'); updateCarouselToolActive(); hideColorCarousel(); });
+    carouselPenBtn.addEventListener('pointerdown', e => {
+      e.stopPropagation(); e.preventDefault();
+      if (tool === 'pen') { toggleColorCarousel(); }
+      else { setTool('pen'); updateCarouselToolActive(); hideColorCarousel(); }
+    });
     document.addEventListener('pointerdown', e => {
       if (toolbarVisible && !toolbar.contains(e.target) && e.target !== menuBtn) hideToolbar();
-      if (carouselVisible && !carousel.contains(e.target) && e.target !== $('paletteBtn') && e.target !== hitarea && e.target !== carouselLassoBtn && e.target !== carouselPenBtn) hideCarousel();
+      if (carouselVisible && !carousel.contains(e.target) && e.target !== $('paletteBtn') && e.target !== hitarea && e.target !== carouselLassoBtn && e.target !== carouselPenBtn) hideColorCarousel();
+      if (toolButtonsVisible && e.target !== $('paletteBtn') && e.target !== carouselLassoBtn && e.target !== carouselPenBtn && !carousel.contains(e.target)) hideToolButtons();
     });
     toolbar.addEventListener('pointerdown', e => e.stopPropagation());
 
