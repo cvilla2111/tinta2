@@ -2681,7 +2681,7 @@
 
     /* ── Scroll physics: simple pixel-based inertia, no bounce ── */
     const FRICTION = 0.92;
-    let penNearScreen = false;
+    let penNearScreen = false, penNearTimer = null;
     let touchScrollActive = false;
     let touchScrollLastY = 0;
     let touchScrollLastTime = 0;
@@ -2854,12 +2854,23 @@
     container.addEventListener('scroll', extendCanvas, { passive: true });
     container.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; });
 
-    container.addEventListener('pointerenter', e => { if (e.pointerType === 'pen') penNearScreen = true; });
+    container.addEventListener('pointerenter', e => {
+      if (e.pointerType === 'pen') {
+        penNearScreen = true;
+        clearTimeout(penNearTimer);
+        penNearTimer = null;
+      }
+    });
     container.addEventListener('pointerdown', e => { e.preventDefault(); e.pointerType === 'touch' ? handleGestureStart(e) : start(e); });
     container.addEventListener('pointermove', e => { e.preventDefault(); e.pointerType === 'touch' ? handleGestureMove(e) : move(e); });
-    container.addEventListener('pointerup', e => { e.pointerType === 'touch' ? handleGestureEnd(e) : stop(e); });
+    container.addEventListener('pointerup', e => {
+      if (e.pointerType === 'pen' && !penNearTimer) {
+        penNearTimer = setTimeout(() => { penNearScreen = false; penNearTimer = null; }, 800);
+      }
+      e.pointerType === 'touch' ? handleGestureEnd(e) : stop(e);
+    });
     container.addEventListener('pointerleave', e => {
-      if (e.pointerType === 'pen') penNearScreen = false;
+      if (e.pointerType === 'pen') { penNearScreen = false; clearTimeout(penNearTimer); penNearTimer = null; }
       e.pointerType === 'touch' ? activePointers.delete(e.pointerId) : stop(e);
     });
     container.addEventListener('pointercancel', e => { e.pointerType === 'touch' ? activePointers.delete(e.pointerId) : stop(e); });
