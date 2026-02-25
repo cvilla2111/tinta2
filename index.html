@@ -74,7 +74,7 @@
     .pdf-page-container.slide-out-right { transform: translateX(100%); opacity: 0; }
     .pdf-page-container.slide-in-left { transform: translateX(100%); opacity: 0; transition: none; }
     .pdf-page-container.slide-in-right { transform: translateX(-100%); opacity: 0; transition: none; }
-    .canvas-container:not(.pdf-mode) .pdf-page-container { position: relative; width: 100%; background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px); background-size: 30px 30px; }
+    .canvas-container:not(.pdf-mode) .pdf-page-container { position: relative; width: 100%; background-color: var(--bg); background-image: linear-gradient(rgba(59, 130, 246, 0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px); background-size: 9px 9px; }
 
     .canvas-container:not(.pdf-mode) #pdf-canvas { display: none; }
     .canvas-container:not(.pdf-mode) #drawing-svg { width: 100%; display: block; position: relative; top: auto; left: auto; }
@@ -247,7 +247,7 @@
     let tool = 'pen', width = 5, color = '#1f2937', sizeIdx = 9, drawing = false, path = null, points = [];
     const ERASER_SIZE = 20, BIG_ERASER_SIZE = 130;
     let strokes = [], undoStack = [], pageAnnotations = {};
-    let eraserEnd = false, lassoEnd = false, prevTool = 'pen', pressure = false, bigEraser = false, tapTimes = [], segLen = 0, strokeStarting = false;
+    let eraserEnd = false, lassoEnd = false, lassoFromPenBtn = false, prevTool = 'pen', pressure = false, bigEraser = false, tapTimes = [], segLen = 0, strokeStarting = false;
     let pdfDoc = null, currentPage = 1, totalPages = 0, pdfPageWidth = 0, pdfPageHeight = 0;
     let toolbarVisible = false, filmstripThumbnails = [];
 
@@ -264,7 +264,10 @@
     let beamDrawing = false, beamLine = null, beamStartPt = null, beamEndPt = null;
     let stemDot = null;
     let gridSnapOriginX = 0, gridSnapOriginY = 0, gridSnapAccumX = 0, gridSnapAccumY = 0;
-    let gridAnimX = 0, gridAnimY = 0, gridTargetX = 0, gridTargetY = 0, gridAnimId = null;
+    let gridAnimX = 0, gridAnimY = 0, gridTargetX = 0, gridTargetY = 0, gridAnimId = null, prevGridTargetX = 0, prevGridTargetY = 0;
+    let gridVelX = 0, gridVelY = 0;
+    let scaleTargetScale = 1, scaleAnimScale = 1, scaleVelScale = 0, scaleAnimId = null, scaleOrigGridStep = 0;
+    let rotTargetAngle = 0, rotAnimAngle = 0, rotVelAngle = 0, rotAnimId = null;
     let cachedToolbarLayout = null;
 
     let needsRender = false;
@@ -288,6 +291,17 @@
     let filmstripTapCount = 0, filmstripTapTimer = 0;
 
     const getPdfScale = () => pdfDoc && pdfPageWidth > 0 ? pdfPageWidth / (container.getBoundingClientRect().width * dpr) : 1;
+    const getDisplayScale = () => pdfDoc ? getPdfScale() : dpr;
+    /* Dynamic grid step: derived from the actual staff sticker dimensions on the canvas.
+       Half the staff line spacing = stickerH * (8/40) / 2 = stickerH * 0.1
+       Falls back to 9 * displayScale when no staff sticker exists. */
+    const getGridStep = () => {
+      for (let i = 0; i < strokes.length; i++) {
+        const s = strokes[i];
+        if (s.isSticker && STICKERS[s.stickerIdx]?.name === 'Staff') return s.stickerH * 0.1;
+      }
+      return 9 * getDisplayScale();
+    };
     const getEffectiveWidth = () => width * getPdfScale();
     const getEffectiveHandleSize = size => size * getPdfScale();
     const showToolbar = () => { toolbarVisible = true; toolbar.classList.remove('hidden'); };
@@ -482,7 +496,7 @@
       { name: 'Beam', isConnector: true, svg: '<svg viewBox="0 0 64 8"><line x1="4" y1="4" x2="60" y2="4" stroke="currentColor" stroke-width="5" stroke-linecap="butt"/></svg>' },
       { name: 'Eighth Note', svg: '<svg viewBox="0 0 64 64"><circle cx="22" cy="46" r="8" fill="currentColor"/><line x1="30" y1="46" x2="30" y2="12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M30 12 Q38 14 42 22 Q38 18 30 20" fill="currentColor"/></svg>' },
       { name: 'Half Note', svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="31" y1="44" x2="31" y2="10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' },
-      { name: 'Quarter Note', stickerScale: 0.675, svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46" rx="9" ry="7" transform="rotate(-20 24 46)" fill="currentColor"/><line x1="31" y1="44" x2="31" y2="2" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' },
+      { name: 'Quarter Note', stickerScale: 0.675, svg: '<svg viewBox="0 0 64 64"><ellipse cx="24" cy="46.22" rx="9" ry="7" transform="rotate(-20 24 46.22)" fill="currentColor"/><line x1="31" y1="44" x2="31" y2="2" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' },
       { name: 'Guitar', svg: '<svg viewBox="0 0 64 64"><ellipse cx="26" cy="44" rx="12" ry="14" fill="none" stroke="currentColor" stroke-width="2.5"/><ellipse cx="26" cy="44" rx="4" ry="5" fill="currentColor" opacity="0.3"/><line x1="37" y1="36" x2="54" y2="8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="50" y1="6" x2="58" y2="10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="52" y1="4" x2="56" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' },
       { name: 'Microphone', svg: '<svg viewBox="0 0 64 64"><rect x="24" y="8" width="16" height="28" rx="8" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M16 28 C16 42 23 48 32 48 C41 48 48 42 48 28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="48" x2="32" y2="58" stroke="currentColor" stroke-width="2.5"/><line x1="24" y1="58" x2="40" y2="58" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>' },
       { name: 'Piano Keys', svg: '<svg viewBox="0 0 64 64"><rect x="8" y="14" width="48" height="36" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="16" y1="14" x2="16" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="24" y1="14" x2="24" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="32" y1="14" x2="32" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="40" y1="14" x2="40" y2="50" stroke="currentColor" stroke-width="1.5"/><line x1="48" y1="14" x2="48" y2="50" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="21" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="37" y="14" width="6" height="22" rx="1" fill="currentColor"/><rect x="45" y="14" width="6" height="22" rx="1" fill="currentColor"/></svg>' },
@@ -609,8 +623,16 @@
       group.appendChild(rect);
       selectionBoxes.push(rect);
       createSelectionHandles();
-      if (tool === 'lasso') setTool('lasso', true);
-      else setTool('pen', true);
+      if (lassoFromPenBtn) {
+        /* Pen-button lasso triggered sticker: stay in lasso temporarily,
+           restore lassoEnd so next stop() reverts to pen */
+        setTool('lasso', true);
+        lassoEnd = true;
+      } else if (tool === 'lasso') {
+        setTool('lasso', true);
+      } else {
+        setTool('pen', true);
+      }
     };
 
     const setTool = (t, preserveSelection = false) => {
@@ -1410,7 +1432,7 @@
     const duplicateSelectedStrokes = () => {
       if (selectedStrokes.length === 0) return;
       hideColorModal();
-      const gridSize = getEffectiveHandleSize(9);
+      const gridSize = getGridStep();
       const rawOffset = 20 * getPdfScale();
       const offset = Math.max(gridSize, Math.round(rawOffset / gridSize) * gridSize);
       const newStrokes = [];
@@ -1652,7 +1674,7 @@
       /* Grid snap: snap sticker movement to invisible grid with elastic ease */
       const hasSticker = selectedStrokes.some(s => s.isSticker);
       if (hasSticker) {
-        const gridSize = getEffectiveHandleSize(9);
+        const gridSize = getGridStep();
         gridSnapAccumX += dx; gridSnapAccumY += dy;
         /* Staff magnet: bias accumulator toward snap target */
         if (staffUnsnappedCenter && staffSnapRef) {
@@ -1678,6 +1700,9 @@
         const snappedY = Math.round(gridSnapAccumY / gridSize) * gridSize;
         gridTargetX = gridSnapOriginX + snappedX;
         gridTargetY = gridSnapOriginY + snappedY;
+        if (gridTargetX !== prevGridTargetX || gridTargetY !== prevGridTargetY) {
+          prevGridTargetX = gridTargetX; prevGridTargetY = gridTargetY;
+        }
         if (!gridAnimId) {
           gridAnimId = requestAnimationFrame(gridAnimStep);
         }
@@ -1698,12 +1723,16 @@
 
     const gridAnimStep = () => { const _t0 = window.__perfActive ? performance.now() : 0;
       gridAnimId = null;
-      const ease = 0.85;
+      /* Spring physics: stiffness pulls toward target, damping settles oscillation */
+      const stiffness = 0.5, damping = 0.55;
       const diffX = gridTargetX - gridAnimX, diffY = gridTargetY - gridAnimY;
-      const moveX = diffX * ease, moveY = diffY * ease;
-      /* Snap to target when close enough to avoid endless micro-frames */
-      const finalX = Math.abs(diffX) < 0.3 ? gridTargetX - gridAnimX : moveX;
-      const finalY = Math.abs(diffY) < 0.3 ? gridTargetY - gridAnimY : moveY;
+      gridVelX = (gridVelX + diffX * stiffness) * damping;
+      gridVelY = (gridVelY + diffY * stiffness) * damping;
+      /* Snap to target when close and velocity is low */
+      const speed = Math.abs(gridVelX) + Math.abs(gridVelY);
+      const dist = Math.abs(diffX) + Math.abs(diffY);
+      const finalX = (dist < 0.3 && speed < 0.3) ? diffX : gridVelX;
+      const finalY = (dist < 0.3 && speed < 0.3) ? diffY : gridVelY;
       if (Math.abs(finalX) > 0.01 || Math.abs(finalY) > 0.01) {
         gridAnimX += finalX; gridAnimY += finalY;
         selectedStrokes.forEach(s => {
@@ -1715,7 +1744,7 @@
           updateSelectionUI(true);
         }
       }
-      if (Math.abs(gridTargetX - gridAnimX) > 0.1 || Math.abs(gridTargetY - gridAnimY) > 0.1) {
+      if (dist > 0.1 || speed > 0.1) {
         gridAnimId = requestAnimationFrame(gridAnimStep);
       }
       if (_t0) __pl('gridAnimStep', performance.now() - _t0);
@@ -1773,6 +1802,90 @@
       }
     };
 
+    /* Apply a given scale factor to the selection from originalStrokePoints */
+    const applyScale = (s, snapToGrid) => {
+      if (!originalBounds) return;
+      const allWidthOnly = selectedStrokes.every(st => st.scaleWidthOnly);
+      const origCx = originalBounds.x + originalBounds.width / 2;
+      const origCy = originalBounds.y + originalBounds.height / 2;
+
+      selectedStrokes.forEach((st, i) => {
+        const origPoints = originalStrokePoints[i];
+        for (let j = 0; j < st.points.length; j++) {
+          const op = origPoints[j], sp = st.points[j];
+          sp.x = scaleAnchorWorldX + (op.x - scaleAnchorWorldX) * s;
+          if (!st.scaleWidthOnly) sp.y = scaleAnchorWorldY + (op.y - scaleAnchorWorldY) * s;
+          else sp.y = op.y;
+        }
+        if (!st.isSticker && !st.isBeam && originalStrokeWidths[i]) st.width = originalStrokeWidths[i] * s;
+        updateStrokeElement(st);
+      });
+
+      const scaledWidth = originalBounds.width * s;
+      const scaledHeight = allWidthOnly ? originalBounds.height : originalBounds.height * s;
+      let newCx = scaleAnchorWorldX + (origCx - scaleAnchorWorldX) * s;
+      let newCy = allWidthOnly ? origCy : scaleAnchorWorldY + (origCy - scaleAnchorWorldY) * s;
+
+      if (snapToGrid) {
+        /* Use post-scale grid step (stickerH was updated by updateStrokeElement above).
+           Snap based on a reference sticker center (prefer Staff) so that the staff
+           lines land on grid points – the note is always k*gridSteps from the staff,
+           so it stays aligned to lines/spaces automatically. */
+        const postGridStep = getGridStep();
+        let refX = newCx, refY = newCy;
+        for (let i = 0; i < selectedStrokes.length; i++) {
+          const st = selectedStrokes[i];
+          if (st.isSticker) {
+            if (STICKERS[st.stickerIdx]?.name === 'Staff') {
+              refX = st.points[4].x; refY = st.points[4].y; break;
+            }
+            if (refX === newCx) { refX = st.points[4].x; refY = st.points[4].y; }
+          }
+        }
+        const snappedRefX = Math.round(refX / postGridStep) * postGridStep;
+        const snappedRefY = allWidthOnly ? refY : Math.round(refY / postGridStep) * postGridStep;
+        const snapDx = snappedRefX - refX, snapDy = snappedRefY - refY;
+        if (Math.abs(snapDx) > 0.01 || Math.abs(snapDy) > 0.01) {
+          selectedStrokes.forEach(st => {
+            st.points.forEach(p => { p.x += snapDx; p.y += snapDy; });
+            updateStrokeElement(st);
+          });
+          newCx += snapDx; newCy += snapDy;
+        }
+      }
+
+      selectionBounds.x = newCx - scaledWidth / 2;
+      selectionBounds.y = newCy - scaledHeight / 2;
+      selectionBounds.width = scaledWidth;
+      selectionBounds.height = scaledHeight;
+      updateSelectionUI(true);
+    };
+
+    /* Spring animation for sticker scaling (mirrors gridAnimStep for dragging) */
+    const scaleAnimStep = () => {
+      scaleAnimId = null;
+      const stiffness = 0.5, damping = 0.55;
+      const diff = scaleTargetScale - scaleAnimScale;
+      scaleVelScale = (scaleVelScale + diff * stiffness) * damping;
+      const speed = Math.abs(scaleVelScale);
+      const dist = Math.abs(diff);
+      const final = (dist < 0.001 && speed < 0.001) ? diff : scaleVelScale;
+      if (Math.abs(final) > 0.0001) {
+        scaleAnimScale += final;
+        applyScale(scaleAnimScale, true);
+      }
+      if (dist > 0.0005 || speed > 0.0005) {
+        scaleAnimId = requestAnimationFrame(scaleAnimStep);
+      }
+    };
+    const stopScaleAnim = () => {
+      if (scaleAnimId) { cancelAnimationFrame(scaleAnimId); scaleAnimId = null; }
+      if (Math.abs(scaleTargetScale - scaleAnimScale) > 0.0001) {
+        scaleAnimScale = scaleTargetScale;
+        applyScale(scaleAnimScale, true);
+      }
+    };
+
     const scaleSelection = (newX, newY) => { const _t0 = window.__perfActive ? performance.now() : 0;
       if (!originalBounds || !activeHandle) { if (_t0) __pl('scaleSelection', performance.now() - _t0); return; }
       const origCx = originalBounds.x + originalBounds.width / 2, origCy = originalBounds.y + originalBounds.height / 2;
@@ -1793,31 +1906,25 @@
       const origDist = isSideHandle ? Math.abs(handleWorldX - scaleAnchorWorldX) : Math.hypot(handleWorldX - scaleAnchorWorldX, handleWorldY - scaleAnchorWorldY);
       const newDist = isSideHandle ? Math.abs(newX - scaleAnchorWorldX) : Math.hypot(newX - scaleAnchorWorldX, newY - scaleAnchorWorldY);
       const minScale = 20 / Math.max(originalBounds.width, originalBounds.height);
-      const scale = Math.max(minScale, origDist > 0 ? newDist / origDist : 1);
+      let scale = Math.max(minScale, origDist > 0 ? newDist / origDist : 1);
 
-      const allWidthOnly = selectedStrokes.every(s => s.scaleWidthOnly);
-
-      selectedStrokes.forEach((s, i) => {
-        const origPoints = originalStrokePoints[i];
-        for (let j = 0; j < s.points.length; j++) {
-          const op = origPoints[j], sp = s.points[j];
-          sp.x = scaleAnchorWorldX + (op.x - scaleAnchorWorldX) * scale;
-          if (!s.scaleWidthOnly) sp.y = scaleAnchorWorldY + (op.y - scaleAnchorWorldY) * scale;
-          else sp.y = op.y;
+      /* Quantize scale to grid steps so stickers stay grid-aligned */
+      const hasSticker = selectedStrokes.some(s => s.isSticker);
+      if (hasSticker) {
+        const gridStep = scaleOrigGridStep;
+        const refDim = isSideHandle ? originalBounds.width : originalBounds.height;
+        if (refDim > 0) {
+          const scaleStep = gridStep / refDim;
+          scale = Math.max(scaleStep, Math.round(scale / scaleStep) * scaleStep);
         }
-        if (!s.isSticker && !s.isBeam && originalStrokeWidths[i]) s.width = originalStrokeWidths[i] * scale;
-        updateStrokeElement(s);
-      });
+        scaleTargetScale = scale;
+        if (!scaleAnimId) scaleAnimId = requestAnimationFrame(scaleAnimStep);
+        if (_t0) __pl('scaleSelection', performance.now() - _t0);
+        return;
+      }
 
-      const scaledWidth = originalBounds.width * scale;
-      const scaledHeight = allWidthOnly ? originalBounds.height : originalBounds.height * scale;
-      const newCx = scaleAnchorWorldX + (origCx - scaleAnchorWorldX) * scale;
-      const newCy = allWidthOnly ? origCy : scaleAnchorWorldY + (origCy - scaleAnchorWorldY) * scale;
-      selectionBounds.x = newCx - scaledWidth / 2;
-      selectionBounds.y = newCy - scaledHeight / 2;
-      selectionBounds.width = scaledWidth;
-      selectionBounds.height = scaledHeight;
-      updateSelectionUI(true);
+      /* Non-sticker: apply immediately without animation */
+      applyScale(scale, false);
       if (_t0) __pl('scaleSelection', performance.now() - _t0);
     };
 
@@ -1874,12 +1981,11 @@
       savePageAnnotations();
     };
 
-    const rotateSelection = (x, y) => {
+    /* Apply a given total rotation angle to the selection from originalStrokePoints */
+    const applyRotation = (totalAngle) => {
       if (!originalBounds) return;
-      const angle = Math.atan2(y - rotationCenterY, x - rotationCenterX);
-      const deltaAngle = angle - startAngle;
-      const totalRotation = previousRotation + deltaAngle;
-      const cos = Math.cos(deltaAngle), sin = Math.sin(deltaAngle);
+      const delta = totalAngle - previousRotation;
+      const cos = Math.cos(delta), sin = Math.sin(delta);
 
       selectedStrokes.forEach((s, i) => {
         const origPoints = originalStrokePoints[i];
@@ -1892,12 +1998,63 @@
         updateStrokeElement(s);
       });
 
-      const rotateTransform = `rotate(${totalRotation * (180 / Math.PI)}, ${rotationCenterX}, ${rotationCenterY})`;
+      const rotateTransform = `rotate(${totalAngle * (180 / Math.PI)}, ${rotationCenterX}, ${rotationCenterY})`;
       selectionBoxes[0]?.setAttribute('transform', rotateTransform);
       selectionHandles.forEach(h => h.setAttribute('transform', rotateTransform));
       rotationHandle?.setAttribute('transform', rotateTransform);
       rotationLine?.setAttribute('transform', rotateTransform);
-      currentRotation = totalRotation;
+      currentRotation = totalAngle;
+    };
+
+    /* Spring animation for 0° detent snap — smooth rotation everywhere else */
+    const ZERO_SNAP_ZONE = 10 * Math.PI / 180; /* ±10° detent range */
+    const rotAnimStep = () => {
+      rotAnimId = null;
+      const stiffness = 0.5, damping = 0.55;
+      const diff = rotTargetAngle - rotAnimAngle;
+      rotVelAngle = (rotVelAngle + diff * stiffness) * damping;
+      const speed = Math.abs(rotVelAngle);
+      const dist = Math.abs(diff);
+      const final = (dist < 0.001 && speed < 0.001) ? diff : rotVelAngle;
+      if (Math.abs(final) > 0.0001) {
+        rotAnimAngle += final;
+        applyRotation(rotAnimAngle);
+      }
+      if (dist > 0.0005 || speed > 0.0005) {
+        rotAnimId = requestAnimationFrame(rotAnimStep);
+      }
+    };
+    const stopRotAnim = () => {
+      if (rotAnimId) { cancelAnimationFrame(rotAnimId); rotAnimId = null; }
+      if (Math.abs(rotTargetAngle - rotAnimAngle) > 0.0001) {
+        rotAnimAngle = rotTargetAngle;
+        applyRotation(rotAnimAngle);
+      }
+    };
+
+    const rotateSelection = (x, y) => {
+      if (!originalBounds) return;
+      const angle = Math.atan2(y - rotationCenterY, x - rotationCenterX);
+      const deltaAngle = angle - startAngle;
+      const totalRotation = previousRotation + deltaAngle;
+
+      /* Normalize to [-π, π] for 0° proximity check */
+      let norm = totalRotation % (2 * Math.PI);
+      if (norm > Math.PI) norm -= 2 * Math.PI;
+      if (norm < -Math.PI) norm += 2 * Math.PI;
+
+      if (Math.abs(norm) < ZERO_SNAP_ZONE) {
+        /* Within detent zone — spring-animate to 0° */
+        rotTargetAngle = 0;
+        if (!rotAnimId) rotAnimId = requestAnimationFrame(rotAnimStep);
+      } else {
+        /* Outside detent — smooth free rotation, cancel any pending anim */
+        if (rotAnimId) { cancelAnimationFrame(rotAnimId); rotAnimId = null; }
+        rotAnimAngle = totalRotation;
+        rotTargetAngle = totalRotation;
+        rotVelAngle = 0;
+        applyRotation(totalRotation);
+      }
     };
 
     let _saveTimer = null;
@@ -2070,7 +2227,7 @@
         if (tool !== 'eraser') setTool('eraser');
         checkTap(); setCursor(e);
       } else if (isLassoButton(e)) {
-        lassoEnd = true; eraserEnd = false; prevTool = tool;
+        lassoEnd = true; lassoFromPenBtn = true; eraserEnd = false; prevTool = tool;
         if (tool !== 'lasso') setTool('lasso');
       } else {
         if (e.button && e.button !== 0) return;
@@ -2138,6 +2295,7 @@
         rotationCenterY = selectionBounds.y + selectionBounds.height / 2;
         startAngle = Math.atan2(d.y - rotationCenterY, d.x - rotationCenterX);
         previousRotation = currentRotation;
+        rotAnimAngle = currentRotation; rotTargetAngle = currentRotation; rotVelAngle = 0;
         animateToolbarOut();
         drawing = false;
         return;
@@ -2178,6 +2336,7 @@
           const dxA = anchorLocalX - cx, dyA = anchorLocalY - cy;
           scaleAnchorWorldX = cx + dxA * cos - dyA * sin;
           scaleAnchorWorldY = cy + dxA * sin + dyA * cos;
+          scaleAnimScale = 1; scaleTargetScale = 1; scaleVelScale = 0; scaleOrigGridStep = getGridStep();
           animateToolbarOut();
           drawing = false;
           return;
@@ -2195,8 +2354,8 @@
         /* Init grid snap tracking – use sticker center for grid alignment so
            different stickers sharing the same grid land on consistent positions */
         if (selectionBounds) {
-          const gridSize = getEffectiveHandleSize(9);
-          const anchorSticker = selectedStrokes.find(s => s.isSticker);
+          const gridSize = getGridStep();
+          const anchorSticker = selectedStrokes.find(s => s.isSticker && STICKERS[s.stickerIdx]?.name === 'Staff') || selectedStrokes.find(s => s.isSticker);
           let originX = selectionBounds.x, originY = selectionBounds.y;
           if (anchorSticker) {
             const acx = anchorSticker.points[4].x, acy = anchorSticker.points[4].y;
@@ -2206,7 +2365,7 @@
             originX = alignedCx - offsetX;
             originY = alignedCy - offsetY;
           }
-          gridSnapOriginX = originX; gridSnapOriginY = originY; gridSnapAccumX = 0; gridSnapAccumY = 0; gridAnimX = selectionBounds.x; gridAnimY = selectionBounds.y; gridTargetX = selectionBounds.x; gridTargetY = selectionBounds.y;
+          gridSnapOriginX = originX; gridSnapOriginY = originY; gridSnapAccumX = 0; gridSnapAccumY = 0; gridAnimX = selectionBounds.x; gridAnimY = selectionBounds.y; gridTargetX = selectionBounds.x; gridTargetY = selectionBounds.y; gridVelX = 0; gridVelY = 0; prevGridTargetX = selectionBounds.x; prevGridTargetY = selectionBounds.y;
         }
         animateToolbarOut();
         drawing = false;
@@ -2314,8 +2473,8 @@
       if (e && e.pointerType === 'touch') { if (_t0) __pl('stop', performance.now() - _t0); return; }
       cachedSvgRect = null;
       cachedInverseCTM = null;
-      if (isRotatingSelection) { isRotatingSelection = false; originalBounds = null; originalStrokePoints = []; savePageAnnotations(); return; }
-      if (isScalingSelection) { isScalingSelection = false; activeHandle = null; originalBounds = null; originalStrokePoints = []; originalStrokeWidths = []; buildToolbarElements(true); savePageAnnotations(); return; }
+      if (isRotatingSelection) { stopRotAnim(); isRotatingSelection = false; originalBounds = null; originalStrokePoints = []; savePageAnnotations(); if (lassoEnd || lassoFromPenBtn) { lassoEnd = false; lassoFromPenBtn = false; setTool('pen', true); } return; }
+      if (isScalingSelection) { stopScaleAnim(); isScalingSelection = false; activeHandle = null; originalBounds = null; originalStrokePoints = []; originalStrokeWidths = []; buildToolbarElements(true); savePageAnnotations(); if (lassoEnd || lassoFromPenBtn) { lassoEnd = false; lassoFromPenBtn = false; setTool('pen', true); } return; }
       if (isDraggingBeamEndpoint) {
         /* Final snap */
         if (e) {
@@ -2330,13 +2489,14 @@
         isDraggingBeamEndpoint = false; beamDragIdx = -1;
         rebuildSelectionFromStrokes();
         savePageAnnotations();
+        if (lassoEnd || lassoFromPenBtn) { lassoEnd = false; lassoFromPenBtn = false; setTool('pen', true); }
         return;
       }
       if (isDraggingSelection) {
         isDraggingSelection = false;
         staffUnsnappedCenter = null; staffSnapRef = null; staffBiasX = 0; staffBiasY = 0;
         stopGridAnim();
-        buildToolbarElements(true); savePageAnnotations(); return;
+        buildToolbarElements(true); savePageAnnotations(); if (lassoEnd || lassoFromPenBtn) { lassoEnd = false; lassoFromPenBtn = false; setTool('pen', true); } return;
       }
       if (!drawing) return;
       drawing = false;
@@ -2431,7 +2591,7 @@
       }
       points = [];
       if (eraserEnd) { eraserEnd = false; resetBig(); if (prevTool !== 'eraser') setTool(prevTool === 'lasso' ? 'pen' : prevTool); }
-      if (lassoEnd) { lassoEnd = false; setTool('pen', true); }
+      if ((lassoEnd || lassoFromPenBtn) && !stickerOverlay.classList.contains('visible')) { lassoEnd = false; lassoFromPenBtn = false; setTool('pen', true); }
     }
 
     function erase(x, y) { const _t0 = window.__perfActive ? performance.now() : 0;
