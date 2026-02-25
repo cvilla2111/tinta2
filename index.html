@@ -120,6 +120,7 @@
     .carousel-lasso-btn.visible, .carousel-pen-btn.visible, .carousel-pdf-btn.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
     .carousel-lasso-btn.active svg, .carousel-pen-btn.active svg { stroke: var(--active); }
     .carousel-lasso-btn svg, .carousel-pen-btn svg, .carousel-pdf-btn svg { width: 30px; height: 30px; stroke: var(--text); stroke-width: 1.5; fill: none; }
+    .carousel-lasso-btn:hover svg, .carousel-pen-btn:hover svg, .carousel-pdf-btn:hover svg, .palette-btn:hover svg { transform: scale(1.2); }
     .carousel-lasso-btn:active svg, .carousel-pen-btn:active svg, .carousel-pdf-btn:active svg, .palette-btn:active svg { transform: scale(0.75); transition: transform 0.1s ease-out; }
     .carousel-lasso-btn svg, .carousel-pen-btn svg, .carousel-pdf-btn svg, .palette-btn svg { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
     .color-carousel { position: fixed; bottom: 70px; left: 30px; width: 0; height: 0; z-index: 1000; pointer-events: none; }
