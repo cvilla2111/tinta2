@@ -263,6 +263,9 @@
     let staffUnsnappedCenter = null, staffSnapRef = null, staffDragAccum = 0, staffBiasX = 0, staffBiasY = 0;
     let beamDrawing = false, beamLine = null, beamStartPt = null, beamEndPt = null;
     let stemDot = null;
+    /* GPU-accelerated drag: use SVG translate transform for ink strokes during drag,
+       commit real point data on release. Avoids expensive buildPath per frame. */
+    let dragTransformX = 0, dragTransformY = 0;
     let gridSnapOriginX = 0, gridSnapOriginY = 0, gridSnapAccumX = 0, gridSnapAccumY = 0;
     let gridAnimX = 0, gridAnimY = 0, gridTargetX = 0, gridTargetY = 0, gridAnimId = null, prevGridTargetX = 0, prevGridTargetY = 0;
     let gridVelX = 0, gridVelY = 0;
@@ -1714,9 +1717,11 @@
         if (_t0) __pl('moveSelection', performance.now() - _t0);
         return;
       }
+      /* GPU-accelerated translate for ink strokes – skip expensive buildPath */
+      dragTransformX += dx; dragTransformY += dy;
+      const txStr = `translate(${dragTransformX},${dragTransformY})`;
       selectedStrokes.forEach(s => {
-        s.points.forEach(p => { p.x += dx; p.y += dy; });
-        updateStrokeElement(s);
+        s.element.setAttribute('transform', txStr);
       });
       if (selectionBounds) {
         selectionBounds.x += dx;
@@ -1740,9 +1745,14 @@
       const finalY = (dist < 0.3 && speed < 0.3) ? diffY : gridVelY;
       if (Math.abs(finalX) > 0.01 || Math.abs(finalY) > 0.01) {
         gridAnimX += finalX; gridAnimY += finalY;
+        dragTransformX += finalX; dragTransformY += finalY;
         selectedStrokes.forEach(s => {
-          s.points.forEach(p => { p.x += finalX; p.y += finalY; });
-          updateStrokeElement(s);
+          if (s.isSticker) {
+            s.points.forEach(p => { p.x += finalX; p.y += finalY; });
+            updateStrokeElement(s);
+          } else {
+            s.element.setAttribute('transform', `translate(${dragTransformX},${dragTransformY})`);
+          }
         });
         if (selectionBounds) {
           selectionBounds.x += finalX; selectionBounds.y += finalY;
@@ -1759,9 +1769,14 @@
       /* Snap any remaining difference */
       const remX = gridTargetX - gridAnimX, remY = gridTargetY - gridAnimY;
       if (Math.abs(remX) > 0.01 || Math.abs(remY) > 0.01) {
+        dragTransformX += remX; dragTransformY += remY;
         selectedStrokes.forEach(s => {
-          s.points.forEach(p => { p.x += remX; p.y += remY; });
-          updateStrokeElement(s);
+          if (s.isSticker) {
+            s.points.forEach(p => { p.x += remX; p.y += remY; });
+            updateStrokeElement(s);
+          } else {
+            s.element.setAttribute('transform', `translate(${dragTransformX},${dragTransformY})`);
+          }
         });
         if (selectionBounds) {
           selectionBounds.x += remX; selectionBounds.y += remY;
@@ -1769,6 +1784,21 @@
         }
         gridAnimX = gridTargetX; gridAnimY = gridTargetY;
       }
+    };
+
+    /* Commit deferred drag transforms: apply accumulated offset to point data,
+       rebuild paths once, and remove the SVG translate transforms. */
+    const commitDragTransforms = () => {
+      const tx = dragTransformX, ty = dragTransformY;
+      dragTransformX = 0; dragTransformY = 0;
+      if (Math.abs(tx) < 0.001 && Math.abs(ty) < 0.001) return;
+      selectedStrokes.forEach(s => {
+        if (!s.isSticker) {
+          s.points.forEach(p => { p.x += tx; p.y += ty; });
+          s.element.removeAttribute('transform');
+          updateStrokeElement(s);
+        }
+      });
     };
 
     /* Merge consecutive split stroke segments in the selection so scaling/rotation
@@ -2354,6 +2384,7 @@
         mergeSplitSegments();
         isDraggingSelection = true;
         dragStartX = d.x; dragStartY = d.y;
+        dragTransformX = 0; dragTransformY = 0;
         /* Init staff magnet snap tracking */
         staffSnapRef = selectedStrokes.find(s => s.isSticker && STICKERS[s.stickerIdx]?.name === 'Staff') || null;
         staffUnsnappedCenter = staffSnapRef ? { x: staffSnapRef.points[4].x, y: staffSnapRef.points[4].y } : null;
@@ -2506,6 +2537,7 @@
         isDraggingSelection = false;
         staffUnsnappedCenter = null; staffSnapRef = null; staffBiasX = 0; staffBiasY = 0;
         stopGridAnim();
+        commitDragTransforms();
         buildToolbarElements(true); savePageAnnotations(); if (lassoEnd || lassoFromPenBtn) { lassoEnd = false; lassoFromPenBtn = false; setTool('pen', true); } return;
       }
       if (!drawing) return;
