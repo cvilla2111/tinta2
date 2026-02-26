@@ -277,6 +277,11 @@
     const SIMPLIFY_EPSILON = 0;
     const MAX_UNDO_STACK = 10;
     const MAX_UNDO_STROKES = 10;
+    /* Tail-rendering: bake older points into a static path, only rebuild the tail each frame */
+    const BAKE_THRESHOLD = 25;  /* Bake when unbaked tail exceeds this many points */
+    const BAKE_OVERLAP = 4;     /* Points of overlap between baked and tail for seamless join */
+    let bakedPath = null;       /* Static SVG path element for the frozen portion */
+    let bakeEndIdx = 0;         /* Index in points[] where baked portion ends */
 
     const $ = id => document.getElementById(id);
     const svg = $('drawing-svg'), group = $('strokes-group'), container = $('canvasContainer');
@@ -2208,6 +2213,8 @@
     }
 
     const newPath = () => {
+      if (bakedPath) { bakedPath.remove(); bakedPath = null; }
+      bakeEndIdx = 0;
       path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.classList.add('stroke-path');
       path.setAttribute('fill', color);
@@ -2452,13 +2459,16 @@
         return;
       }
       const last = points[points.length - 1], dist = Math.hypot(d.x - last.x, d.y - last.y);
-      if (dist < 2) return;
+      if (dist < 3) return;
       segLen += dist;
       points.push(d);
       if (strokeStarting && points.length > 3) strokeStarting = false;
       needsRender = true;
       kickRenderLoop();
       if (segLen >= SEGMENT_MAX) {
+        /* Merge baked portion back before finalizing the segment */
+        if (bakedPath) { bakedPath.remove(); bakedPath = null; }
+        bakeEndIdx = 0;
         path.setAttribute('d', buildPath(points, getEffectiveWidth()));
         finalize();
         points = points.slice(-2);
@@ -2527,6 +2537,9 @@
         return;
       }
       if (tool === 'pen' && path) {
+        /* Merge baked portion back before finalizing the stroke */
+        if (bakedPath) { bakedPath.remove(); bakedPath = null; }
+        bakeEndIdx = 0;
         const simplified = simplifyPoints(points, SIMPLIFY_EPSILON);
         path.setAttribute('d', buildPath(simplified, getEffectiveWidth()));
         addStroke({ element: path, points: simplified, color, width: getEffectiveWidth() });
@@ -3083,7 +3096,22 @@
     function renderLoop() {
       renderLoopId = null;
       if (needsRender && drawing && tool === 'pen' && path && points.length > 0) {
-        path.setAttribute('d', buildPath(points, getEffectiveWidth()));
+        const w = getEffectiveWidth();
+        /* Bake older points into a static path when tail gets long */
+        if (points.length - bakeEndIdx > BAKE_THRESHOLD && points.length > BAKE_THRESHOLD + BAKE_OVERLAP) {
+          const newBakeEnd = points.length - BAKE_OVERLAP;
+          if (!bakedPath) {
+            bakedPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            bakedPath.classList.add('stroke-path');
+            bakedPath.setAttribute('fill', path.getAttribute('fill'));
+            group.insertBefore(bakedPath, path);
+          }
+          bakedPath.setAttribute('d', buildPath(points.slice(0, newBakeEnd), w));
+          bakeEndIdx = newBakeEnd;
+        }
+        /* Only render the tail portion (constant ~29 points max) */
+        const tailPts = bakeEndIdx > 0 ? points.slice(bakeEndIdx - BAKE_OVERLAP) : points;
+        path.setAttribute('d', buildPath(tailPts, w));
         renderLoopId = requestAnimationFrame(renderLoop);
       }
     }
