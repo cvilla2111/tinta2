@@ -192,6 +192,7 @@
     <div class="stepper"><button class="stepper-btn" id="sizeDown">−</button><span class="stepper-value" id="sizeValue">5</span><button class="stepper-btn" id="sizeUp">+</button></div>
     <div class="divider"></div>
     <button class="tool-btn" id="pressureBtn" title="Pressure Sensitivity"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg></button>
+    <button class="tool-btn active" id="smoothBtn" title="Ink Smoothing"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M2 12c3-7 6 7 10 0s7 7 10 0"/></svg></button>
     <div class="divider"></div>
     <button class="tool-btn" id="undoBtn" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 2.5-6.5L3 7"/></svg></button>
     <button class="tool-btn" id="redoBtn" title="Redo (Ctrl+Shift+Z)"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-2.5-6.5L21 7"/></svg></button>
@@ -247,7 +248,7 @@
     let tool = 'pen', width = 5, color = '#1f2937', sizeIdx = 9, drawing = false, path = null, points = [];
     const ERASER_SIZE = 20, BIG_ERASER_SIZE = 130;
     let strokes = [], undoStack = [], pageAnnotations = {};
-    let eraserEnd = false, lassoEnd = false, lassoFromPenBtn = false, prevTool = 'pen', pressure = false, bigEraser = false, tapTimes = [], segLen = 0, strokeStarting = false;
+    let eraserEnd = false, lassoEnd = false, lassoFromPenBtn = false, prevTool = 'pen', pressure = false, smooth = true, bigEraser = false, tapTimes = [], segLen = 0, strokeStarting = false;
     let pdfDoc = null, currentPage = 1, totalPages = 0, pdfPageWidth = 0, pdfPageHeight = 0;
     let toolbarVisible = false, filmstripThumbnails = [];
 
@@ -2233,11 +2234,18 @@
         R.push({ x: p.x - nx*hw, y: p.y - ny*hw });
       }
       let d = `M${L[0].x},${L[0].y}`;
-      for (let i = 1; i < L.length; i++) d += `Q${L[i-1].x},${L[i-1].y},${(L[i-1].x+L[i].x)/2},${(L[i-1].y+L[i].y)/2}`;
-      const ll = L[L.length-1], lr = R[R.length-1];
-      d += `L${(ll.x+lr.x)/2},${(ll.y+lr.y)/2}`;
-      for (let i = R.length-2; i >= 0; i--) d += `Q${R[i+1].x},${R[i+1].y},${(R[i+1].x+R[i].x)/2},${(R[i+1].y+R[i].y)/2}`;
-      d += `Q${R[0].x},${R[0].y},${L[0].x},${L[0].y}Z`;
+      if (smooth) {
+        for (let i = 1; i < L.length; i++) d += `Q${L[i-1].x},${L[i-1].y},${(L[i-1].x+L[i].x)/2},${(L[i-1].y+L[i].y)/2}`;
+        const ll = L[L.length-1], lr = R[R.length-1];
+        d += `L${(ll.x+lr.x)/2},${(ll.y+lr.y)/2}`;
+        for (let i = R.length-2; i >= 0; i--) d += `Q${R[i+1].x},${R[i+1].y},${(R[i+1].x+R[i].x)/2},${(R[i+1].y+R[i].y)/2}`;
+        d += `Q${R[0].x},${R[0].y},${L[0].x},${L[0].y}Z`;
+      } else {
+        for (let i = 1; i < L.length; i++) d += `L${L[i].x},${L[i].y}`;
+        d += `L${R[R.length-1].x},${R[R.length-1].y}`;
+        for (let i = R.length-2; i >= 0; i--) d += `L${R[i].x},${R[i].y}`;
+        d += 'Z';
+      }
       if (_t0) __pl('buildPath', performance.now() - _t0);
       return d;
     }
@@ -3072,6 +3080,7 @@
     $('sizeDown').onclick = () => { if (sizeIdx > 0) { width = sizes[--sizeIdx]; sizeVal.textContent = width; updateCursor(); } };
     $('sizeUp').onclick = () => { if (sizeIdx < sizes.length-1) { width = sizes[++sizeIdx]; sizeVal.textContent = width; updateCursor(); } };
     $('pressureBtn').onclick = () => { pressure = !pressure; $('pressureBtn').classList.toggle('active', pressure); };
+    $('smoothBtn').onclick = () => { smooth = !smooth; $('smoothBtn').classList.toggle('active', smooth); };
     $('undoBtn').onclick = undo;
     $('redoBtn').onclick = redo;
     $('clearBtn').onclick = () => { if (strokes.length) { pushUndo(...strokes.reverse()); strokes = []; group.innerHTML = ''; savePageAnnotations(); } };
